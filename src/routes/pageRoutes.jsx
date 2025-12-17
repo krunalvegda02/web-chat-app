@@ -1,0 +1,84 @@
+import AuthLayout from "../layouts/AuthLayout";
+import AdminLayout from "../layouts/AdminLayout";
+import SuperAdminLayout from "../layouts/SuperAdminLayout";
+import UserChatLayout from "../layouts/UserChatLayout";
+
+// Auth Pages
+import LoginPage from "../pages/auth/LoginPage";
+import RegisterPage from "../pages/auth/RegisterPage";
+import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
+import UserJoinPage from "../pages/user/UserJoinPage";
+
+// Admin Pages
+import AdminDashboard from "../pages/admin/AdminChats";
+import AdminThemeSettings from "../pages/admin/AdminThemeSettings";
+import AdminUsersList from "../pages/admin/AdminUsersList";
+import AdminChatMonitor from "../pages/admin/AdminChatMonitor";
+
+// Super Admin Pages
+import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
+import SuperAdminAdminsList from "../pages/superAdmin/SuperAdmin_AdminsList";
+import SuperAdminChat from "../pages/superAdmin/SuperAdminChat";
+
+// User Pages
+import UserChatPage from "../pages/user/UserChatPage";
+
+// Error Pages
+import Unauthorized from "../pages/common/Unauthorized";
+import NotFound from "../pages/common/NotFound";
+import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
+
+// ------------------------------------
+// CENTRALIZED ROUTE CONFIG
+// ------------------------------------
+export const pageRoutes = [
+  {
+    layout: AuthLayout,
+    routes: [
+      { path: "/login", element: LoginPage },
+      { path: "/register", element: RegisterPage },
+      { path: "/reset-password", element: ResetPasswordPage },
+      { path: "/join/:tenantSlug", element: UserJoinPage },
+    ],
+  },
+
+  {
+    layout: AdminLayout,
+    requiredRoles: ["ADMIN"],
+    routes: [
+      { path: "/admin", element: AdminDashboard },
+      { path: "/admin/theme", element: AdminThemeSettings },
+      { path: "/admin/users", element: AdminUsersList },
+      { path: "/admin/monitor", element: AdminChatMonitor },
+    ],
+  },
+
+  {
+    layout: SuperAdminLayout,
+    requiredRoles: ["SUPER_ADMIN"],
+    routes: [
+      { path: "/super-admin", element: SuperAdminDashboard },
+      { path: "/super-admin/admins", element: SuperAdminAdminsList },
+      { path: "/super-admin/chat", element: SuperAdminChat },
+      { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
+
+    ],
+  },
+
+  {
+    layout: UserChatLayout,
+    requiredRoles: ["USER"],
+    routes: [
+      { path: "/user/chat", element: UserChatPage },
+    ],
+  },
+
+  // Public error pages
+  {
+    layout: null,
+    routes: [
+      { path: "/unauthorized", element: Unauthorized },
+      { path: "*", element: NotFound },
+    ],
+  },
+];
