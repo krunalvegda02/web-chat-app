@@ -1,9 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { chatSocketClient } from '../sockets/chatSocketClient.js';
-import { socketMessageReceived, addTypingUser, removeTypingUser } from '../redux/slices/chatSlice.jsx';
+import { chatSocketClient } from '../sockets/chatSocketClient';
+import {
+  socketMessageReceived,
+  addTypingUser,
+  removeTypingUser,
+  setOnlineUsers,
+  updateMessageStatus,
+  updateMessagesReadStatus,
+} from '../redux/slices/chatSlice';
 
-// Track if global listeners are initialized
 let globalListenersInitialized = false;
 
 export const useSocket = () => {
@@ -11,7 +17,7 @@ export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { token, user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
 
@@ -23,37 +29,68 @@ export const useSocket = () => {
       setError(null);
 
       try {
-        const connectedSocket = await chatSocketClient.connect(
-          token,
-          (err) => {
-            console.error('Socket error callback:', err);
-            setError(err);
-          }
-        );
+        const connectedSocket = await chatSocketClient.connect(token, (err) => {
+          console.error('Socket error:', err);
+          setError(err);
+        });
 
         setSocket(connectedSocket);
         setIsConnected(true);
-        
-        // Initialize global listeners once
+
+        // ✅ Initialize global listeners ONCE
         if (!globalListenersInitialized) {
+          // Message received event
           chatSocketClient.on('message_received', (data) => {
-            console.log('✅ [GLOBAL] Message received:', data);
+            console.log('✅ [GLOBAL] message_received:', data);
             dispatch(socketMessageReceived({ roomId: data.roomId, message: data }));
           });
 
+          // Message delivered event
+          chatSocketClient.on('message_delivered', (data) => {
+            console.log('✅ [GLOBAL] message_delivered:', data);
+            dispatch(updateMessageStatus({
+              roomId: data.roomId || 'unknown',
+              messageId: data.messageId,
+              status: 'delivered',
+            }));
+          });
+
+          // Messages read event
+          chatSocketClient.on('messages_read', (data) => {
+            console.log('✅ [GLOBAL] messages_read:', data);
+            dispatch(updateMessagesReadStatus({
+              roomId: data.roomId,
+              messageIds: data.messageIds,
+            }));
+          });
+
+          // User typing event
           chatSocketClient.on('user_typing', (data) => {
+            console.log('✅ [GLOBAL] user_typing:', data);
             if (data.userId === user?._id) return;
-            
+
             if (data.isTyping) {
               dispatch(addTypingUser({ userId: data.userId }));
             } else {
               dispatch(removeTypingUser({ userId: data.userId }));
             }
           });
-          
+
+          // Online users event
+          chatSocketClient.on('online_users', (data) => {
+            console.log('✅ [GLOBAL] online_users:', data.users);
+            dispatch(setOnlineUsers(data.users || []));
+          });
+
+          // Room updated event
+          chatSocketClient.on('room_updated', (data) => {
+            console.log('✅ [GLOBAL] room_updated:', data);
+          });
+
           globalListenersInitialized = true;
           console.log('✅ [GLOBAL] Socket listeners initialized');
         }
+
       } catch (err) {
         console.error('Failed to initialize socket:', err);
         setError(err);
@@ -66,30 +103,9 @@ export const useSocket = () => {
     initializeSocket();
 
     return () => {
-      // Don't disconnect on unmount - socket should persist across routes
+      // Don't disconnect on unmount - keep connection alive
     };
   }, [token, isConnected, dispatch, user]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleConnect = () => {
-      setIsConnected(true);
-      setError(null);
-    };
-
-    const handleDisconnect = () => {
-      setIsConnected(false);
-    };
-
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-    };
-  }, [socket]);
 
   const disconnect = useCallback(() => {
     chatSocketClient.disconnect();

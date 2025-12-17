@@ -1,27 +1,24 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
-import { getAllChats } from '../../redux/slices/chatSlice.jsx';
-import { Card, Row, Col, Statistic, Table, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Empty } from 'antd';
 import { MessageOutlined, UsergroupDeleteOutlined, DatabaseOutlined } from '@ant-design/icons';
 
 export default function SuperAdminDashboard() {
   const { user } = useAuthGuard(['SUPER_ADMIN']);
   const dispatch = useDispatch();
-  const { allChats, loadingChats } = useSelector((s) => s.chat);
+  const { rooms } = useSelector((s) => s.chat);
 
-  useEffect(() => {
-    dispatch(getAllChats());
-  }, [dispatch]);
+  // No need to fetch - rooms are already loaded
 
   if (!user) return null;
 
-  console.log(allChats)
+  const roomsArray = Array.isArray(rooms) ? rooms : rooms?.data?.rooms || rooms?.rooms || [];
 
   const stats = {
-    totalChats: allChats?.data?.chats?.length || 0,
-    totalMessages: allChats?.data?.chats?.reduce((sum, chat) => sum + (chat.messageCount || 0), 0) || 0,
-    activeUsers: allChats?.data?.chats?.reduce((sum, chat) => sum + (chat.participantCount || 0), 0) || 0,
+    totalChats: roomsArray.length || 0,
+    totalMessages: 0,
+    activeUsers: roomsArray.reduce((sum, room) => sum + (room.participants?.length || 0), 0),
   };
 
   return (
@@ -60,22 +57,23 @@ export default function SuperAdminDashboard() {
         </Col>
       </Row>
 
-      {/* Chat Table */}
+      {/* Recent Conversations */}
       <Card className="bg-white border-gray-200 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Conversations</h3>
-        <Table
-          dataSource={allChats?.data?.chats?.slice(0, 10) || []}
-          loading={loadingChats}
-          pagination={false}
-          columns={[
-            { title: 'Room', dataIndex: 'name', key: 'name' },
-            { title: 'Participants', dataIndex: 'participantCount', key: 'participantCount' },
-            { title: 'Messages', dataIndex: 'messageCount', key: 'messageCount' },
-            { title: 'Last Message', dataIndex: 'lastMessageTime', key: 'lastMessageTime' },
-          ]}
-          className="bg-gray-50"
-          locale={{ emptyText: <Empty description="No conversations" /> }}
-        />
+        {roomsArray.length === 0 ? (
+          <Empty description="No conversations" />
+        ) : (
+          <div className="space-y-2">
+            {roomsArray.slice(0, 10).map((room) => (
+              <div key={room._id} className="p-3 border rounded hover:bg-gray-50">
+                <div className="font-medium">{room.name || 'Unnamed Room'}</div>
+                <div className="text-sm text-gray-500">
+                  {room.participants?.length || 0} participants
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

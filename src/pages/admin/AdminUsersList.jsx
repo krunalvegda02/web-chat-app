@@ -29,10 +29,12 @@ export default function AdminUsersList() {
     try {
       const result = await dispatch(getTenantUsers({ tenantId: user.tenantId }));
       if (result.payload) {
-        setUsers(result.payload.data || []);
+        const usersData = result.payload.data?.users || result.payload.data || result.payload.users || [];
+        setUsers(Array.isArray(usersData) ? usersData : []);
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }

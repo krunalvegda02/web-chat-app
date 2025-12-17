@@ -13,7 +13,7 @@ import UserJoinPage from "../pages/user/UserJoinPage";
 import AdminDashboard from "../pages/admin/AdminChats";
 import AdminThemeSettings from "../pages/admin/AdminThemeSettings";
 import AdminUsersList from "../pages/admin/AdminUsersList";
-import AdminChatMonitor from "../pages/admin/AdminChatMonitor";
+
 
 // Super Admin Pages
 import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
@@ -27,58 +27,58 @@ import UserChatPage from "../pages/user/UserChatPage";
 import Unauthorized from "../pages/common/Unauthorized";
 import NotFound from "../pages/common/NotFound";
 import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
+import AdminUsersChat from "../pages/admin/Admin_userschat";
 
 // ------------------------------------
 // CENTRALIZED ROUTE CONFIG
 // ------------------------------------
 export const pageRoutes = [
-  {
-    layout: AuthLayout,
-    routes: [
-      { path: "/login", element: LoginPage },
-      { path: "/register", element: RegisterPage },
-      { path: "/reset-password", element: ResetPasswordPage },
-      { path: "/join/:tenantSlug", element: UserJoinPage },
-    ],
-  },
+    {
+        layout: AuthLayout,
+        routes: [
+            { path: "/login", element: LoginPage },
+            { path: "/register", element: RegisterPage },
+            { path: "/reset-password", element: ResetPasswordPage },
+            { path: "/join/:tenantSlug", element: UserJoinPage },
+        ],
+    },
 
-  {
-    layout: AdminLayout,
-    requiredRoles: ["ADMIN"],
-    routes: [
-      { path: "/admin", element: AdminDashboard },
-      { path: "/admin/theme", element: AdminThemeSettings },
-      { path: "/admin/users", element: AdminUsersList },
-      { path: "/admin/monitor", element: AdminChatMonitor },
-    ],
-  },
+    {
+        layout: AdminLayout,
+        requiredRoles: ["ADMIN"],
+        routes: [
+            { path: "/admin", element: AdminDashboard },
+            { path: "/admin/theme", element: AdminThemeSettings },
+            { path: "/admin/users", element: AdminUsersList },
+            { path: "/admin/user-chat", element: AdminUsersChat },
 
-  {
-    layout: SuperAdminLayout,
-    requiredRoles: ["SUPER_ADMIN"],
-    routes: [
-      { path: "/super-admin", element: SuperAdminDashboard },
-      { path: "/super-admin/admins", element: SuperAdminAdminsList },
-      { path: "/super-admin/chat", element: SuperAdminChat },
-      { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
+        ],
+    },
+    {
+        layout: SuperAdminLayout,
+        requiredRoles: ["SUPER_ADMIN"],
+        routes: [
+            { path: "/super-admin", element: SuperAdminDashboard },
+            { path: "/super-admin/admins", element: SuperAdminAdminsList },
+            { path: "/super-admin/chat", element: SuperAdminChat },
+            { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
 
-    ],
-  },
+        ],
+    },
+    {
+        layout: UserChatLayout,
+        requiredRoles: ["USER"],
+        routes: [
+            { path: "/user/chat", element: UserChatPage },
+        ],
+    },
 
-  {
-    layout: UserChatLayout,
-    requiredRoles: ["USER"],
-    routes: [
-      { path: "/user/chat", element: UserChatPage },
-    ],
-  },
-
-  // Public error pages
-  {
-    layout: null,
-    routes: [
-      { path: "/unauthorized", element: Unauthorized },
-      { path: "*", element: NotFound },
-    ],
-  },
+    // Public error pages
+    {
+        layout: null,
+        routes: [
+            { path: "/unauthorized", element: Unauthorized },
+            { path: "*", element: NotFound },
+        ],
+    },
 ];

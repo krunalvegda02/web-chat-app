@@ -1,111 +1,92 @@
 import { useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useSocket } from './useSocket.js';
-import { useSocketEvents } from './useSocketEvents.js';
-import { SOCKET_EVENTS } from '../constants/socketEvents.js';
-import { chatEventHandlers } from '../sockets/chatEventHandler.js';
-import { addTypingUser, removeTypingUser } from '../redux/slices/chatSlice.jsx';
+import { useSocket } from './useSocket';
+import { chatSocketClient } from '../sockets/chatSocketClient';
 
-export const useChatSocket = (callbacks = {}) => {
-  const { socket, isConnected, error, isLoading } = useSocket();
-  const dispatch = useDispatch();
-  const { user } = useSelector((s) => s.auth);
 
-  useSocketEvents(
-    {
-      [SOCKET_EVENTS.MESSAGE_RECEIVED]: callbacks.onMessageReceived,
-      [SOCKET_EVENTS.MESSAGE_EDITED]: callbacks.onMessageEdited,
-      [SOCKET_EVENTS.MESSAGE_DELETED]: callbacks.onMessageDeleted,
-      [SOCKET_EVENTS.REACTION_ADDED]: callbacks.onReactionAdded,
-      [SOCKET_EVENTS.REACTION_REMOVED]: callbacks.onReactionRemoved,
-      [SOCKET_EVENTS.USER_TYPING]: (data) => {
-        // Ignore own typing events
-        if (data.userId === user?._id) {
-          console.log(`🚫 [SOCKET] Ignoring own typing event`);
-          return;
-        }
-        
-        if (data.isTyping === false) {
-          dispatch(removeTypingUser({ userId: data.userId }));
-          console.log(`🛑 [SOCKET] User ${data.userId} stopped typing`);
-        } else {
-          dispatch(addTypingUser({ userId: data.userId }));
-          console.log(`⌨️ [SOCKET] User ${data.userId} is typing`);
-        }
-        callbacks.onUserTyping?.(data);
-      },
-      [SOCKET_EVENTS.USER_JOINED]: callbacks.onUserJoined,
-      [SOCKET_EVENTS.USER_LEFT]: callbacks.onUserLeft,
-      [SOCKET_EVENTS.ONLINE_USERS]: callbacks.onOnlineUsers,
-      ['unread_count_updated']: (data) => {
-        // Update unread count for specific room
-        console.log(`📖 [UNREAD] Room ${data.roomId} unread count: ${data.unreadCount}`);
-        callbacks.onUnreadCountUpdated?.(data);
-      },
-      ['messages_read']: (data) => {
-        // Update read status for messages
-        console.log(`📖 [READ] Messages read by user ${data.userId}:`, data.messageIds);
-        callbacks.onMessagesRead?.(data);
-      },
-    },
-    [callbacks, dispatch]
-  );
+export const useChatSocket = () => {
+  const { socket, isConnected } = useSocket();
 
+  // ✅ Join room
   const joinRoom = useCallback((roomId) => {
-    return chatEventHandlers.joinRoom(roomId);
-  }, []);
-
-  const leaveRoom = useCallback((roomId) => {
-    return chatEventHandlers.leaveRoom(roomId);
-  }, []);
-
-  const sendMessage = useCallback((roomId, content) => {
-    return chatEventHandlers.sendMessage(roomId, content);
-  }, []);
-
-  const editMessage = useCallback((messageId, content) => {
-    return chatEventHandlers.editMessage(messageId, content);
-  }, []);
-
-  const deleteMessage = useCallback((messageId) => {
-    return chatEventHandlers.deleteMessage(messageId);
-  }, []);
-
-  const addReaction = useCallback((messageId, emoji) => {
-    return chatEventHandlers.addReaction(messageId, emoji);
-  }, []);
-
-  const removeReaction = useCallback((messageId, emoji) => {
-    return chatEventHandlers.removeReaction(messageId, emoji);
-  }, []);
-
-  const startTyping = useCallback((roomId) => {
-    return chatEventHandlers.startTyping(roomId);
-  }, []);
-
-  // ✅ ADDED: Explicit stop typing with socket emit
-  const stopTyping = useCallback((roomId) => {
-    if (socket?.connected) {
-      socket.emit('stop_typing', { roomId });
-      console.log(`🛑 [EMIT] Sent stop_typing for room ${roomId}`);
+    if (!isConnected) {
+      console.warn('⚠️ Socket not connected');
+      return;
     }
-    return chatEventHandlers.stopTyping(roomId);
-  }, [socket]);
+    chatSocketClient.emit('join_room', { roomId });
+    console.log(`🏠 [ACTION] Joining room: ${roomId}`);
+  }, [isConnected]);
+
+  // ✅ Leave room
+  const leaveRoom = useCallback((roomId) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('leave_room', { roomId });
+    console.log(`🚪 [ACTION] Leaving room: ${roomId}`);
+  }, [isConnected]);
+
+  // ✅ Send message
+  const sendMessage = useCallback((roomId, content) => {
+    if (!isConnected) {
+      console.warn('⚠️ Socket not connected');
+      return Promise.reject(new Error('Socket not connected'));
+    }
+    console.log(`📤 [ACTION] Sending message in room ${roomId}`);
+    return chatSocketClient.emit('send_message', { roomId, content });
+  }, [isConnected]);
+
+  // ✅ Start typing
+  const startTyping = useCallback((roomId) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('start_typing', { roomId });
+    console.log(`⌨️ [ACTION] Start typing in room ${roomId}`);
+  }, [isConnected]);
+
+  // ✅ Stop typing
+  const stopTyping = useCallback((roomId) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('stop_typing', { roomId });
+    console.log(`🛑 [ACTION] Stop typing in room ${roomId}`);
+  }, [isConnected]);
+
+  // ✅ Edit message
+  const editMessage = useCallback((messageId, content) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('edit_message', { messageId, content });
+    console.log(`✏️ [ACTION] Editing message ${messageId}`);
+  }, [isConnected]);
+
+  // ✅ Delete message
+  const deleteMessage = useCallback((messageId) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('delete_message', { messageId });
+    console.log(`🗑️ [ACTION] Deleting message ${messageId}`);
+  }, [isConnected]);
+
+  // ✅ Add reaction
+  const addReaction = useCallback((messageId, emoji) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('add_reaction', { messageId, emoji });
+    console.log(`😊 [ACTION] Added reaction ${emoji} to message ${messageId}`);
+  }, [isConnected]);
+
+  // ✅ Remove reaction
+  const removeReaction = useCallback((messageId, emoji) => {
+    if (!isConnected) return;
+    chatSocketClient.emit('remove_reaction', { messageId, emoji });
+    console.log(`😔 [ACTION] Removed reaction ${emoji} from message ${messageId}`);
+  }, [isConnected]);
 
   return {
     socket,
     isConnected,
-    isLoading,
-    error,
     joinRoom,
     leaveRoom,
     sendMessage,
+    startTyping,
+    stopTyping,
     editMessage,
     deleteMessage,
     addReaction,
     removeReaction,
-    startTyping,
-    stopTyping,
   };
 };
 

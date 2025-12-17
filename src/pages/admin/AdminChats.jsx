@@ -6,9 +6,11 @@ import { useSelector } from 'react-redux';
 
 export default function AdminChats() {
   const { user } = useAuthGuard(['ADMIN']);
+  console.log("====================user",user);
+  
   useSocket(); // Initialize socket connection
 
-  if (!user) return null;
+  // if (!user) return null;
 
   const usera = useSelector((state) => state);
   console.log('AdminChats rendered', usera);

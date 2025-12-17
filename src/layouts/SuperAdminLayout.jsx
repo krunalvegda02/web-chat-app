@@ -13,7 +13,7 @@ export default function SuperAdminLayout() {
   return (
     <ThemeProvider>
       <LayoutProvider>
-        <LayoutWrapper A
+        <LayoutWrapper 
           hasSidebar={true}
           hasTopbar={true}
           footer={true}

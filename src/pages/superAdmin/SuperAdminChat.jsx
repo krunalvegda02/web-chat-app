@@ -1,65 +1,71 @@
 import { useEffect, useState } from 'react';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchAdminRooms, createAdminRoom } from '../../redux/slices/chatSlice';
+import { fetchAdminChatRooms, createOrGetAdminRoom, setActiveRoom } from '../../redux/slices/chatSlice';
 import { getAllTenants } from '../../redux/slices/tenantSlice';
 import RoomList from '../../components/chat/RoomList';
 import ChatWindow from '../../components/chat/ChatWindow';
-import { useSocket } from '../../hooks/useSocket';
-import { Card, Button, Modal, List, Avatar } from 'antd';
-import { MessageOutlined, PlusOutlined } from '@ant-design/icons';
+import { Modal, List, Avatar, message } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 
 export default function SuperAdminChat() {
   const { user } = useAuthGuard(['SUPER_ADMIN']);
   const dispatch = useDispatch();
   const { tenants } = useSelector((state) => state.tenant);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const { socket, isConnected } = useSocket();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const initializeAdminChats = async () => {
-      try {
-        // First get all tenants
-        const tenantsResult = await dispatch(getAllTenants());
-        console.log('Tenants result:', tenantsResult);
-        
-        // Auto-create rooms for all admins
-        if (tenantsResult.payload?.data) {
-          console.log('Creating rooms for admins:', tenantsResult.payload.data);
-          const createRoomPromises = tenantsResult.payload.data.map(async (tenant) => {
-            console.log('Creating room for admin:', tenant.admin);
-            const result = await dispatch(createAdminRoom({ adminId: tenant.admin._id }));
-            console.log('Room creation result:', result);
-            return result;
-          });
-          await Promise.all(createRoomPromises);
-        }
-        
-        // Then fetch all admin rooms
-        const roomsResult = await dispatch(fetchAdminRooms());
-        console.log('Admin rooms result:', roomsResult);
-      } catch (error) {
-        console.error('Error initializing admin chats:', error);
-      }
-    };
-
-    initializeAdminChats();
+    dispatch(getAllTenants());
+    dispatch(fetchAdminChatRooms());
   }, [dispatch]);
 
-  const handleCreateAdminRoom = async (adminId) => {
-    await dispatch(createAdminRoom({ adminId }));
-    dispatch(fetchAdminRooms());
-    setShowAdminModal(false);
+  const handleCreateChat = async (adminId) => {
+    setLoading(true);
+    try {
+      const result = await dispatch(createOrGetAdminRoom({ adminId })).unwrap();
+      let roomId = null;
+      if (result?.data?.room?._id) roomId = result.data.room._id;
+      else if (result?.room?._id) roomId = result.room._id;
+      else if (result?._id) roomId = result._id;
+
+      if (!roomId) {
+        message.error('Failed to get room ID');
+        return;
+      } else if (roomId) {
+        dispatch(setActiveRoom(roomId));
+        await dispatch(fetchAdminChatRooms());
+        message.success('Chat opened successfully');
+      }
+      setShowAdminModal(false);
+    } catch (error) {
+      message.error(error || 'Failed to create chat');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin tip="Loading..." />
+      </div>
+    );
+  }
+
+  const tenantsArray = Array.isArray(tenants)
+    ? tenants
+    : tenants?.data?.tenants || tenants?.data || [];
+  const adminsList = tenantsArray
+    .map(t => t.admin)
+    .filter(admin => admin && admin._id);
 
   return (
-    <div className="h-screen ">
+    <div className="h-screen">
       <div className="grid grid-cols-12 gap-4 h-[calc(100%-80px)]">
         <div className="col-span-4">
-          <RoomList 
-            fetchRoomsAction={fetchAdminRooms}
+          <RoomList
+            fetchRoomsAction={fetchAdminChatRooms}
             onCreateRoom={() => setShowAdminModal(true)}
           />
         </div>
@@ -73,31 +79,29 @@ export default function SuperAdminChat() {
         open={showAdminModal}
         onCancel={() => setShowAdminModal(false)}
         footer={null}
+        width={500}
       >
         <List
-          dataSource={tenants}
-          renderItem={(tenant) => (
+          dataSource={adminsList}
+          loading={loading}
+          renderItem={(admin) => (
             <List.Item
-              actions={[
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={() => handleCreateAdminRoom(tenant.admin._id)}
-                >
-                  Chat
-                </Button>
-              ]}
+              className="cursor-pointer hover:bg-gray-50 px-4 py-3 rounded"
+              onClick={() => {
+                if (!loading) {
+                  handleCreateChat(admin._id);
+                }
+              }}
             >
               <List.Item.Meta
-                avatar={<Avatar>{tenant.admin.name[0]}</Avatar>}
-                title={tenant.admin.name}
-                description={tenant.admin.email}
+                avatar={<Avatar src={admin.avatar}>{admin.name?.[0]}</Avatar>}
+                title={admin.name}
+                description={admin.email}
               />
             </List.Item>
           )}
         />
       </Modal>
-      {/* </Card> */}
     </div>
   );
 }
