@@ -124,7 +124,7 @@ export default function SuperAdminAdminChats() {
                   </div>
                 ) : (
                   <div className="space-y-1 p-2">
-                    {chatParticipants.map((participant) => (
+                    {Array.isArray(chatParticipants) && chatParticipants.map((participant) => (
                       <div
                         key={participant.participantId}
                         className={`p-3 rounded-lg cursor-pointer transition-colors border ${

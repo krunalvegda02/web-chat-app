@@ -88,7 +88,9 @@ const tenantSlice = createSlice({
       })
       .addCase(getAllTenants.fulfilled, (state, action) => {
         state.loading = false;
-        state.tenants = action.payload.data;
+        // Ensure tenants is always an array
+        const data = action.payload.data;
+        state.tenants = Array.isArray(data) ? data : data?.tenants || [];
       })
       .addCase(getAllTenants.rejected, (state, action) => {
         state.loading = false;
@@ -100,7 +102,12 @@ const tenantSlice = createSlice({
       })
       .addCase(createTenant.fulfilled, (state, action) => {
         state.loading = false;
-        state.tenants.unshift(action.payload.data.tenant);
+        // Ensure tenants is an array before unshift
+        if (!Array.isArray(state.tenants)) {
+          state.tenants = [];
+        }
+        const newTenant = action.payload.data?.tenant || action.payload.data;
+        state.tenants.unshift(newTenant);
       })
       .addCase(createTenant.rejected, (state, action) => {
         state.loading = false;

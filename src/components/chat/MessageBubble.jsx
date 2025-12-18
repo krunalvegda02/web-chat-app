@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Avatar, Tooltip, Dropdown } from 'antd';
+import { Avatar, Tooltip, Dropdown, Modal, Input, message as antMessage } from 'antd';
 import {
   CheckOutlined,
   CheckCircleOutlined,
@@ -7,17 +7,28 @@ import {
   DeleteOutlined,
   EditOutlined,
 } from '@ant-design/icons';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTheme } from '../../hooks/useTheme';
+import { useDispatch } from 'react-redux';
+import { editMessage, deleteMessage } from '../../redux/slices/chatSlice';
+import { chatSocketClient } from '../../sockets/chatSocketClient';
+
 
 /**
- * ✅ OPTIMAL MessageBubble Component
- * Combines:
- * - Full theme support (colors, radius, font size)
- * - Edit/delete functionality
- * - Reactions display
- * - Status tracking (sending/sent/delivered/read)
- * - Professional UI
+ * ✅ ENHANCED MessageBubble Component (HYBRID - BEST OF BOTH)
+ * 
+ * Features:
+ * ✅ Full theme support (colors, radius, font size)
+ * ✅ Edit/delete functionality with modal
+ * ✅ Reactions display
+ * ✅ Status tracking (sending/sent/delivered/read)
+ * ✅ Media support (images/videos) - ADDED
+ * ✅ Avatar display with sender name
+ * ✅ Context menu (right-click)
+ * ✅ Professional UI with transitions
+ * ✅ Proper socket integration
+ * ✅ Redux state management
+ * ✅ Error handling & validation
  */
 export default function MessageBubble({
   message,
@@ -27,8 +38,12 @@ export default function MessageBubble({
   onDelete,
 }) {
   const { theme } = useTheme();
+  const dispatch = useDispatch();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
   const isMine =
     message.senderId === currentUser?._id || message.sender?._id === currentUser?._id;
+
 
   // ✅ Status icons with theme colors
   const statusConfig = useMemo(() => {
@@ -70,6 +85,7 @@ export default function MessageBubble({
     return configs[status] || configs.sent;
   }, [message.status, theme]);
 
+
   // ✅ Dynamic border radius from theme
   const bubbleRadius = {
     rounded: `${theme.messageBorderRadius}px`,
@@ -77,14 +93,17 @@ export default function MessageBubble({
     pill: '24px',
   }[theme.bubbleStyle] || `${theme.messageBorderRadius}px`;
 
+
   // ✅ Dynamic colors from theme
   const bubbleColor = isMine ? theme.chatBubbleAdmin : theme.chatBubbleUser;
   const textColor = isMine ? theme.chatBubbleAdminText : theme.chatBubbleUserText;
+
 
   // ✅ Format time
   const formatTime = (date) => {
     return format(new Date(date), 'HH:mm');
   };
+
 
   // ✅ Get sender info
   const sender = message.sender || {
@@ -92,6 +111,7 @@ export default function MessageBubble({
     name: 'Unknown User',
     avatar: null,
   };
+
 
   // ✅ Handle deleted messages
   if (message.deletedAt) {
@@ -110,22 +130,76 @@ export default function MessageBubble({
     );
   }
 
+
+  // ✅ Handle edit message
+  const handleEdit = () => {
+    setEditContent(message.content);
+    setIsEditModalOpen(true);
+  };
+
+
+  const handleEditSubmit = () => {
+    if (!editContent.trim()) {
+      antMessage.error('Message cannot be empty');
+      return;
+    }
+    
+    if (editContent === message.content) {
+      setIsEditModalOpen(false);
+      return;
+    }
+
+    // Emit socket event
+    chatSocketClient.emit('edit_message', {
+      messageId: message._id,
+      content: editContent.trim(),
+    });
+
+    // Update Redux state
+    dispatch(editMessage({ messageId: message._id, content: editContent.trim() }));
+    
+    setIsEditModalOpen(false);
+    antMessage.success('Message edited');
+  };
+
+
+  // ✅ Handle delete message
+  const handleDelete = () => {
+    Modal.confirm({
+      title: 'Delete Message',
+      content: 'Are you sure you want to delete this message?',
+      okText: 'Delete',
+      okType: 'danger',
+      onOk: () => {
+        // Emit socket event
+        chatSocketClient.emit('delete_message', { messageId: message._id });
+        
+        // Update Redux state
+        dispatch(deleteMessage({ messageId: message._id }));
+        
+        antMessage.success('Message deleted');
+      },
+    });
+  };
+
+
   // ✅ Context menu items
   const menuItems = [
     isMine && {
       key: 'edit',
       label: 'Edit',
       icon: <EditOutlined />,
-      onClick: () => onEdit?.(message),
+      onClick: onEdit || handleEdit,
     },
     isMine && {
       key: 'delete',
       label: 'Delete',
       icon: <DeleteOutlined />,
-      onClick: () => onDelete?.(message._id),
+      onClick: onDelete || handleDelete,
       danger: true,
     },
   ].filter(Boolean);
+
 
   return (
     <div
@@ -147,6 +221,7 @@ export default function MessageBubble({
           {sender.name?.charAt(0)?.toUpperCase() || 'U'}
         </Avatar>
       )}
+
 
       {/* ✅ Message bubble with context menu */}
       <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
@@ -184,8 +259,69 @@ export default function MessageBubble({
               </div>
             )}
 
+
+            {/* ✅ MEDIA SUPPORT - Images & Videos */}
+            {message.media && message.media.length > 0 && (
+              <div
+                style={{
+                  marginBottom: '8px',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                }}
+              >
+                {message.media.map((m, i) => (
+                  <div key={i}>
+                    {m.type === 'image' && (
+                      <img
+                        src={m.url}
+                        alt="message media"
+                        style={{
+                          maxWidth: '200px',
+                          maxHeight: '200px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s',
+                          border: `1px solid ${isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    {m.type === 'video' && (
+                      <video
+                        src={m.url}
+                        controls
+                        style={{
+                          maxWidth: '200px',
+                          maxHeight: '200px',
+                          borderRadius: '6px',
+                          border: `1px solid ${isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                        }}
+                      />
+                    )}
+                    {m.type === 'audio' && (
+                      <audio
+                        src={m.url}
+                        controls
+                        style={{
+                          maxWidth: '200px',
+                          marginTop: '4px',
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+
             {/* Message content */}
-            <div style={{ margin: 0 }}>{message.content}</div>
+            {message.content && (
+              <div style={{ margin: 0 }}>{message.content}</div>
+            )}
+
 
             {/* Edited indicator */}
             {message.isEdited && (
@@ -197,9 +333,10 @@ export default function MessageBubble({
                   fontStyle: 'italic',
                 }}
               >
-                (edited)
+                (edited {message.editedAt ? format(new Date(message.editedAt), 'HH:mm') : ''})
               </div>
             )}
+
 
             {/* Time and status */}
             <div
@@ -217,6 +354,7 @@ export default function MessageBubble({
               {isMine && theme.showReadStatus && statusConfig.icon}
             </div>
 
+
             {/* Reactions display */}
             {message.reactions && message.reactions.length > 0 && (
               <div
@@ -229,7 +367,16 @@ export default function MessageBubble({
                 }}
               >
                 {message.reactions.map((r, i) => (
-                  <span key={i} title={`Reacted by ${r.userId}`}>
+                  <span 
+                    key={i} 
+                    title={`Reacted by ${r.userId}`}
+                    style={{
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
+                    onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                  >
                     {r.emoji}
                   </span>
                 ))}
@@ -238,6 +385,7 @@ export default function MessageBubble({
           </div>
         </Tooltip>
       </Dropdown>
+
 
       {/* ✅ Avatar for current user */}
       {isMine && theme.showAvatars && (
@@ -249,6 +397,25 @@ export default function MessageBubble({
           {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
         </Avatar>
       )}
+
+
+      {/* ✅ Edit Modal */}
+      <Modal
+        title="Edit Message"
+        open={isEditModalOpen}
+        onOk={handleEditSubmit}
+        onCancel={() => setIsEditModalOpen(false)}
+        okText="Save"
+        cancelText="Cancel"
+      >
+        <Input.TextArea
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          rows={4}
+          placeholder="Edit your message..."
+          autoFocus
+        />
+      </Modal>
     </div>
   );
 }

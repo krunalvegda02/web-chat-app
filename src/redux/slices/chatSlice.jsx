@@ -1,4 +1,3 @@
-
 import { createSlice } from '@reduxjs/toolkit';
 import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
 import { _get, _post } from '../../helper/apiClient';
@@ -6,7 +5,9 @@ import { buildUrlWithParams } from '../../helper/helperFunction';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
 import API from '../../constants/ApiEndpoints';
 
+
 // ============ ASYNC THUNKS ============
+
 
 export const fetchRooms = createAsyncThunkHandler(
   'chat/fetchRooms',
@@ -14,11 +15,13 @@ export const fetchRooms = createAsyncThunkHandler(
   (tenantId) => buildUrlWithParams(API.CHAT.ROOMS, tenantId ? { tenantId } : {})
 );
 
+
 export const fetchMessages = createAsyncThunkHandler(
   'chat/fetchMessages',
   _get,
   (payload) => buildUrlWithParams(`${API.CHAT.ROOM_MESSAGES}/${payload.roomId}/messages`, { page: payload.page || 1, limit: payload.limit || 50 })
 );
+
 
 export const fetchAvailableUsers = createAsyncThunkHandler(
   'chat/fetchAvailableUsers',
@@ -26,11 +29,13 @@ export const fetchAvailableUsers = createAsyncThunkHandler(
   API.CHAT.AVAILABLE_USERS
 );
 
+
 export const createDirectRoom = createAsyncThunkHandler(
   'chat/createDirectRoom',
   _post,
   API.CHAT.DIRECT
 );
+
 
 export const createAdminChat = createAsyncThunkHandler(
   'chat/createAdminChat',
@@ -38,13 +43,51 @@ export const createAdminChat = createAsyncThunkHandler(
   API.CHAT.ADMIN_CHAT
 );
 
+
 export const createGroupRoom = createAsyncThunkHandler(
   'chat/createGroupRoom',
   _post,
   API.CHAT.GROUP
 );
 
-// Socket thunks remain as-is (not API calls)
+
+export const sendMessageAPI = createAsyncThunkHandler(
+  'chat/sendMessage',
+  _post,
+  API.CHAT.SEND_MESSAGE
+);
+
+
+export const editMessageAPI = createAsyncThunkHandler(
+  'chat/editMessage',
+  (payload) => _post(payload, `${API.CHAT.EDIT_MESSAGE}/${payload.messageId}`),
+  null
+);
+
+
+export const deleteMessageAPI = createAsyncThunkHandler(
+  'chat/deleteMessage',
+  (payload) => _post(payload, `${API.CHAT.DELETE_MESSAGE}/${payload.messageId}`),
+  null
+);
+
+
+export const markMessagesDelivered = createAsyncThunkHandler(
+  'chat/markDelivered',
+  _post,
+  API.CHAT.MARK_DELIVERED
+);
+
+
+export const createOrGetRoom = createAsyncThunkHandler(
+  'chat/createOrGetRoom',
+  _post,
+  API.CHAT.CREATE_OR_GET_ROOM
+);
+
+
+// ============ THUNK ACTIONS (Socket + Optimistic) ============
+
 
 export const sendMessageThunk = (content) => (dispatch, getState) => {
   const { activeRoomId } = getState().chat;
@@ -73,13 +116,12 @@ export const sendMessageThunk = (content) => (dispatch, getState) => {
   chatSocketClient.emit('send_message', { roomId: activeRoomId, content });
 };
 
+
 export const joinRoomThunk = (roomId) => async (dispatch) => {
   try {
-    // ✅ FIX: Wait for both join and mark read to complete
     await chatSocketClient.emit('join_room', { roomId });
     console.log('✅ Joined room:', roomId);
     
-    // Emit mark read after a short delay to ensure room is joined
     setTimeout(() => {
       chatSocketClient.emit('mark_room_read', { roomId });
       console.log('✅ Marked room as read:', roomId);
@@ -89,7 +131,9 @@ export const joinRoomThunk = (roomId) => async (dispatch) => {
   }
 };
 
+
 // ============ INITIAL STATE ============
+
 
 const initialState = {
   rooms: [],
@@ -99,14 +143,16 @@ const initialState = {
   loadingMessages: {},
   error: null,
   onlineUsers: [],
-  typingUsers: {}, // ✅ FIX: Changed to object with roomId keys
+  typingUsers: {},
   messageDeliveryStatus: {},
   userOnlineStatus: {},
   isSendingMessage: false,
   pendingMessageIds: [],
 };
 
+
 // ============ SLICE ============
+
 
 const chatSlice = createSlice({
   name: 'chat',
@@ -116,6 +162,7 @@ const chatSlice = createSlice({
       state.activeRoomId = action.payload;
       console.log(`🏠 [REDUX] Active room set to: ${action.payload}`);
     },
+
 
     addMessage(state, action) {
       const { roomId, message } = action.payload;
@@ -142,6 +189,7 @@ const chatSlice = createSlice({
       console.log(`✅ [REDUX] Message added (optimistic: ${message.optimistic}):`, message._id);
     },
 
+
     socketMessageReceived(state, action) {
       const { roomId, message } = action.payload;
 
@@ -151,14 +199,12 @@ const chatSlice = createSlice({
         state.messagesByRoom[roomId] = [];
       }
 
-      // Check for duplicate real message
       const exists = state.messagesByRoom[roomId].some(m => m._id === message._id && !m.optimistic);
       if (exists) {
         console.log(`⚠️ [REDUX] Duplicate message ignored: ${message._id}`);
         return;
       }
 
-      // Remove ALL optimistic messages with same content
       const beforeCount = state.messagesByRoom[roomId].length;
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].filter((m) => {
         if (!m.optimistic) return true;
@@ -171,7 +217,6 @@ const chatSlice = createSlice({
       const afterCount = state.messagesByRoom[roomId].length;
       console.log(`📊 [REDUX] Removed ${beforeCount - afterCount} optimistic messages`);
 
-      // Add real message with proper sender
       const finalMessage = {
         ...message,
         sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
@@ -184,17 +229,14 @@ const chatSlice = createSlice({
 
       state.messagesByRoom[roomId].push(finalMessage);
 
-      // Clear all pending temp messages
       state.pendingMessageIds = state.pendingMessageIds.filter(id => !id.startsWith('temp-'));
 
-      // Update room list with new message
       const roomsArray = Array.isArray(state.rooms) ? state.rooms : [];
       const roomIndex = roomsArray.findIndex(r => r._id === roomId);
       if (roomIndex !== -1) {
         roomsArray[roomIndex].lastMessage = finalMessage;
         roomsArray[roomIndex].lastMessageTime = finalMessage.createdAt;
         roomsArray[roomIndex].lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
-        // Move room to top
         const [room] = roomsArray.splice(roomIndex, 1);
         roomsArray.unshift(room);
         state.rooms = roomsArray;
@@ -204,6 +246,8 @@ const chatSlice = createSlice({
       console.log(`💬 [REDUX] Real message added: ${message._id}, total messages: ${state.messagesByRoom[roomId].length}`);
     },
 
+
+    // ✅ Update single message status
     updateMessageStatus(state, action) {
       const { roomId, messageId, status } = action.payload;
 
@@ -217,7 +261,37 @@ const chatSlice = createSlice({
       }
     },
 
-    // ✅ FIX: Track typing users by room
+
+    // ✅ Update bulk message status
+    updateMessagesStatus(state, action) {
+      const { roomId, messageIds, status } = action.payload;
+
+      if (!state.messagesByRoom[roomId]) return;
+
+      let updatedCount = 0;
+      const messageIdStrings = messageIds.map(id => id.toString());
+
+      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
+        if (messageIdStrings.includes(message._id.toString())) {
+          updatedCount++;
+          return {
+            ...message,
+            status,
+            ...(status === 'read' && { readAt: new Date().toISOString() })
+          };
+        }
+        return message;
+      });
+
+      messageIds.forEach(id => {
+        state.messageDeliveryStatus[id] = status;
+      });
+
+      console.log(`📊 [REDUX] Updated ${updatedCount}/${messageIds.length} messages to status: ${status}`);
+    },
+
+
+    // ✅ Track typing users by room
     addTypingUser(state, action) {
       const { userId, roomId } = action.payload;
       
@@ -231,7 +305,8 @@ const chatSlice = createSlice({
       }
     },
 
-    // ✅ FIX: Remove typing user from specific room
+
+    // ✅ Remove typing user from specific room
     removeTypingUser(state, action) {
       const { userId, roomId } = action.payload;
       
@@ -241,20 +316,24 @@ const chatSlice = createSlice({
       }
     },
 
-    // ✅ FIX: Clear typing users for a specific room
+
+    // ✅ Clear typing users for specific room
     clearRoomTypingUsers(state, action) {
       const { roomId } = action.payload;
       state.typingUsers[roomId] = [];
     },
 
+
     clearTypingUsers(state) {
       state.typingUsers = {};
     },
+
 
     setOnlineUsers(state, action) {
       state.onlineUsers = action.payload;
       console.log(`👥 [REDUX] Online users: ${action.payload.length}`);
     },
+
 
     setUserOnlineStatus(state, action) {
       const { userId, isOnline } = action.payload;
@@ -264,7 +343,8 @@ const chatSlice = createSlice({
       };
     },
 
-    // ✅ FIX: Properly update multiple messages as read
+
+    // ✅ Mark messages as read
     updateMessagesReadStatus(state, action) {
       const { roomId, messageIds } = action.payload;
 
@@ -276,7 +356,6 @@ const chatSlice = createSlice({
       let updatedCount = 0;
       const messageIdStrings = messageIds.map(id => id.toString());
       
-      // Create new array to trigger React re-render
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
         if (messageIdStrings.includes(message._id.toString())) {
           updatedCount++;
@@ -289,9 +368,15 @@ const chatSlice = createSlice({
         return message;
       });
 
+      messageIds.forEach(id => {
+        state.messageDeliveryStatus[id] = 'read';
+      });
+
       console.log(`👁️ [REDUX] Marked ${updatedCount}/${messageIds.length} messages as read in room ${roomId}`);
     },
 
+
+    // ✅ Edit message
     editMessage(state, action) {
       const { messageId, content } = action.payload;
 
@@ -307,18 +392,22 @@ const chatSlice = createSlice({
       }
     },
 
+
+    // ✅ Delete message (soft delete)
     deleteMessage(state, action) {
       const { messageId } = action.payload;
 
       for (const roomId in state.messagesByRoom) {
-        const index = state.messagesByRoom[roomId].findIndex(m => m._id === messageId);
-        if (index > -1) {
-          state.messagesByRoom[roomId][index].deletedAt = new Date().toISOString();
-          console.log(`🗑️ [REDUX] Message deleted: ${messageId}`);
+        const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
+        if (message) {
+          message.isDeleted = true;
+          message.deletedAt = new Date().toISOString();
+          console.log(`🗑️ [REDUX] Message marked as deleted: ${messageId}`);
           return;
         }
       }
     },
+
 
     addReaction(state, action) {
       const { messageId, emoji, userId } = action.payload;
@@ -336,6 +425,7 @@ const chatSlice = createSlice({
       }
     },
 
+
     removeReaction(state, action) {
       const { messageId, emoji, userId } = action.payload;
 
@@ -350,10 +440,12 @@ const chatSlice = createSlice({
       }
     },
 
+
     clearError(state) {
       state.error = null;
     },
   },
+
 
   extraReducers: (builder) => {
     builder
@@ -383,14 +475,20 @@ const chatSlice = createSlice({
 
         const messagesArray = action.payload?.data?.messages || action.payload?.messages || [];
         
-        // Transform messages to have sender field instead of senderId object
         state.messagesByRoom[roomId] = Array.isArray(messagesArray) 
           ? messagesArray.map(msg => ({
               ...msg,
               sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
-              senderId: msg.senderId?._id || msg.senderId
+              senderId: msg.senderId?._id || msg.senderId,
+              status: msg.status || 'read',
             }))
           : [];
+
+        messagesArray.forEach(msg => {
+          if (msg._id) {
+            state.messageDeliveryStatus[msg._id] = msg.status || 'read';
+          }
+        });
 
         console.log(`✅ [REDUX] Fetched ${state.messagesByRoom[roomId].length} messages for room ${roomId}`);
       })
@@ -402,11 +500,13 @@ const chatSlice = createSlice({
   },
 });
 
+
 export const {
   setActiveRoom,
   addMessage,
   socketMessageReceived,
   updateMessageStatus,
+  updateMessagesStatus,
   addTypingUser,
   removeTypingUser,
   clearRoomTypingUsers,
@@ -420,5 +520,6 @@ export const {
   removeReaction,
   clearError,
 } = chatSlice.actions;
+
 
 export default chatSlice.reducer;

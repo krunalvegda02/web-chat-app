@@ -44,11 +44,13 @@ export const useSocket = () => {
           // ✅ Message received event
           chatSocketClient.on('message_received', (data) => {
             console.log('✅ [SOCKET] message_received:', data);
+            console.log('📦 [SOCKET] Dispatching socketMessageReceived for room:', data?.roomId);
             if (data && data.roomId) {
               dispatch(socketMessageReceived({
                 roomId: data.roomId,
                 message: data
               }));
+              console.log('✅ [SOCKET] Message added to Redux state');
 
               // ✅ Auto-mark as read if message is from someone else and we're viewing this room
               const state = window.__REDUX_STORE__?.getState();
@@ -114,8 +116,11 @@ export const useSocket = () => {
           chatSocketClient.on('user_typing', (data) => {
             console.log('✅ [SOCKET] user_typing:', data);
             
-            // ✅ FIX: Don't show own typing indicator
-            if (data.userId === user?._id) {
+            // ✅ FIX: Don't show own typing indicator (compare both string and object)
+            const currentUserId = user?._id?.toString() || user?._id;
+            const typingUserId = data.userId?.toString() || data.userId;
+            
+            if (currentUserId === typingUserId) {
               console.log(`⏭️ [SOCKET] Skipping own typing indicator`);
               return;
             }

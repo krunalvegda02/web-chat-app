@@ -41,7 +41,12 @@ export default function SuperAdminAdminsList() {
     fetchAdmins();
   }, []);
 
-console.log(tenants);
+  // ✅ Ensure tenants is always an array
+  const tenantsArray = Array.isArray(tenants) 
+    ? tenants 
+    : tenants?.data?.tenants || tenants?.tenants || [];
+
+  console.log('Tenants:', tenantsArray);
 
 
   const handleCreateAdmin = async (values) => {
@@ -165,7 +170,7 @@ console.log(tenants);
         <Table
           rowKey="_id"
           columns={columns}
-          dataSource={tenants}
+          dataSource={tenantsArray}
           loading={loading}
           pagination={{ pageSize: 10 }}
           className="rounded-2xl bg-white border border-gray-200 shadow-sm"

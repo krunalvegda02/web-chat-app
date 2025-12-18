@@ -27,11 +27,9 @@ const MessageInput = memo(function MessageInput() {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      if (activeRoomId) {
-        stopTyping(activeRoomId);
-      }
+      // Don't call stopTyping here - it causes infinite loop
     };
-  }, [activeRoomId, stopTyping]);
+  }, []); // ✅ Empty deps - only run on mount/unmount
 
   // ✅ Clear typing timeout
   const clearTypingTimeout = () => {

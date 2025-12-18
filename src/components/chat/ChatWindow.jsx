@@ -356,6 +356,7 @@ export default function ChatWindow({ isMobile = false }) {
 
     const loadRoom = async () => {
       try {
+        setMessagesLoaded(false); // Start loading
         joinRoom(activeRoomId);
 
         await dispatch(fetchMessages({
@@ -370,7 +371,7 @@ export default function ChatWindow({ isMobile = false }) {
       } catch (error) {
         console.error(`❌ Failed to load room:`, error);
         if (isMounted) {
-          setMessagesLoaded(false);
+          setMessagesLoaded(true); // Still show UI even on error
         }
       }
     };
@@ -383,31 +384,11 @@ export default function ChatWindow({ isMobile = false }) {
       leaveRoom(activeRoomId);
       hasJoinedRoom.current = false;
     };
-  }, [activeRoomId, dispatch, joinRoom, leaveRoom]);
+  }, [activeRoomId, dispatch]); // ✅ REMOVED joinRoom, leaveRoom - they're stable callbacks
 
-  // ✅ Auto-mark messages as read when viewing chat
-  useEffect(() => {
-    if (!activeRoomId || !messagesLoaded || messages.length === 0) return;
-
-    // Find unread messages from other users
-    const unreadMessageIds = messages
-      .filter(msg => 
-        msg.senderId !== user?._id && 
-        msg.sender?._id !== user?._id &&
-        (!msg.status || msg.status !== 'read')
-      )
-      .map(msg => msg._id);
-
-    if (unreadMessageIds.length > 0) {
-      // Mark as read after a short delay
-      const timer = setTimeout(() => {
-        markMessagesAsRead(activeRoomId, unreadMessageIds);
-        console.log(`📖 [AUTO] Marking ${unreadMessageIds.length} messages as read`);
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [activeRoomId, messages, messagesLoaded, user, markMessagesAsRead]);
+  // ❌ REMOVED: Auto-mark-as-read logic that was causing infinite loop
+  // Messages are marked as read via socket events when user joins room
+  // See: Backend chatSocket.js join_room event handler
 
   // ✅ Show empty state if no room selected
   if (!activeRoomId) {
@@ -426,8 +407,10 @@ export default function ChatWindow({ isMobile = false }) {
     );
   }
 
-  // ✅ Show loading state
-  if (!messagesLoaded || loadingMessages[activeRoomId]) {
+  // ✅ Show loading state only when actively loading
+  const isLoading = loadingMessages[activeRoomId] || (!messagesLoaded && messages.length === 0);
+  
+  if (isLoading) {
     return (
       <div
         style={{

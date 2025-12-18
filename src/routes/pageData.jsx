@@ -29,7 +29,7 @@ export const getMenuItems = (role, navigate) => {
       { key: '/super-admin/admins', icon: <UsergroupAddOutlined className='text-[25px]' />, label: 'Admins', path: '/super-admin/admins' },
       { key: '/super-admin/chat', icon: <MessageOutlined className='text-[25px]' />, label: 'Messages', path: '/super-admin/chat' },
       { key: '/super-admin/admin-chats', icon: <MessageOutlined className='text-[25px]' />, label: 'Messages', path: '/super-admin/admin-chats' },
-      { key: '/super-admin/analytics', icon: <AreaChartOutlined className='text-[25px]' />, label: 'Analytics', path: '/super-admin/analytics' },
+      // { key: '/super-admin/analytics', icon: <AreaChartOutlined className='text-[25px]' />, label: 'Analytics', path: '/super-admin/analytics' },
       { key: '/super-admin/settings', icon: <SettingOutlined className='text-[25px]' />, label: 'Settings', path: '/super-admin/settings' },
     ],
     USER: [
