@@ -1,8 +1,3 @@
-
-// ============================================================================
-// USER JOIN PAGE - pages/user/UserJoinPage.jsx
-// ============================================================================
-
 import { useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';

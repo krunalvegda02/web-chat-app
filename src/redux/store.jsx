@@ -80,5 +80,10 @@ export const store = configureStore({
     }),
 });
 
+// Expose store globally for socket access
+if (typeof window !== 'undefined') {
+  window.__REDUX_STORE__ = store;
+}
+
 export const persistor = persistStore(store);
 export default store;

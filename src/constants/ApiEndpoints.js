@@ -1,18 +1,30 @@
 const API = {
     AUTH: {
-        REGISTER: '/api/v1/auth/register',
-        LOGIN: '/api/v1/auth/login',
-        LOGOUT: '/api/v1/auth/logout',
-        ME: '/api/v1/auth/me',
+        REGISTER: '/auth/register',
+        LOGIN: '/auth/login',
+        LOGOUT: '/auth/logout',
+        ME: '/auth/me',
     },
     CHAT: {
+        AVAILABLE_USERS: '/chat/available-users',
         ROOMS: '/chat/rooms',
-        ADMIN_CHAT_ROOMS: '/chat/admin-chat-rooms',
+        DIRECT: '/chat/direct',
+        GROUP: '/chat/group',
+        ADMIN_CHAT: '/chat/admin-chat',
         ROOM_MESSAGES: '/chat/rooms',
-        CREATE_OR_GET_ADMIN_ROOM: '/chat/admin-rooms',
+        SEARCH_MESSAGES: '/chat/rooms',
+        MARK_AS_READ: '/chat/rooms',
+        ALL_CHATS: '/chat/admin/all-chats',
+        ADMIN_CHATS_BY_ID: '/chat/admin/chats',
     },
     TENANT: {
-        GET_ALL: '/api/v1/tenants',
+        GET_ALL: '/tenants',
+        GET_THEME: '/tenants/:tenantId/theme',
+        UPDATE_THEME: '/tenants/:tenantId/theme',
+        ADMIN_USERS: '/tenants/admin-users',
+    },
+    UPLOAD: {
+        THEME_IMAGE: '/upload/theme-image',
     },
 };
 

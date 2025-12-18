@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { fetchTenantTheme, updateTenantTheme, uploadThemeImage } from '../../redux/slices/themeSlice';
 import {
   Form,
   Input,
@@ -30,12 +31,15 @@ import {
 export default function ThemeCustomization() {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth || {});
-  const { theme = {}, updating } = useSelector((s) => s.theme || {});
+  const { theme = {}, updating, uploading } = useSelector((s) => s.theme || {});
 
   const [form] = Form.useForm();
   const [changed, setChanged] = useState(false);
-  const [previewMode, setPreviewMode] = useState('light');
-  const [values, setValues] = useState(theme || {});
+  const [logoFile, setLogoFile] = useState(null);
+  const [bgFile, setBgFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  // const [previewMode, setPreviewMode] = useState('light');
+  const previewMode = "light" //for future use
 
   const defaultTheme = {
     appName: 'Chat App',
@@ -63,26 +67,70 @@ export default function ThemeCustomization() {
   };
 
   const handleValuesChange = useCallback((_, allValues) => {
-    setValues(allValues);
     setChanged(true);
   }, []);
 
+  useEffect(() => {
+    if (user?.tenantId) {
+      dispatch(fetchTenantTheme(user.tenantId));
+    }
+  }, [dispatch, user?.tenantId]);
+
+  useEffect(() => {
+    if (theme && Object.keys(theme).length > 0) {
+      form.setFieldsValue(theme);
+    }
+  }, [theme, form]);
+
   const handleFinish = useCallback(
     async (formValues) => {
+      if (!user?.tenantId) {
+        antMessage.error('Tenant ID not found');
+        return;
+      }
+      setSaving(true);
       try {
+        let finalValues = { ...formValues };
+
+        // Upload logo if file exists and delete old one
+        if (logoFile) {
+          const logoResult = await dispatch(uploadThemeImage({ 
+            file: logoFile, 
+            type: 'logo',
+            oldUrl: theme.logoUrl 
+          })).unwrap();
+          finalValues.logoUrl = logoResult.url;
+        }
+
+        // Upload background if file exists and delete old one
+        if (bgFile) {
+          const bgResult = await dispatch(uploadThemeImage({ 
+            file: bgFile, 
+            type: 'background',
+            oldUrl: theme.chatBackgroundImage 
+          })).unwrap();
+          finalValues.chatBackgroundImage = bgResult.url;
+        }
+
+        await dispatch(updateTenantTheme({ tenantId: user.tenantId, ...finalValues })).unwrap();
         antMessage.success('Theme updated successfully');
         setChanged(false);
+        setLogoFile(null);
+        setBgFile(null);
       } catch (e) {
-        antMessage.error('Failed to update theme');
+        antMessage.error(e || 'Failed to update theme');
+      } finally {
+        setSaving(false);
       }
     },
-    [dispatch, user]
+    [dispatch, user, logoFile, bgFile, theme]
   );
 
   const handleReset = useCallback(() => {
     form.setFieldsValue(defaultTheme);
-    setValues(defaultTheme);
     setChanged(false);
+    setLogoFile(null);
+    setBgFile(null);
     antMessage.info('Theme reset to default');
   }, [form]);
 
@@ -92,6 +140,11 @@ export default function ThemeCustomization() {
         const reader = new FileReader();
         reader.onload = () => {
           form.setFieldValue(fieldName, reader.result);
+          if (fieldName === 'logoUrl') {
+            setLogoFile(file);
+          } else if (fieldName === 'chatBackgroundImage') {
+            setBgFile(file);
+          }
           setChanged(true);
         };
         reader.readAsDataURL(file);
@@ -194,8 +247,8 @@ export default function ThemeCustomization() {
                 type="primary"
                 icon={<SaveOutlined />}
                 htmlType="submit"
-                loading={!!updating}
-                disabled={!changed}
+                loading={saving || uploading || updating}
+                disabled={!changed || saving}
                 size="large"
                 className="!bg-gradient-to-r from-blue-500 to-purple-600 !border-none !text-white !font-semibold !h-11 hover:!shadow-lg hover:-translate-y-0.5 transition-all duration-300"
               >
@@ -225,7 +278,7 @@ export default function ThemeCustomization() {
         <p className="text-gray-500 text-sm mb-6 italic">
           This is how your chat UI will look with the current settings.
         </p>
-        <PreviewChat theme={{ ...defaultTheme, ...values }} mode={previewMode} />
+        <PreviewChat theme={{ ...defaultTheme, ...theme }} mode={previewMode} />
       </div>
     </div>
   );
@@ -506,7 +559,7 @@ function FeaturesTab() {
 
   return (
     <div className="pt-6 animate-in fade-in duration-300">
-      
+
       <div className="text-lg font-bold text-gray-800 mb-6 pb-4 border-b-2 border-blue-200">
         Chat Features
       </div>

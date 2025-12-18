@@ -75,6 +75,13 @@ export const useChatSocket = () => {
     console.log(`😔 [ACTION] Removed reaction ${emoji} from message ${messageId}`);
   }, [isConnected]);
 
+  // ✅ Mark messages as read
+  const markMessagesAsRead = useCallback((roomId, messageIds) => {
+    if (!isConnected || !messageIds || messageIds.length === 0) return;
+    chatSocketClient.emit('mark_messages_read', { roomId, messageIds });
+    console.log(`📖 [ACTION] Marking ${messageIds.length} messages as read in room ${roomId}`);
+  }, [isConnected]);
+
   return {
     socket,
     isConnected,
@@ -87,6 +94,7 @@ export const useChatSocket = () => {
     deleteMessage,
     addReaction,
     removeReaction,
+    markMessagesAsRead,
   };
 };
 

@@ -27,7 +27,7 @@ export default function Sidebar() {
 
         {/* LOGO */}
         <div
-          className="w-full py-3 px-1 border-b flex items-center justify-center"
+          className="w-full py-2.5 px-1 border-b flex items-center justify-center"
           style={{
             borderColor: 'rgba(139, 92, 246, 0.15)',
           }}
@@ -115,3 +115,274 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+
+
+
+// import { useRef, useState, useMemo } from 'react';
+// import { Avatar, Tooltip, Menu, Button, Badge, Empty } from 'antd';
+// import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
+// import { useLocation, useNavigate } from 'react-router-dom';
+// import { useAuth } from '../../hooks/useAuth';
+// import { useTheme } from '../../hooks/useTheme';
+// import { getMenuItems } from '../../routes/pageData';
+
+// /**
+//  * ✅ ENHANCED Sidebar Component with Full Theme Support
+//  * 
+//  * Features:
+//  * - Theme-based colors and styling
+//  * - Dynamic menu based on user role
+//  * - Smooth transitions
+//  * - User profile section
+//  * - Responsive design
+//  * - Active menu item highlighting
+//  * - Hover effects
+//  */
+// export default function Sidebar({ collapsed = false, onCollapse = null }) {
+//   const { user, logout } = useAuth();
+//   const { theme, styles } = useTheme();
+//   const navigate = useNavigate();
+//   const location = useLocation();
+//   const sidebarRef = useRef(null);
+
+//   const [hoveredItem, setHoveredItem] = useState(null);
+
+//   // ✅ Get menu items based on user role
+//   const menuItems = useMemo(
+//     () => getMenuItems(user?.role, navigate),
+//     [user?.role, navigate]
+//   );
+
+//   // ✅ Get active menu key from current path
+//   const activeKey = useMemo(
+//     () => location.pathname,
+//     [location.pathname]
+//   );
+
+//   // ✅ Dynamic styles based on theme
+//   const dynamicStyles = {
+//     sidebarContainer: {
+//       background: theme.sidebarBackground,
+//       borderRight: `1px solid ${theme.sidebarBorderColor}`,
+//       height: '100vh',
+//       display: 'flex',
+//       flexDirection: 'column',
+//       overflowY: 'auto',
+//       transition: `all ${theme.transitionDuration}ms ease`,
+//       overflowX: 'hidden',
+//     },
+//     profileSection: {
+//       padding: '16px',
+//       borderBottom: `1px solid ${theme.sidebarBorderColor}`,
+//       background: theme.sidebarBackground,
+//       display: 'flex',
+//       alignItems: 'center',
+//       gap: 12,
+//     },
+//     profileInfo: {
+//       flex: 1,
+//       minWidth: 0,
+//     },
+//     profileName: {
+//       fontSize: '14px',
+//       fontWeight: '600',
+//       color: theme.sidebarText,
+//       margin: 0,
+//       whiteSpace: 'nowrap',
+//       overflow: 'hidden',
+//       textOverflow: 'ellipsis',
+//     },
+//     profileRole: {
+//       fontSize: '12px',
+//       color: theme.headerTextSecondary,
+//       margin: '4px 0 0 0',
+//     },
+//     menuContainer: {
+//       flex: 1,
+//       padding: '12px 0',
+//       overflow: 'y',
+//     },
+//     menuItemContainer: {
+//       padding: '8px 12px',
+//       margin: '0 8px',
+//       borderRadius: '6px',
+//       cursor: 'pointer',
+//       display: 'flex',
+//       alignItems: 'center',
+//       gap: 12,
+//       transition: `all ${theme.transitionDuration}ms ease`,
+//       textDecoration: 'none',
+//       color: theme.sidebarText,
+//       fontSize: '14px',
+//     },
+//     menuItemActive: {
+//       background: theme.sidebarBgActive,
+//       color: theme.sidebarTextActive,
+//       fontWeight: '600',
+//     },
+//     menuItemHover: {
+//       background: theme.sidebarBgHover,
+//     },
+//     menuItemIcon: {
+//       fontSize: '18px',
+//       display: 'flex',
+//       alignItems: 'center',
+//       justifyContent: 'center',
+//       minWidth: '24px',
+//     },
+//     menuItemLabel: {
+//       flex: 1,
+//       whiteSpace: 'nowrap',
+//       overflow: 'hidden',
+//       textOverflow: 'ellipsis',
+//     },
+//     menuItemBadge: {
+//       fontSize: '12px',
+//       padding: '2px 6px',
+//       borderRadius: '12px',
+//       background: theme.accentColor,
+//       color: '#fff',
+//     },
+//     footerSection: {
+//       padding: '12px',
+//       borderTop: `1px solid ${theme.sidebarBorderColor}`,
+//       background: theme.sidebarBackground,
+//       display: 'flex',
+//       gap: 8,
+//     },
+//     logoutBtn: {
+//       flex: 1,
+//       width: '100%',
+//     },
+//   };
+
+//   // ✅ Handle logout
+//   const handleLogout = async () => {
+//     await logout();
+//     navigate('/login');
+//   };
+
+//   return (
+//     <div
+//       ref={sidebarRef}
+//       style={dynamicStyles.sidebarContainer}
+//       className="sidebar"
+//     >
+//       {/* ✅ PROFILE SECTION */}
+//       <div style={dynamicStyles.profileSection}>
+//         <Avatar
+//           size={40}
+//           src={user?.avatar}
+//           icon={<UserOutlined />}
+//           style={{
+//             background: theme.primaryColor,
+//             flexShrink: 0,
+//           }}
+//         />
+//         {!collapsed && (
+//           <div style={dynamicStyles.profileInfo}>
+//             <p style={dynamicStyles.profileName} title={user?.name}>
+//               {user?.name || 'User'}
+//             </p>
+//             <p style={dynamicStyles.profileRole}>
+//               {user?.role?.charAt(0).toUpperCase() +
+//                 user?.role?.slice(1).toLowerCase()}
+//             </p>
+//           </div>
+//         )}
+//       </div>
+
+//       {/* ✅ MENU SECTION */}
+//       <div style={dynamicStyles.menuContainer}>
+//         {menuItems && menuItems.length > 0 ? (
+//           menuItems.map((item) => (
+//             <Tooltip
+//               key={item.key}
+//               title={collapsed ? item.label : ''}
+//               placement="right"
+//             >
+//               <div
+//                 style={{
+//                   ...dynamicStyles.menuItemContainer,
+//                   ...(activeKey === item.key && dynamicStyles.menuItemActive),
+//                   ...(hoveredItem === item.key && dynamicStyles.menuItemHover),
+//                 }}
+//                 onMouseEnter={() => setHoveredItem(item.key)}
+//                 onMouseLeave={() => setHoveredItem(null)}
+//                 onClick={() => {
+//                   item.onClick?.();
+//                   navigate(item.key);
+//                 }}
+//               >
+//                 <div style={dynamicStyles.menuItemIcon}>
+//                   {item.icon}
+//                 </div>
+
+//                 {!collapsed && (
+//                   <>
+//                     <span style={dynamicStyles.menuItemLabel}>
+//                       {item.label}
+//                     </span>
+//                     {item.badge && (
+//                       <Badge
+//                         count={item.badge}
+//                         style={{
+//                           background: theme.accentColor,
+//                         }}
+//                       />
+//                     )}
+//                   </>
+//                 )}
+//               </div>
+//             </Tooltip>
+//           ))
+//         ) : (
+//           <Empty
+//             description="No menu items"
+//             style={{
+//               marginTop: '20px',
+//               color: theme.headerTextSecondary,
+//             }}
+//           />
+//         )}
+//       </div>
+
+//       {/* ✅ FOOTER SECTION - LOGOUT */}
+//       <div style={dynamicStyles.footerSection}>
+//         <Button
+//           type="primary"
+//           danger
+//           icon={<LogoutOutlined />}
+//           onClick={handleLogout}
+//           style={{
+//             width: collapsed ? '36px' : 'auto',
+//             borderColor: '#ff4d4f',
+//             background: '#ff4d4f',
+//             color: '#fff',
+//           }}
+//           title="Logout"
+//         >
+//           {!collapsed && 'Logout'}
+//         </Button>
+//       </div>
+
+//       {/* ✅ CUSTOM SCROLLBAR STYLING */}
+//       <style>{`
+//         .sidebar::-webkit-scrollbar {
+//           width: 6px;
+//         }
+//         .sidebar::-webkit-scrollbar-track {
+//           background: transparent;
+//         }
+//         .sidebar::-webkit-scrollbar-thumb {
+//           background: ${theme.borderColor};
+//           border-radius: 3px;
+//         }
+//         .sidebar::-webkit-scrollbar-thumb:hover {
+//           background: ${theme.headerTextSecondary};
+//         }
+//       `}</style>
+//     </div>
+//   );
+// }

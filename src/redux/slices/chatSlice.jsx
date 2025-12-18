@@ -1,3 +1,4 @@
+
 import { createSlice } from '@reduxjs/toolkit';
 import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
 import { _get, _post } from '../../helper/apiClient';
@@ -10,13 +11,7 @@ import API from '../../constants/ApiEndpoints';
 export const fetchRooms = createAsyncThunkHandler(
   'chat/fetchRooms',
   _get,
-  (tenantId) => buildUrlWithParams(API.CHAT.ROOMS, { tenantId })
-);
-
-export const fetchAdminChatRooms = createAsyncThunkHandler(
-  'chat/fetchAdminChatRooms',
-  _get,
-  API.CHAT.ADMIN_CHAT_ROOMS
+  (tenantId) => buildUrlWithParams(API.CHAT.ROOMS, tenantId ? { tenantId } : {})
 );
 
 export const fetchMessages = createAsyncThunkHandler(
@@ -25,16 +20,36 @@ export const fetchMessages = createAsyncThunkHandler(
   (payload) => buildUrlWithParams(`${API.CHAT.ROOM_MESSAGES}/${payload.roomId}/messages`, { page: payload.page || 1, limit: payload.limit || 50 })
 );
 
-export const createOrGetAdminRoom = createAsyncThunkHandler(
-  'chat/createOrGetAdminRoom',
+export const fetchAvailableUsers = createAsyncThunkHandler(
+  'chat/fetchAvailableUsers',
+  _get,
+  API.CHAT.AVAILABLE_USERS
+);
+
+export const createDirectRoom = createAsyncThunkHandler(
+  'chat/createDirectRoom',
   _post,
-  API.CHAT.CREATE_OR_GET_ADMIN_ROOM
+  API.CHAT.DIRECT
+);
+
+export const createAdminChat = createAsyncThunkHandler(
+  'chat/createAdminChat',
+  _post,
+  API.CHAT.ADMIN_CHAT
+);
+
+export const createGroupRoom = createAsyncThunkHandler(
+  'chat/createGroupRoom',
+  _post,
+  API.CHAT.GROUP
 );
 
 // Socket thunks remain as-is (not API calls)
+
 export const sendMessageThunk = (content) => (dispatch, getState) => {
   const { activeRoomId } = getState().chat;
   const { user } = getState().auth;
+
   if (!activeRoomId || !user) return;
 
   const tempMessage = {
@@ -58,11 +73,17 @@ export const sendMessageThunk = (content) => (dispatch, getState) => {
   chatSocketClient.emit('send_message', { roomId: activeRoomId, content });
 };
 
-export const joinRoomThunk = (roomId) => async () => {
+export const joinRoomThunk = (roomId) => async (dispatch) => {
   try {
+    // ✅ FIX: Wait for both join and mark read to complete
     await chatSocketClient.emit('join_room', { roomId });
-    await chatSocketClient.emit('mark_room_read', { roomId });
     console.log('✅ Joined room:', roomId);
+    
+    // Emit mark read after a short delay to ensure room is joined
+    setTimeout(() => {
+      chatSocketClient.emit('mark_room_read', { roomId });
+      console.log('✅ Marked room as read:', roomId);
+    }, 200);
   } catch (error) {
     console.error('❌ Failed to join room:', error);
   }
@@ -78,7 +99,7 @@ const initialState = {
   loadingMessages: {},
   error: null,
   onlineUsers: [],
-  typingUsers: [],
+  typingUsers: {}, // ✅ FIX: Changed to object with roomId keys
   messageDeliveryStatus: {},
   userOnlineStatus: {},
   isSendingMessage: false,
@@ -98,6 +119,7 @@ const chatSlice = createSlice({
 
     addMessage(state, action) {
       const { roomId, message } = action.payload;
+
       if (!state.messagesByRoom[roomId]) {
         state.messagesByRoom[roomId] = [];
       }
@@ -110,48 +132,81 @@ const chatSlice = createSlice({
       };
 
       state.messagesByRoom[roomId].push(messageWithStatus);
+
       if (message.optimistic) {
         if (!state.pendingMessageIds.includes(message._id)) {
-          state.pendingMessageIds.push(message._id);  // Right method
+          state.pendingMessageIds.push(message._id);
         }
       }
+
       console.log(`✅ [REDUX] Message added (optimistic: ${message.optimistic}):`, message._id);
     },
 
     socketMessageReceived(state, action) {
       const { roomId, message } = action.payload;
+
+      console.log('🔍 [DEBUG] Socket message received:', message._id, message.content);
+
       if (!state.messagesByRoom[roomId]) {
         state.messagesByRoom[roomId] = [];
       }
 
-      const exists = state.messagesByRoom[roomId].some(m => m._id === message._id);
+      // Check for duplicate real message
+      const exists = state.messagesByRoom[roomId].some(m => m._id === message._id && !m.optimistic);
       if (exists) {
         console.log(`⚠️ [REDUX] Duplicate message ignored: ${message._id}`);
         return;
       }
 
-      const now = new Date().getTime();
+      // Remove ALL optimistic messages with same content
+      const beforeCount = state.messagesByRoom[roomId].length;
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].filter((m) => {
         if (!m.optimistic) return true;
-        if (m.content !== message.content) return true;
-        const msgTime = new Date(m.createdAt).getTime();
-        return now - msgTime > 5000;
+        if (m.content === message.content) {
+          console.log(`🗑️ [REDUX] Removing optimistic message: ${m._id}`);
+          return false;
+        }
+        return true;
       });
+      const afterCount = state.messagesByRoom[roomId].length;
+      console.log(`📊 [REDUX] Removed ${beforeCount - afterCount} optimistic messages`);
 
-      state.messagesByRoom[roomId].push({
+      // Add real message with proper sender
+      const finalMessage = {
         ...message,
-        status: message.status || 'delivered',
+        sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
+        senderId: message.senderId?._id || message.senderId,
+        status: message.status || 'sent',
         optimistic: false,
-      });
+      };
 
-      state.pendingMessageIds = state.pendingMessageIds.filter(
-        id => id !== message._id  // Right method
-      );
-      console.log(`💬 [REDUX] Real message received: ${message._id}`);
+      console.log('✅ [DEBUG] Adding real message with sender:', finalMessage.sender?.name);
+
+      state.messagesByRoom[roomId].push(finalMessage);
+
+      // Clear all pending temp messages
+      state.pendingMessageIds = state.pendingMessageIds.filter(id => !id.startsWith('temp-'));
+
+      // Update room list with new message
+      const roomsArray = Array.isArray(state.rooms) ? state.rooms : [];
+      const roomIndex = roomsArray.findIndex(r => r._id === roomId);
+      if (roomIndex !== -1) {
+        roomsArray[roomIndex].lastMessage = finalMessage;
+        roomsArray[roomIndex].lastMessageTime = finalMessage.createdAt;
+        roomsArray[roomIndex].lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
+        // Move room to top
+        const [room] = roomsArray.splice(roomIndex, 1);
+        roomsArray.unshift(room);
+        state.rooms = roomsArray;
+        console.log(`📋 [REDUX] Room list updated for room: ${roomId}`);
+      }
+
+      console.log(`💬 [REDUX] Real message added: ${message._id}, total messages: ${state.messagesByRoom[roomId].length}`);
     },
 
     updateMessageStatus(state, action) {
       const { roomId, messageId, status } = action.payload;
+
       if (!state.messagesByRoom[roomId]) return;
 
       const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
@@ -162,22 +217,38 @@ const chatSlice = createSlice({
       }
     },
 
+    // ✅ FIX: Track typing users by room
     addTypingUser(state, action) {
-      const { userId } = action.payload;
-      if (!state.typingUsers.includes(userId)) {
-        state.typingUsers.push(userId);
-        console.log(`⌨️ [REDUX] User ${userId} typing`);
+      const { userId, roomId } = action.payload;
+      
+      if (!state.typingUsers[roomId]) {
+        state.typingUsers[roomId] = [];
+      }
+
+      if (!state.typingUsers[roomId].includes(userId)) {
+        state.typingUsers[roomId].push(userId);
+        console.log(`⌨️ [REDUX] User ${userId} typing in room ${roomId}`);
       }
     },
 
+    // ✅ FIX: Remove typing user from specific room
     removeTypingUser(state, action) {
-      const { userId } = action.payload;
-      state.typingUsers = state.typingUsers.filter(id => id !== userId);
-      console.log(`🛑 [REDUX] User ${userId} stopped typing`);
+      const { userId, roomId } = action.payload;
+      
+      if (state.typingUsers[roomId]) {
+        state.typingUsers[roomId] = state.typingUsers[roomId].filter(id => id !== userId);
+        console.log(`🛑 [REDUX] User ${userId} stopped typing in room ${roomId}`);
+      }
+    },
+
+    // ✅ FIX: Clear typing users for a specific room
+    clearRoomTypingUsers(state, action) {
+      const { roomId } = action.payload;
+      state.typingUsers[roomId] = [];
     },
 
     clearTypingUsers(state) {
-      state.typingUsers = [];
+      state.typingUsers = {};
     },
 
     setOnlineUsers(state, action) {
@@ -193,22 +264,37 @@ const chatSlice = createSlice({
       };
     },
 
+    // ✅ FIX: Properly update multiple messages as read
     updateMessagesReadStatus(state, action) {
       const { roomId, messageIds } = action.payload;
-      if (!state.messagesByRoom[roomId]) return;
 
-      messageIds.forEach(messageId => {
-        const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
-        if (message) {
-          message.status = 'read';
-          message.readAt = new Date().toISOString();
+      if (!state.messagesByRoom[roomId]) {
+        console.warn(`⚠️ [REDUX] Room ${roomId} not found in messagesByRoom`);
+        return;
+      }
+
+      let updatedCount = 0;
+      const messageIdStrings = messageIds.map(id => id.toString());
+      
+      // Create new array to trigger React re-render
+      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
+        if (messageIdStrings.includes(message._id.toString())) {
+          updatedCount++;
+          return {
+            ...message,
+            status: 'read',
+            readAt: new Date().toISOString()
+          };
         }
+        return message;
       });
-      console.log(`👁️ [REDUX] Marked ${messageIds.length} messages as read`);
+
+      console.log(`👁️ [REDUX] Marked ${updatedCount}/${messageIds.length} messages as read in room ${roomId}`);
     },
 
     editMessage(state, action) {
       const { messageId, content } = action.payload;
+
       for (const roomId in state.messagesByRoom) {
         const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
         if (message) {
@@ -223,6 +309,7 @@ const chatSlice = createSlice({
 
     deleteMessage(state, action) {
       const { messageId } = action.payload;
+
       for (const roomId in state.messagesByRoom) {
         const index = state.messagesByRoom[roomId].findIndex(m => m._id === messageId);
         if (index > -1) {
@@ -235,6 +322,7 @@ const chatSlice = createSlice({
 
     addReaction(state, action) {
       const { messageId, emoji, userId } = action.payload;
+
       for (const roomId in state.messagesByRoom) {
         const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
         if (message) {
@@ -250,6 +338,7 @@ const chatSlice = createSlice({
 
     removeReaction(state, action) {
       const { messageId, emoji, userId } = action.payload;
+
       for (const roomId in state.messagesByRoom) {
         const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
         if (message && message.reactions) {
@@ -275,27 +364,12 @@ const chatSlice = createSlice({
         state.loadingRooms = false;
         const roomsArray = action.payload?.data?.rooms || action.payload?.rooms || action.payload?.data || [];
         state.rooms = Array.isArray(roomsArray) ? roomsArray : [];
+
         if (!state.activeRoomId && state.rooms.length > 0) {
           state.activeRoomId = state.rooms[0]._id;
         }
       })
       .addCase(fetchRooms.rejected, (state, action) => {
-        state.loadingRooms = false;
-        state.error = action.payload;
-      })
-      .addCase(fetchAdminChatRooms.pending, (state) => {
-        state.loadingRooms = true;
-      })
-      .addCase(fetchAdminChatRooms.fulfilled, (state, action) => {
-        state.loadingRooms = false;
-        const roomsArray = action.payload?.data?.rooms || action.payload?.rooms || action.payload?.data || [];
-        state.rooms = Array.isArray(roomsArray) ? roomsArray : [];
-        if (!state.activeRoomId && state.rooms.length > 0) {
-          state.activeRoomId = state.rooms[0]._id;
-        }
-      })
-
-      .addCase(fetchAdminChatRooms.rejected, (state, action) => {
         state.loadingRooms = false;
         state.error = action.payload;
       })
@@ -306,19 +380,19 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.fulfilled, (state, action) => {
         const roomId = action.meta.arg.roomId;
         state.loadingMessages[roomId] = false;
-        const messages = action.payload?.data?.messages || action.payload?.messages || [];
-        state.messagesByRoom[roomId] = Array.isArray(messages) ? messages.map(msg => ({
-          ...msg,
-          status: msg.status || 'delivered',
-          sender: msg.sender || {
-            _id: msg.senderId?._id || msg.senderId,
-            name: msg.senderId?.name || 'Unknown',
-            email: msg.senderId?.email,
-            avatar: msg.senderId?.avatar,
-            role: msg.senderId?.role,
-          },
-          optimistic: false,
-        })) : [];
+
+        const messagesArray = action.payload?.data?.messages || action.payload?.messages || [];
+        
+        // Transform messages to have sender field instead of senderId object
+        state.messagesByRoom[roomId] = Array.isArray(messagesArray) 
+          ? messagesArray.map(msg => ({
+              ...msg,
+              sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
+              senderId: msg.senderId?._id || msg.senderId
+            }))
+          : [];
+
+        console.log(`✅ [REDUX] Fetched ${state.messagesByRoom[roomId].length} messages for room ${roomId}`);
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         const roomId = action.meta.arg.roomId;
@@ -335,6 +409,7 @@ export const {
   updateMessageStatus,
   addTypingUser,
   removeTypingUser,
+  clearRoomTypingUsers,
   clearTypingUsers,
   setOnlineUsers,
   setUserOnlineStatus,

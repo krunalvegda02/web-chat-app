@@ -6,3 +6,20 @@ body {
   @apply bg-gray-50;
   font-family: 'Inter', sans-serif;
 }
+
+
+/* e.g. in index.css or a module imported in this page */
+.glass-table .ant-table {
+  background: transparent;
+}
+
+.glass-table .ant-table-thead > tr > th {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px);
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #0f172a;
+}
+
+.glass-table .ant-table-tbody > tr > td {
+  border-color: transparent;
+}

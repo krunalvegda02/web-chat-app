@@ -36,13 +36,25 @@ export const updateTheme = createAsyncThunkHandler(
 export const generateInviteLink = createAsyncThunkHandler(
   'tenant/generateInviteLink',
   _post,
-  (payload) => `/tenants/${payload}/invite-link`
+  (payload) => `/tenants/${payload.tenantId}/invite-link`
 );
 
 export const getTenantUsers = createAsyncThunkHandler(
   'tenant/getTenantUsers',
   _get,
   (payload) => buildUrlWithParams(`/tenants/${payload.tenantId}/users`, { page: payload.page, limit: payload.limit })
+);
+
+export const getAdminUsers = createAsyncThunkHandler(
+  'tenant/getAdminUsers',
+  _get,
+  (payload) => buildUrlWithParams('/tenants/admin-users', { page: payload?.page, limit: payload?.limit })
+);
+
+export const getTenantMembers = createAsyncThunkHandler(
+  'tenant/getTenantMembers',
+  _get,
+  '/tenants/members'
 );
 
 export const deleteTenant = createAsyncThunkHandler(
@@ -52,11 +64,10 @@ export const deleteTenant = createAsyncThunkHandler(
 );
 
 const initialState = {
-  tenants: [
-  ],
+  tenants: [],
   currentTenant: {},
-  tenantUsers: [
-  ],
+  tenantUsers: [],
+  tenantMembers: [],
   inviteLink: '',
   loading: false,
   error: null,
@@ -111,6 +122,28 @@ const tenantSlice = createSlice({
       })
       .addCase(getTenantUsers.fulfilled, (state, action) => {
         state.tenantUsers = action.payload.data;
+      })
+      .addCase(getAdminUsers.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(getAdminUsers.fulfilled, (state, action) => {
+        state.loading = false;
+        state.tenantUsers = action.payload.data;
+      })
+      .addCase(getAdminUsers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(getTenantMembers.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(getTenantMembers.fulfilled, (state, action) => {
+        state.loading = false;
+        state.tenantMembers = action.payload.data.members;
+      })
+      .addCase(getTenantMembers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });

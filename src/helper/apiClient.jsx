@@ -10,7 +10,6 @@ const apiClient = axios.create({
     },
 });
 
-// eslint-disable-next-line no-unused-vars
 const _get = (url, data = {}, config = {}) => {
     return apiClient.get(url, config);
 };

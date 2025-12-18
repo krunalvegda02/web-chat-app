@@ -1,13 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
-import { Input, Button, Space, message as antMessage } from 'antd';
-import { SendOutlined } from '@ant-design/icons';
+import { useState, useRef, useEffect, memo } from 'react';
+import { Input, Button, Space, Tooltip, message as antMessage } from 'antd';
+import { SendOutlined, PlusOutlined, SmileOutlined } from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { addMessage } from '../../redux/slices/chatSlice';
 import { useChatSocket } from '../../hooks/useChatSocket';
+import { useTheme } from '../../hooks/useTheme';
 import { v4 as uuidv4 } from 'uuid';
 
-export default function MessageInput() {
+
+const MessageInput = memo(function MessageInput() {
   const dispatch = useDispatch();
+  const { theme } = useTheme();
   const [value, setValue] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -18,6 +21,7 @@ export default function MessageInput() {
   const { user } = useSelector((s) => s.auth);
   const { sendMessage, startTyping, stopTyping } = useChatSocket();
 
+  // ✅ Cleanup on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) {
@@ -29,6 +33,7 @@ export default function MessageInput() {
     };
   }, [activeRoomId, stopTyping]);
 
+  // ✅ Clear typing timeout
   const clearTypingTimeout = () => {
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -36,6 +41,7 @@ export default function MessageInput() {
     }
   };
 
+  // ✅ Send typing indicator
   const sendTypingIndicator = () => {
     if (!activeRoomId || !value.trim()) return;
 
@@ -47,6 +53,7 @@ export default function MessageInput() {
     }, 2000);
   };
 
+  // ✅ Handle send message with optimistic updates
   const handleSend = async () => {
     const trimmed = value.trim();
     if (!trimmed || !activeRoomId || isSending) return;
@@ -56,6 +63,7 @@ export default function MessageInput() {
     stopTyping(activeRoomId);
 
     try {
+      // ✅ Optimistic message - shows immediately
       const optimisticMessage = {
         _id: `temp_${uuidv4()}`,
         roomId: activeRoomId,
@@ -73,17 +81,21 @@ export default function MessageInput() {
         createdAt: new Date().toISOString(),
       };
 
-      dispatch(addMessage({
-        roomId: activeRoomId,
-        message: optimisticMessage,
-      }));
+      // ✅ Add to UI immediately for instant feedback
+      dispatch(
+        addMessage({
+          roomId: activeRoomId,
+          message: optimisticMessage,
+        })
+      );
 
+      // ✅ Send to server
       await sendMessage(activeRoomId, trimmed);
 
+      // ✅ Clear input
       setValue('');
       inputRef.current?.focus();
       antMessage.success('Message sent');
-
     } catch (error) {
       console.error('Failed to send message:', error);
       antMessage.error('Failed to send message');
@@ -92,6 +104,7 @@ export default function MessageInput() {
     }
   };
 
+  // ✅ Handle keyboard events
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !isComposing && !isSending) {
       e.preventDefault();
@@ -99,6 +112,7 @@ export default function MessageInput() {
     }
   };
 
+  // ✅ Handle text change with typing indicator
   const handleChange = (e) => {
     setValue(e.target.value);
     if (e.target.value.trim()) {
@@ -112,30 +126,57 @@ export default function MessageInput() {
   };
 
   return (
-    <Space.Compact style={{ width: '100%' }}>
-      <Input.TextArea
-        ref={inputRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onCompositionStart={() => setIsComposing(true)}
-        onCompositionEnd={() => setIsComposing(false)}
-        placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
-        rows={3}
-        disabled={!activeRoomId || isSending}
-        maxLength={5000}
-        style={{ resize: 'none' }}
-      />
-      <Button
-        type="primary"
-        icon={<SendOutlined />}
-        onClick={handleSend}
-        disabled={!value.trim() || !activeRoomId || isSending}
-        loading={isSending}
-        style={{ height: '100%' }}
-      >
-        Send
-      </Button>
-    </Space.Compact>
+    <div
+      style={{
+        padding: '12px 16px',
+        borderTop: `1px solid ${theme.borderColor}`,
+        backgroundColor: theme.backgroundColor,
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'flex-end',
+      }}
+    >
+      <Space style={{ flex: 1 }}>
+        <Input.TextArea
+          ref={inputRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={() => setIsComposing(false)}
+          placeholder="Type a message... "
+          // rows={3}
+          disabled={!activeRoomId || isSending}
+          maxLength={5000}
+          style={{
+            backgroundColor: theme.secondaryColor,
+            borderColor: theme.borderColor,
+            color: theme.headerText,
+            fontSize: `${theme.messageFontSize}px`,
+            resize: 'none',
+          }}
+          bordered
+        />
+      </Space>
+
+      <Tooltip title={isSending ? 'Sending...' : 'Send message (Enter)'}>
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={handleSend}
+          disabled={!value.trim() || !activeRoomId || isSending}
+          loading={isSending}
+          style={{
+            backgroundColor: theme.primaryColor,
+            borderColor: theme.primaryColor,
+            height: '100%',
+          }}
+        >
+          Send
+        </Button>
+      </Tooltip>
+    </div>
   );
-}
+});
+
+export default MessageInput;

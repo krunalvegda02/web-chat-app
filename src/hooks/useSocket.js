@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { chatSocketClient } from '../sockets/chatSocketClient';
@@ -5,6 +6,7 @@ import {
   socketMessageReceived,
   addTypingUser,
   removeTypingUser,
+  clearRoomTypingUsers,
   setOnlineUsers,
   updateMessageStatus,
   updateMessagesReadStatus,
@@ -37,60 +39,134 @@ export const useSocket = () => {
         setSocket(connectedSocket);
         setIsConnected(true);
 
-        // ✅ Initialize global listeners ONCE
+        // ✅ FIX: Initialize global listeners ONCE with better error handling
         if (!globalListenersInitialized) {
-          // Message received event
+          // ✅ Message received event
           chatSocketClient.on('message_received', (data) => {
-            console.log('✅ [GLOBAL] message_received:', data);
-            dispatch(socketMessageReceived({ roomId: data.roomId, message: data }));
-          });
+            console.log('✅ [SOCKET] message_received:', data);
+            if (data && data.roomId) {
+              dispatch(socketMessageReceived({
+                roomId: data.roomId,
+                message: data
+              }));
 
-          // Message delivered event
-          chatSocketClient.on('message_delivered', (data) => {
-            console.log('✅ [GLOBAL] message_delivered:', data);
-            dispatch(updateMessageStatus({
-              roomId: data.roomId || 'unknown',
-              messageId: data.messageId,
-              status: 'delivered',
-            }));
-          });
-
-          // Messages read event
-          chatSocketClient.on('messages_read', (data) => {
-            console.log('✅ [GLOBAL] messages_read:', data);
-            dispatch(updateMessagesReadStatus({
-              roomId: data.roomId,
-              messageIds: data.messageIds,
-            }));
-          });
-
-          // User typing event
-          chatSocketClient.on('user_typing', (data) => {
-            console.log('✅ [GLOBAL] user_typing:', data);
-            if (data.userId === user?._id) return;
-
-            if (data.isTyping) {
-              dispatch(addTypingUser({ userId: data.userId }));
-            } else {
-              dispatch(removeTypingUser({ userId: data.userId }));
+              // ✅ Auto-mark as read if message is from someone else and we're viewing this room
+              const state = window.__REDUX_STORE__?.getState();
+              const activeRoomId = state?.chat?.activeRoomId;
+              
+              if (activeRoomId === data.roomId && data.senderId !== user?._id) {
+                // Mark this message as read
+                setTimeout(() => {
+                  chatSocketClient.emit('mark_messages_read', {
+                    roomId: data.roomId,
+                    messageIds: [data._id]
+                  });
+                  console.log(`📖 [AUTO] Auto-marked message ${data._id} as read`);
+                }, 500);
+              }
             }
           });
 
-          // Online users event
+          // ✅ FIX: Message sent event (emit by server after send succeeds)
+          chatSocketClient.on('message_sent', (data) => {
+            console.log('✅ [SOCKET] message_sent:', data);
+            if (data && data.messageId && data.roomId) {
+              dispatch(updateMessageStatus({
+                roomId: data.roomId,
+                messageId: data.messageId,
+                status: 'sent' // ✅ FIX: Change to 'sent' instead of 'delivered'
+              }));
+            }
+          });
+
+          // ✅ Message delivered event
+          chatSocketClient.on('message_delivered', (data) => {
+            console.log('✅ [SOCKET] message_delivered:', data);
+            if (data && data.messageId && data.roomId) {
+              dispatch(updateMessageStatus({
+                roomId: data.roomId,
+                messageId: data.messageId,
+                status: 'delivered'
+              }));
+            }
+          });
+
+          // ✅ FIX: Messages read event with proper roomId
+          chatSocketClient.on('messages_read', (data) => {
+            console.log('✅ [SOCKET] messages_read EVENT RECEIVED:', JSON.stringify(data));
+            if (data && data.roomId && data.messageIds && data.messageIds.length > 0) {
+              console.log(`👁️ [SOCKET] Dispatching updateMessagesReadStatus for ${data.messageIds.length} messages`);
+              console.log(`👁️ [SOCKET] Message IDs:`, data.messageIds);
+              console.log(`👁️ [SOCKET] Room ID:`, data.roomId);
+              
+              dispatch(updateMessagesReadStatus({
+                roomId: data.roomId,
+                messageIds: data.messageIds
+              }));
+              
+              console.log(`✅ [SOCKET] Redux action dispatched successfully`);
+            } else {
+              console.warn('⚠️ [SOCKET] Invalid messages_read data:', data);
+            }
+          });
+
+          // ✅ FIX: User typing event - include roomId
+          chatSocketClient.on('user_typing', (data) => {
+            console.log('✅ [SOCKET] user_typing:', data);
+            
+            // ✅ FIX: Don't show own typing indicator
+            if (data.userId === user?._id) {
+              console.log(`⏭️ [SOCKET] Skipping own typing indicator`);
+              return;
+            }
+
+            // ✅ Always dispatch - let component filter by activeRoomId
+            if (data.isTyping) {
+              dispatch(addTypingUser({
+                userId: data.userId,
+                roomId: data.roomId
+              }));
+
+              // ✅ FIX: Auto-remove typing indicator after 3 seconds
+              setTimeout(() => {
+                dispatch(removeTypingUser({
+                  userId: data.userId,
+                  roomId: data.roomId
+                }));
+              }, 3000);
+            } else {
+              dispatch(removeTypingUser({
+                userId: data.userId,
+                roomId: data.roomId
+              }));
+            }
+          });
+
+          // ✅ Online users event
           chatSocketClient.on('online_users', (data) => {
-            console.log('✅ [GLOBAL] online_users:', data.users);
+            console.log('✅ [SOCKET] online_users:', data.users);
             dispatch(setOnlineUsers(data.users || []));
           });
 
-          // Room updated event
+          // ✅ FIX: Room updated event - refetch rooms if in same room
           chatSocketClient.on('room_updated', (data) => {
-            console.log('✅ [GLOBAL] room_updated:', data);
+            console.log('✅ [SOCKET] room_updated:', data);
+            // This will trigger a room re-fetch from the component listening
+          });
+
+          // ✅ FIX: User went online
+          chatSocketClient.on('user_online', (data) => {
+            console.log('✅ [SOCKET] user_online:', data.userId);
+          });
+
+          // ✅ FIX: User went offline
+          chatSocketClient.on('user_offline', (data) => {
+            console.log('✅ [SOCKET] user_offline:', data.userId);
           });
 
           globalListenersInitialized = true;
-          console.log('✅ [GLOBAL] Socket listeners initialized');
+          console.log('✅ [SOCKET] Listeners initialized successfully');
         }
-
       } catch (err) {
         console.error('Failed to initialize socket:', err);
         setError(err);
@@ -111,6 +187,7 @@ export const useSocket = () => {
     chatSocketClient.disconnect();
     setSocket(null);
     setIsConnected(false);
+    globalListenersInitialized = false; // ✅ FIX: Reset flag on disconnect
   }, []);
 
   return {

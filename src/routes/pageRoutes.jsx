@@ -1,7 +1,7 @@
 import AuthLayout from "../layouts/AuthLayout";
 import AdminLayout from "../layouts/AdminLayout";
 import SuperAdminLayout from "../layouts/SuperAdminLayout";
-import UserChatLayout from "../layouts/UserChatLayout";
+import UserChatLayout from "../layouts/UserLayout";
 
 // Auth Pages
 import LoginPage from "../pages/auth/LoginPage";
@@ -28,6 +28,7 @@ import Unauthorized from "../pages/common/Unauthorized";
 import NotFound from "../pages/common/NotFound";
 import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
 import AdminUsersChat from "../pages/admin/Admin_userschat";
+import JoinPage from "../pages/user/JoinPage";
 
 // ------------------------------------
 // CENTRALIZED ROUTE CONFIG
@@ -40,6 +41,8 @@ export const pageRoutes = [
             { path: "/register", element: RegisterPage },
             { path: "/reset-password", element: ResetPasswordPage },
             { path: "/join/:tenantSlug", element: UserJoinPage },
+
+            { path: "/join", element: JoinPage },
         ],
     },
 
@@ -69,7 +72,9 @@ export const pageRoutes = [
         layout: UserChatLayout,
         requiredRoles: ["USER"],
         routes: [
-            { path: "/user/chat", element: UserChatPage },
+            { path: "/user/chats", element: UserChatPage },
+            {path: "/user/calls", element: UserChatPage },
+            {path: "/user/profile", element: UserChatPage },
         ],
     },
 

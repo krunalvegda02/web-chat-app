@@ -39,6 +39,18 @@ export const resetPassword = createAsyncThunkHandler(
   '/auth/reset-password'
 );
 
+export const fetchInviteInfo = createAsyncThunkHandler(
+  'auth/fetchInviteInfo',
+  _get,
+  (payload) => `/auth/invite-info?token=${payload.token}&tenantId=${payload.tenantId}`
+);
+
+export const registerWithInvite = createAsyncThunkHandler(
+  'auth/registerWithInvite',
+  _post,
+  '/auth/register-with-invite'
+);
+
 const initialState = {
   user: null,
   loading: false,
@@ -46,6 +58,9 @@ const initialState = {
   initialized: false,
   token: null,
   refreshToken: null,
+  inviteInfo: null,
+  inviteLoading: false,
+  inviteError: null,
 };
 
 const authSlice = createSlice({
@@ -128,6 +143,38 @@ const authSlice = createSlice({
         state.refreshToken = null;
         state.initialized = true;
       })
+
+      // Fetch Invite Info
+      .addCase(fetchInviteInfo.pending, (state) => {
+        state.inviteLoading = true;
+        state.inviteError = null;
+      })
+      .addCase(fetchInviteInfo.fulfilled, (state, action) => {
+        state.inviteLoading = false;
+        state.inviteInfo = action.payload.data;
+      })
+      .addCase(fetchInviteInfo.rejected, (state, action) => {
+        state.inviteLoading = false;
+        state.inviteError = action.payload;
+      })
+
+      // Register with Invite
+      .addCase(registerWithInvite.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(registerWithInvite.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.data.user;
+        state.token = action.payload.data.accessToken;
+        state.refreshToken = action.payload.data.refreshToken;
+        state.initialized = true;
+      })
+      .addCase(registerWithInvite.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
       .addCase('persist/PURGE', () => {
         return initialState;
       });
