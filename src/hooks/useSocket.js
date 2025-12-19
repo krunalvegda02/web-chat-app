@@ -147,7 +147,7 @@ export const useSocket = () => {
             }
           });
 
-          // ✅ Online users event
+          // ✅ Online users event (initial list)
           chatSocketClient.on('online_users', (data) => {
             console.log('✅ [SOCKET] online_users:', data.users);
             dispatch(setOnlineUsers(data.users || []));
@@ -159,14 +159,21 @@ export const useSocket = () => {
             // This will trigger a room re-fetch from the component listening
           });
 
-          // ✅ FIX: User went online
-          chatSocketClient.on('user_online', (data) => {
-            console.log('✅ [SOCKET] user_online:', data.userId);
-          });
-
-          // ✅ FIX: User went offline
-          chatSocketClient.on('user_offline', (data) => {
-            console.log('✅ [SOCKET] user_offline:', data.userId);
+          // ✅ User status changed (online/offline)
+          chatSocketClient.on('user_status_changed', (data) => {
+            console.log(`✅ [SOCKET] user_status_changed: ${data.userId} is now ${data.status}`);
+            // Trigger a re-fetch of online users or update local state
+            if (data.status === 'online') {
+              const state = window.__REDUX_STORE__?.getState();
+              const currentOnlineUsers = state?.chat?.onlineUsers || [];
+              if (!currentOnlineUsers.includes(data.userId)) {
+                dispatch(setOnlineUsers([...currentOnlineUsers, data.userId]));
+              }
+            } else if (data.status === 'offline') {
+              const state = window.__REDUX_STORE__?.getState();
+              const currentOnlineUsers = state?.chat?.onlineUsers || [];
+              dispatch(setOnlineUsers(currentOnlineUsers.filter(id => id !== data.userId)));
+            }
           });
 
           globalListenersInitialized = true;

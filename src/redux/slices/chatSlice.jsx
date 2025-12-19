@@ -58,6 +58,13 @@ export const sendMessageAPI = createAsyncThunkHandler(
 );
 
 
+export const uploadChatMedia = createAsyncThunkHandler(
+  'chat/uploadMedia',
+  _post,
+  API.UPLOAD.CHAT_MEDIA
+);
+
+
 export const editMessageAPI = createAsyncThunkHandler(
   'chat/editMessage',
   (payload) => _post(payload, `${API.CHAT.EDIT_MESSAGE}/${payload.messageId}`),

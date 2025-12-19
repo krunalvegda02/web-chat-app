@@ -52,6 +52,7 @@ import chatReducer from './slices/chatSlice.jsx';
 import tenantReducer from './slices/tenantSlice.jsx';
 import userReducer from './slices/userSlice.jsx';
 import themeReducer from './slices/themeSlice.jsx';
+import adminChatReducer from './slices/adminChatSlice.jsx';
 
 const persistConfig = {
   key: 'root',
@@ -65,6 +66,7 @@ const rootReducer = combineReducers({
   tenant: tenantReducer,
   user: userReducer,
   theme: themeReducer,
+  adminChat: adminChatReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
