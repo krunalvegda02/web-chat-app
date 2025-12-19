@@ -6,10 +6,12 @@ import {
   socketMessageReceived,
   addTypingUser,
   removeTypingUser,
-  clearRoomTypingUsers,
   setOnlineUsers,
   updateMessageStatus,
   updateMessagesReadStatus,
+  updateRoomUnreadCount,
+  editMessage,
+  deleteMessage,
 } from '../redux/slices/chatSlice';
 
 let globalListenersInitialized = false;
@@ -55,7 +57,7 @@ export const useSocket = () => {
               // ✅ Auto-mark as read if message is from someone else and we're viewing this room
               const state = window.__REDUX_STORE__?.getState();
               const activeRoomId = state?.chat?.activeRoomId;
-              
+
               if (activeRoomId === data.roomId && data.senderId !== user?._id) {
                 // Mark this message as read
                 setTimeout(() => {
@@ -95,31 +97,40 @@ export const useSocket = () => {
 
           // ✅ FIX: Messages read event with proper roomId
           chatSocketClient.on('messages_read', (data) => {
-            console.log('✅ [SOCKET] messages_read EVENT RECEIVED:', JSON.stringify(data));
+            console.log('👁️👁️👁️ [SOCKET] ========== messages_read EVENT RECEIVED ==========');
+            console.log('👁️ [SOCKET] Full data:', JSON.stringify(data, null, 2));
+            console.log('👁️ [SOCKET] Room ID:', data?.roomId);
+            console.log('👁️ [SOCKET] Message IDs:', data?.messageIds);
+            console.log('👁️ [SOCKET] Read by:', data?.readBy);
+
             if (data && data.roomId && data.messageIds && data.messageIds.length > 0) {
-              console.log(`👁️ [SOCKET] Dispatching updateMessagesReadStatus for ${data.messageIds.length} messages`);
-              console.log(`👁️ [SOCKET] Message IDs:`, data.messageIds);
-              console.log(`👁️ [SOCKET] Room ID:`, data.roomId);
-              
+              console.log(`👁️ [SOCKET] ✅ Valid data - Dispatching updateMessagesReadStatus for ${data.messageIds.length} messages`);
+
               dispatch(updateMessagesReadStatus({
                 roomId: data.roomId,
                 messageIds: data.messageIds
               }));
-              
-              console.log(`✅ [SOCKET] Redux action dispatched successfully`);
+
+              console.log(`✅ [SOCKET] Redux action dispatched - messages should now show as read`);
             } else {
-              console.warn('⚠️ [SOCKET] Invalid messages_read data:', data);
+              console.error('❌ [SOCKET] Invalid messages_read data:', {
+                hasData: !!data,
+                hasRoomId: !!data?.roomId,
+                hasMessageIds: !!data?.messageIds,
+                messageIdsLength: data?.messageIds?.length
+              });
             }
+            console.log('👁️👁️👁️ [SOCKET] ========== END messages_read ==========');
           });
 
           // ✅ FIX: User typing event - include roomId
           chatSocketClient.on('user_typing', (data) => {
             console.log('✅ [SOCKET] user_typing:', data);
-            
+
             // ✅ FIX: Don't show own typing indicator (compare both string and object)
             const currentUserId = user?._id?.toString() || user?._id;
             const typingUserId = data.userId?.toString() || data.userId;
-            
+
             if (currentUserId === typingUserId) {
               console.log(`⏭️ [SOCKET] Skipping own typing indicator`);
               return;
@@ -173,6 +184,40 @@ export const useSocket = () => {
               const state = window.__REDUX_STORE__?.getState();
               const currentOnlineUsers = state?.chat?.onlineUsers || [];
               dispatch(setOnlineUsers(currentOnlineUsers.filter(id => id !== data.userId)));
+            }
+          });
+
+          // ✅ Unread count updated
+          chatSocketClient.on('unread_count_updated', (data) => {
+            console.log('🔔 [SOCKET] unread_count_updated:', data);
+            if (data && data.roomId) {
+              dispatch(updateRoomUnreadCount({
+                roomId: data.roomId,
+                unreadCount: data.unreadCount
+              }));
+            }
+          });
+
+          // ✅ Message edited
+          chatSocketClient.on('message_edited', (data) => {
+            console.log('✏️ [SOCKET] message_edited:', data);
+            if (data && data.messageId) {
+              dispatch(editMessage({
+                messageId: data.messageId,
+                content: data.content,
+                editedAt: data.editedAt
+              }));
+            }
+          });
+
+          // ✅ Message deleted
+          chatSocketClient.on('message_deleted', (data) => {
+            console.log('🗑️ [SOCKET] message_deleted:', data);
+            if (data && data.messageId) {
+              dispatch(deleteMessage({
+                messageId: data.messageId,
+                deletedAt: data.deletedAt
+              }));
             }
           });
 

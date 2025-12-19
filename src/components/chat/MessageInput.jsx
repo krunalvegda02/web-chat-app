@@ -74,10 +74,19 @@ const MessageInput = memo(function MessageInput() {
         const formData = new FormData();
         fileList.forEach(file => {
           const fileObj = file.originFileObj || file;
-          console.log('📎 Appending file:', fileObj.name, fileObj.type, fileObj.size);
-          formData.append('files', fileObj);
+          // Ensure we have a valid File/Blob object
+          if (!(fileObj instanceof File) && !(fileObj instanceof Blob)) {
+            console.error('❌ Invalid file object:', fileObj);
+            throw new Error('Invalid file object');
+          }
+          console.log('📎 Appending file:', fileObj.name, fileObj.type, fileObj.size, 'isFile:', fileObj instanceof File);
+          formData.append('files', fileObj, fileObj.name);
         });
         console.log('📦 FormData entries:', Array.from(formData.entries()).length);
+        // Log FormData contents for debugging
+        for (const [key, value] of formData.entries()) {
+          console.log(`📋 FormData[${key}]:`, value instanceof File ? `File(${value.name}, ${value.size} bytes)` : value);
+        }
         const uploadResult = await dispatch(uploadChatMedia(formData)).unwrap();
         mediaUrls = uploadResult.data.media;
       }
@@ -86,8 +95,10 @@ const MessageInput = memo(function MessageInput() {
         ? (mediaUrls[0].type === 'video' ? 'video' : mediaUrls[0].type === 'image' ? 'image' : 'file')
         : 'text';
 
+      // Add optimistic message for immediate UI feedback
+      const tempId = `temp_${Date.now()}_${Math.random()}`;
       const optimisticMessage = {
-        _id: `temp_${uuidv4()}`,
+        _id: tempId,
         roomId: activeRoomId,
         content: trimmed,
         type: messageType,
@@ -112,7 +123,6 @@ const MessageInput = memo(function MessageInput() {
       setValue('');
       setFileList([]);
       inputRef.current?.focus();
-      antMessage.success('Message sent');
     } catch (error) {
       console.error('Failed to send message:', error);
       antMessage.error('Failed to send message');

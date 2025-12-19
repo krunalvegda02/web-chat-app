@@ -16,30 +16,30 @@ export const createAsyncThunkHandler = (typePrefix, apiMethod, urlResolver, isMu
       const shouldSendBody = typeof payload === 'object' && payload !== null;
       const requestBody = shouldSendBody ? payload : {};
       
+      // Detect FormData automatically or use isMultipart flag
+      const isFormData = requestBody instanceof FormData;
+      const shouldUseMultipart = isMultipart === true || isFormData;
+      
       // Log differently for FormData vs regular objects
-      if (requestBody instanceof FormData) {
+      if (isFormData) {
         console.log(`📦 [AsyncThunk] ${typePrefix} - Request Body: FormData with`, requestBody.entries ? Array.from(requestBody.entries()).length : 'unknown', 'entries');
       } else {
         console.log(`📦 [AsyncThunk] ${typePrefix} - Request Body:`, JSON.stringify(requestBody, null, 2));
       }
-      console.log(`📎 [AsyncThunk] ${typePrefix} - isMultipart:`, isMultipart);
+      console.log(`📎 [AsyncThunk] ${typePrefix} - isMultipart:`, shouldUseMultipart);
       
-      const response = await apiMethod(
-        url,
-        requestBody,
-        isMultipart === true
-          ? {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          : {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-      );
+      // For FormData/multipart: Don't set Content-Type manually - let axios set it with boundary
+      // For regular requests: Set Authorization header
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        }
+      };
+      
+      // Don't set Content-Type for multipart - axios will set it automatically with boundary
+      // The apiClient will handle removing any Content-Type header if FormData is detected
+      
+      const response = await apiMethod(url, requestBody, config);
       
       console.log(`✅ [AsyncThunk] ${typePrefix} - Response:`, response.data);
       

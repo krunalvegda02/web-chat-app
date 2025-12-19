@@ -36,6 +36,12 @@ export const createDirectRoom = createAsyncThunkHandler(
   API.CHAT.DIRECT
 );
 
+export const createChatFromContact = createAsyncThunkHandler(
+  'chat/createChatFromContact',
+  _post,
+  API.CHAT.CONTACT_CHAT
+);
+
 
 export const createAdminChat = createAsyncThunkHandler(
   'chat/createAdminChat',
@@ -61,7 +67,8 @@ export const sendMessageAPI = createAsyncThunkHandler(
 export const uploadChatMedia = createAsyncThunkHandler(
   'chat/uploadMedia',
   _post,
-  API.UPLOAD.CHAT_MEDIA
+  API.UPLOAD.CHAT_MEDIA,
+  true // isMultipart - required for FormData file uploads
 );
 
 
@@ -124,7 +131,7 @@ export const sendMessageThunk = (content) => (dispatch, getState) => {
 };
 
 
-export const joinRoomThunk = (roomId) => async (dispatch) => {
+export const joinRoomThunk = (roomId) => async () => {
   try {
     await chatSocketClient.emit('join_room', { roomId });
     console.log('✅ Joined room:', roomId);
@@ -166,8 +173,19 @@ const chatSlice = createSlice({
   initialState,
   reducers: {
     setActiveRoom(state, action) {
-      state.activeRoomId = action.payload;
-      console.log(`🏠 [REDUX] Active room set to: ${action.payload}`);
+      const roomId = action.payload;
+      state.activeRoomId = roomId;
+      
+      // Clear unread count for this room
+      const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
+      const room = roomsArray.find(r => r._id === roomId);
+      if (room && room.unreadCount > 0) {
+        room.unreadCount = 0;
+        state.rooms = roomsArray;
+        console.log(`📥 [REDUX] Cleared unread count for room: ${roomId}`);
+      }
+      
+      console.log(`🏠 [REDUX] Active room set to: ${roomId}`);
     },
 
 
@@ -230,6 +248,10 @@ const chatSlice = createSlice({
         senderId: message.senderId?._id || message.senderId,
         status: message.status || 'sent',
         optimistic: false,
+        // Ensure media array is preserved
+        media: Array.isArray(message.media) ? message.media : [],
+        // Ensure type is set
+        type: message.type || (message.media && message.media.length > 0 ? 'image' : 'text'),
       };
 
       console.log('✅ [DEBUG] Adding real message with sender:', finalMessage.sender?.name);
@@ -238,16 +260,19 @@ const chatSlice = createSlice({
 
       state.pendingMessageIds = state.pendingMessageIds.filter(id => !id.startsWith('temp-'));
 
-      const roomsArray = Array.isArray(state.rooms) ? state.rooms : [];
+      const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
       const roomIndex = roomsArray.findIndex(r => r._id === roomId);
       if (roomIndex !== -1) {
-        roomsArray[roomIndex].lastMessage = finalMessage;
-        roomsArray[roomIndex].lastMessageTime = finalMessage.createdAt;
-        roomsArray[roomIndex].lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
-        const [room] = roomsArray.splice(roomIndex, 1);
+        const room = roomsArray[roomIndex];
+        room.lastMessage = finalMessage;
+        room.lastMessageTime = finalMessage.createdAt;
+        room.lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
+        roomsArray.splice(roomIndex, 1);
         roomsArray.unshift(room);
         state.rooms = roomsArray;
         console.log(`📋 [REDUX] Room list updated for room: ${roomId}`);
+      } else {
+        console.warn(`⚠️ [REDUX] Room ${roomId} not found in rooms array`);
       }
 
       console.log(`💬 [REDUX] Real message added: ${message._id}, total messages: ${state.messagesByRoom[roomId].length}`);
@@ -385,14 +410,14 @@ const chatSlice = createSlice({
 
     // ✅ Edit message
     editMessage(state, action) {
-      const { messageId, content } = action.payload;
+      const { messageId, content, editedAt } = action.payload;
 
       for (const roomId in state.messagesByRoom) {
         const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
         if (message) {
           message.content = content;
           message.isEdited = true;
-          message.editedAt = new Date().toISOString();
+          message.editedAt = editedAt || new Date().toISOString();
           console.log(`✏️ [REDUX] Message edited: ${messageId}`);
           return;
         }
@@ -402,13 +427,13 @@ const chatSlice = createSlice({
 
     // ✅ Delete message (soft delete)
     deleteMessage(state, action) {
-      const { messageId } = action.payload;
+      const { messageId, deletedAt } = action.payload;
 
       for (const roomId in state.messagesByRoom) {
         const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
         if (message) {
           message.isDeleted = true;
-          message.deletedAt = new Date().toISOString();
+          message.deletedAt = deletedAt || new Date().toISOString();
           console.log(`🗑️ [REDUX] Message marked as deleted: ${messageId}`);
           return;
         }
@@ -447,6 +472,19 @@ const chatSlice = createSlice({
       }
     },
 
+
+    updateRoomUnreadCount(state, action) {
+      const { roomId, unreadCount } = action.payload;
+      const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
+      const room = roomsArray.find(r => r._id === roomId);
+      if (room) {
+        room.unreadCount = unreadCount;
+        state.rooms = roomsArray;
+        console.log(`🔔 [REDUX] Unread count updated for room ${roomId}: ${unreadCount}`);
+      } else {
+        console.warn(`⚠️ [REDUX] Room ${roomId} not found for unread count update`);
+      }
+    },
 
     clearError(state) {
       state.error = null;
@@ -488,6 +526,10 @@ const chatSlice = createSlice({
               sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
               senderId: msg.senderId?._id || msg.senderId,
               status: msg.status || 'read',
+              // Ensure media array is preserved
+              media: Array.isArray(msg.media) ? msg.media : [],
+              // Ensure type is set
+              type: msg.type || (msg.media && msg.media.length > 0 ? 'image' : 'text'),
             }))
           : [];
 
@@ -525,6 +567,7 @@ export const {
   deleteMessage,
   addReaction,
   removeReaction,
+  updateRoomUnreadCount,
   clearError,
 } = chatSlice.actions;
 

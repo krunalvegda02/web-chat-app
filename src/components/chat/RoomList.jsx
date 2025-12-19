@@ -6,28 +6,9 @@ import { SearchOutlined, PlusOutlined, MessageOutlined } from '@ant-design/icons
 import Avatar from '../common/Avatar';
 import OnlineStatus from './OnlineStatus';
 import { format, isToday, isYesterday } from 'date-fns';
-import { chatSocketClient } from '../../sockets/chatSocketClient';
 import { useTheme } from '../../hooks/useTheme';
 
 
-/**
- * ✅ ENHANCED RoomList Component (HYBRID - BEST OF BOTH)
- * 
- * Features:
- * ✅ Full theme integration
- * ✅ Professional UI with hover effects
- * ✅ Avatar badge with unread count
- * ✅ Online status indicator
- * ✅ Real-time socket updates
- * ✅ Active room indicator
- * ✅ Search functionality with theme
- * ✅ Create room button
- * ✅ Time formatting (Today/Yesterday/Date)
- * ✅ Empty state with CTA
- * ✅ Socket ready check
- * ✅ Proper cleanup on unmount
- * ✅ Debug logging
- */
 export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null }) {
   const dispatch = useDispatch();
   const { theme } = useTheme();
@@ -44,11 +25,6 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
     }
   }, [dispatch, user?.role, fetchRoomsAction]);
 
-  // ❌ REMOVED: Socket listeners that were causing infinite API calls
-  // Room list updates are handled by Redux state from socket events in useSocket.js
-  // No need to refetch all rooms on every message - state updates automatically
-
-  // ✅ Get rooms array from various formats
   const roomsArray = Array.isArray(rooms)
     ? rooms
     : rooms?.data?.rooms || rooms?.rooms || rooms?.data || [];
@@ -75,7 +51,14 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
   }, [user?._id]);
 
   // ✅ Get last message text
-  const getLastMessageText = useCallback((lastMessage) => {
+  const getLastMessageText = useCallback((room) => {
+    // Show first unread message if there are unread messages
+    if (room.unreadCount > 0 && room.firstUnreadMessage) {
+      return room.firstUnreadMessage.content || 'New message';
+    }
+    
+    // Otherwise show last message
+    const lastMessage = room.lastMessage;
     if (!lastMessage) return 'No messages yet';
     if (typeof lastMessage === 'object' && lastMessage.content) {
       return lastMessage.content.substring(0, 50);
@@ -116,6 +99,8 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
       </div>
     );
   }
+
+
 
   return (
     <div
@@ -212,15 +197,18 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
             )}
           </Empty>
         ) : (
+          
           <List
             dataSource={filteredRooms}
             renderItem={(room) => {
+                    {console.log("room", room)}
+
               const isActive = activeRoomId === room._id;
               const unreadCount = getUnreadCount(room);
 
               return (
                 <List.Item
-                  key={room._id}
+                  key={`${room._id}-${room.lastMessageTime || ''}-${room.unreadCount || 0}`}
                   onClick={() => dispatch(setActiveRoom(room._id))}
                   style={{
                     backgroundColor: isActive
@@ -329,7 +317,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
                             fontWeight: unreadCount > 0 ? 600 : 400,
                           }}
                         >
-                          {getLastMessageText(room.lastMessage)}
+                          {getLastMessageText(room)}
                         </span>
                       </div>
                     }

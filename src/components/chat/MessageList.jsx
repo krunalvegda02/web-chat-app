@@ -26,18 +26,33 @@ const MessageList = memo(function MessageList({ messages = [] }) {
     return messages
       .filter((message) => {
         if (!message || typeof message !== 'object') return false;
-        if (!message._id || !message.content) return false;
+        if (!message._id) return false;
+        // Allow messages with content OR media (image/video/file messages may have empty content)
+        if (!message.content && (!message.media || !Array.isArray(message.media) || message.media.length === 0)) return false;
         if (!message.createdAt) return false;
         if (!message.sender && !message.senderId) return false;
         return true;
       })
-      .map((message) => ({
-        ...message,
-        sender: message.sender || {
-          _id: message.senderId,
+      .map((message) => {
+        // Normalize senderId - handle both object and string formats
+        const senderId = typeof message.senderId === 'object' && message.senderId?._id 
+          ? message.senderId._id 
+          : (message.senderId || message.sender?._id);
+        
+        // Normalize sender - use senderId object if it's populated, otherwise use sender
+        const sender = message.sender || (typeof message.senderId === 'object' ? message.senderId : null) || {
+          _id: senderId,
           name: 'Unknown User',
-        },
-      }));
+        };
+
+        return {
+          ...message,
+          sender,
+          senderId,
+          // Ensure media array exists and is properly formatted
+          media: Array.isArray(message.media) ? message.media : [],
+        };
+      });
   }, [messages]);
 
   // ✅ Auto-scroll to bottom on new messages
@@ -62,10 +77,11 @@ const MessageList = memo(function MessageList({ messages = [] }) {
     }
   }, [activeRoomId, validMessages, user?._id]);
 
-  // ✅ Format date label
+  // ✅ Format date label - WhatsApp style
   const formatDateLabel = (date) => {
     if (isToday(date)) return 'Today';
     if (isYesterday(date)) return 'Yesterday';
+    // Format like "Dec 19, 2024" or "19/12/2024" - WhatsApp style
     return format(date, 'MMM d, yyyy');
   };
 
@@ -154,27 +170,46 @@ const MessageList = memo(function MessageList({ messages = [] }) {
         .sort()
         .map((dateKey) => (
           <div key={dateKey}>
-            {/* ✅ Date divider with theme colors */}
-            <Divider
+            {/* ✅ Date divider - WhatsApp style (subtle and centered) */}
+            <div
               style={{
-                color: theme.borderColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 margin: '16px 0',
+                position: 'relative',
               }}
             >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  height: '1px',
+                  backgroundColor: theme.borderColor,
+                  opacity: 0.3,
+                }}
+              />
               <span
                 style={{
-                  fontSize: '12px',
+                  fontSize: '12.5px',
                   color: theme.headerText,
+                  backgroundColor: theme.backgroundColor,
+                  padding: '0 12px',
+                  position: 'relative',
+                  fontWeight: 400,
+                  opacity: 0.8,
+                  letterSpacing: '0.3px',
                 }}
               >
                 {formatDateLabel(new Date(dateKey))}
               </span>
-            </Divider>
+            </div>
 
             {/* ✅ Messages for this date */}
             {groupedMessages[dateKey].map((message) => (
               <MessageBubble
-                key={`${message._id}-${message.status || 'sent'}`}
+                key={message._id}
                 message={message}
                 currentUser={user}
                 showAvatar={theme.showAvatars}

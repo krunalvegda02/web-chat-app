@@ -22,6 +22,15 @@ export const SOCKET_EVENTS = {
   ONLINE_USERS: 'online_users',
   ERROR: 'error',
   AUTH_ERROR: 'auth_error',
+  // WebRTC Events
+  CALL_INITIATE: 'call_initiate',
+  CALL_INCOMING: 'call_incoming',
+  CALL_ACCEPTED: 'call_accepted',
+  CALL_REJECTED: 'call_rejected',
+  CALL_ENDED: 'call_ended',
+  WEBRTC_OFFER: 'webrtc_offer',
+  WEBRTC_ANSWER: 'webrtc_answer',
+  WEBRTC_ICE_CANDIDATE: 'webrtc_ice_candidate',
 };
 
 export const MESSAGE_TYPES = {

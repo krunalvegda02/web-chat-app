@@ -9,6 +9,7 @@ const API = {
         AVAILABLE_USERS: '/chat/available-users',
         ROOMS: '/chat/rooms',
         DIRECT: '/chat/direct',
+        CONTACT_CHAT: '/chat/contact-chat',
         GROUP: '/chat/group',
         ADMIN_CHAT: '/chat/admin-chat',
         ROOM_MESSAGES: '/chat/rooms',

@@ -277,7 +277,8 @@ import {
 } from '../../redux/slices/chatSlice';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import { Spin, Empty, Button, Avatar, Space, Tooltip } from 'antd';
+import VideoCallModal from './VideoCallModal';
+import { Spin, Empty, Button, Avatar, Space, Tooltip, message } from 'antd';
 import {
   PhoneOutlined,
   VideoCameraOutlined,
@@ -288,6 +289,7 @@ import OnlineStatus from './OnlineStatus';
 import TypingIndicator from './TypingIndicator';
 import { useTheme } from '../../hooks/useTheme';
 import { useChatSocket } from '../../hooks/useChatSocket';
+import { chatSocketClient } from '../../sockets/chatSocketClient';
 
 export default function ChatWindow({ isMobile = false }) {
   const dispatch = useDispatch();
@@ -306,6 +308,9 @@ export default function ChatWindow({ isMobile = false }) {
   const [roomDetails, setRoomDetails] = useState(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const hasJoinedRoom = useRef(false);
+  const [callModalVisible, setCallModalVisible] = useState(false);
+  const [callType, setCallType] = useState('audio');
+  const [incomingCall, setIncomingCall] = useState(null);
 
   // ✅ Get room details from rooms (memoized)
   const currentRoom = useMemo(() => {
@@ -389,6 +394,42 @@ export default function ChatWindow({ isMobile = false }) {
   // ❌ REMOVED: Auto-mark-as-read logic that was causing infinite loop
   // Messages are marked as read via socket events when user joins room
   // See: Backend chatSocket.js join_room event handler
+
+  // Handle incoming calls
+  useEffect(() => {
+    const handleIncomingCall = ({ callerId, callerName, callType, roomId }) => {
+      if (roomId === activeRoomId) {
+        setIncomingCall({ callerId, callerName, callType });
+        setCallType(callType);
+        setCallModalVisible(true);
+      }
+    };
+
+    chatSocketClient.on('call_incoming', handleIncomingCall);
+
+    return () => {
+      chatSocketClient.offAll('call_incoming');
+    };
+  }, [activeRoomId]);
+
+  const handleStartCall = (type) => {
+    if (!otherParticipant) {
+      message.error('Cannot start call: No participant found');
+      return;
+    }
+    if (!isOtherUserOnline) {
+      message.warning('User is offline');
+      return;
+    }
+    setCallType(type);
+    setIncomingCall(null);
+    setCallModalVisible(true);
+  };
+
+  const handleCloseCall = () => {
+    setCallModalVisible(false);
+    setIncomingCall(null);
+  };
 
   // ✅ Show empty state if no room selected
   if (!activeRoomId) {
@@ -491,11 +532,21 @@ export default function ChatWindow({ isMobile = false }) {
         </Space>
 
         <Space>
-          <Tooltip title="Call">
-            <Button type="text" icon={<PhoneOutlined />} />
+          <Tooltip title="Audio Call">
+            <Button
+              type="text"
+              icon={<PhoneOutlined />}
+              onClick={() => handleStartCall('audio')}
+              disabled={!isOtherUserOnline}
+            />
           </Tooltip>
-          <Tooltip title="Video">
-            <Button type="text" icon={<VideoCameraOutlined />} />
+          <Tooltip title="Video Call">
+            <Button
+              type="text"
+              icon={<VideoCameraOutlined />}
+              onClick={() => handleStartCall('video')}
+              disabled={!isOtherUserOnline}
+            />
           </Tooltip>
           <Tooltip title="More">
             <Button type="text" icon={<MoreOutlined />} />
@@ -521,6 +572,19 @@ export default function ChatWindow({ isMobile = false }) {
 
       {/* Input */}
       <MessageInput roomId={activeRoomId} />
+
+      {/* Video/Audio Call Modal */}
+      {callModalVisible && (
+        <VideoCallModal
+          visible={callModalVisible}
+          onClose={handleCloseCall}
+          callType={callType}
+          targetUserId={otherParticipant?._id}
+          targetUserName={otherParticipant?.name}
+          isIncoming={!!incomingCall}
+          callerId={incomingCall?.callerId}
+        />
+      )}
     </div>
   );
 }

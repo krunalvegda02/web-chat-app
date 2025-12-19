@@ -51,6 +51,47 @@ export const chatEventHandlers = {
   stopTyping: (roomId) => {
     return chatSocketClient.emit(SOCKET_EVENTS.STOP_TYPING, { roomId });
   },
+
+  initiateCall: (targetUserId, callType, roomId) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.CALL_INITIATE, {
+      targetUserId,
+      callType,
+      roomId,
+    });
+  },
+
+  acceptCall: (callerId) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.CALL_ACCEPTED, { callerId });
+  },
+
+  rejectCall: (callerId) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.CALL_REJECTED, { callerId });
+  },
+
+  endCall: (targetUserId) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.CALL_ENDED, { targetUserId });
+  },
+
+  sendWebRTCOffer: (targetUserId, offer) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.WEBRTC_OFFER, {
+      targetUserId,
+      offer,
+    });
+  },
+
+  sendWebRTCAnswer: (targetUserId, answer) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.WEBRTC_ANSWER, {
+      targetUserId,
+      answer,
+    });
+  },
+
+  sendICECandidate: (targetUserId, candidate) => {
+    return chatSocketClient.emit(SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
+      targetUserId,
+      candidate,
+    });
+  },
 };
 
 export default chatEventHandlers;
