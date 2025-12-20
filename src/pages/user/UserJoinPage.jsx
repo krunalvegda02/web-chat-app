@@ -1,9 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { useTheme } from '../../hooks/useTheme';
 import { fetchTenantTheme } from '../../redux/slices/themeSlice';
-import { Card, Button, Typography, Spin, Result } from 'antd';
-import { CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {
+  Card,
+  Button,
+  Typography,
+  Spin,
+  Result,
+  Space,
+  Avatar,
+  Divider,
+  Row,
+  Col,
+} from 'antd';
+import {
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  ArrowRightOutlined,
+  LockOutlined,
+  UserAddOutlined,
+  MessageOutlined,
+} from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -12,12 +31,26 @@ export default function UserJoinPage() {
   const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const { theme: loadedTheme } = useSelector((s) => s.theme);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   const inviteToken = searchParams.get('token');
 
   useEffect(() => {
-    if (tenantSlug) {
-      dispatch(fetchTenantTheme(tenantSlug));
-    }
+    const loadTheme = async () => {
+      try {
+        if (tenantSlug) {
+          await dispatch(fetchTenantTheme(tenantSlug));
+        }
+        setLoading(false);
+      } catch (err) {
+        setError(true);
+        setLoading(false);
+      }
+    };
+    loadTheme();
   }, [tenantSlug, dispatch]);
 
   const handleContinue = () => {
@@ -28,45 +61,276 @@ export default function UserJoinPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-40 -right-40 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-600/10 rounded-full blur-3xl" />
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: theme.backgroundColor || '#FFFFFF' }}
+      >
+        <Spin size="large" tip="Loading workspace..." />
       </div>
+    );
+  }
 
-      <Card className="w-full max-w-md relative z-10 !bg-slate-900 !border-slate-700 shadow-2xl">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-cyan-400 flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
-            ✓
-          </div>
+  if (error) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{ backgroundColor: theme.backgroundColor || '#FFFFFF' }}
+      >
+        <Card className="w-full max-w-md border-0 shadow-lg">
+          <Result
+            status="error"
+            title="Workspace Not Found"
+            subTitle="The workspace you're looking for doesn't exist or is unavailable."
+            extra={
+              <Button
+                type="primary"
+                size="large"
+                onClick={() => navigate('/login')}
+                style={{
+                  backgroundColor: theme.primaryColor || '#3B82F6',
+                }}
+              >
+                Back to Login
+              </Button>
+            }
+          />
+        </Card>
+      </div>
+    );
+  }
 
-          <Title level={2} className="!text-slate-100 !mb-2">
-            Welcome to ChatApp
-          </Title>
+  return (
+    <div
+      className="min-h-screen py-8 px-4 sm:px-6 md:px-8"
+      style={{ backgroundColor: loadedTheme?.backgroundColor || '#FFFFFF' }}
+    >
+      <div className="max-w-5xl mx-auto">
+        <Row gutter={[32, 32]} align="middle">
+          {/* Left Side - Welcome */}
+          <Col xs={24} lg={12}>
+            <div className="space-y-6">
+              {/* Logo/Icon */}
+              <div>
+                <div
+                  className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4"
+                  style={{
+                    backgroundColor: `${loadedTheme?.primaryColor || '#3B82F6'}20`,
+                  }}
+                >
+                  <MessageOutlined
+                    style={{
+                      fontSize: '40px',
+                      color: loadedTheme?.primaryColor || '#3B82F6',
+                    }}
+                  />
+                </div>
+                <Title
+                  level={2}
+                  style={{
+                    color: loadedTheme?.headerText || '#1F2937',
+                    margin: 0,
+                  }}
+                >
+                  {loadedTheme?.appName || 'Welcome'}
+                </Title>
+                <Paragraph
+                  style={{
+                    color: '#6B7280',
+                    fontSize: '16px',
+                    marginTop: '12px',
+                  }}
+                >
+                  Join our team and start communicating securely with your
+                  colleagues in a professional environment.
+                </Paragraph>
+              </div>
 
-          <Paragraph className="!text-slate-400">
-            You've been invited to join a professional chat workspace. Click below to get started.
-          </Paragraph>
+              <Divider />
 
-          <Button
-            type="primary"
-            block
-            size="large"
-            onClick={handleContinue}
-            className="!h-10 !font-medium !rounded-lg mt-6"
-          >
-            Continue
-          </Button>
+              {/* Features */}
+              <div className="space-y-4">
+                {[
+                  { icon: MessageOutlined, title: 'Secure Messaging' },
+                  {
+                    icon: UserAddOutlined,
+                    title: 'Collaborate with Teams',
+                  },
+                  {
+                    icon: CheckCircleOutlined,
+                    title: 'Professional Workspace',
+                  },
+                ].map((feature, idx) => {
+                  const Icon = feature.icon;
+                  return (
+                    <div key={idx} className="flex items-start gap-3">
+                      <div
+                        className="p-2 rounded-lg flex-shrink-0"
+                        style={{
+                          backgroundColor: `${loadedTheme?.primaryColor || '#3B82F6'}15`,
+                        }}
+                      >
+                        <Icon
+                          style={{
+                            color: loadedTheme?.primaryColor || '#3B82F6',
+                            fontSize: '18px',
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Text
+                          strong
+                          style={{
+                            color: loadedTheme?.headerText || '#1F2937',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          {feature.title}
+                        </Text>
+                        <Text style={{ color: '#9CA3AF', fontSize: '14px' }}>
+                          Experience seamless communication
+                        </Text>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Col>
 
-          <Paragraph className="!text-slate-400 mt-4 text-sm">
-            Already have an account?{' '}
-            <a href="/login" className="text-blue-500 hover:text-blue-400">
-              Sign in
-            </a>
-          </Paragraph>
-        </div>
-      </Card>
+          {/* Right Side - CTA */}
+          <Col xs={24} lg={12}>
+            <Card
+              className="border-0 shadow-xl"
+              style={{
+                backgroundColor: loadedTheme?.backgroundColor || '#FFFFFF',
+                borderTop: `4px solid ${loadedTheme?.primaryColor || '#3B82F6'}`,
+              }}
+            >
+              <div className="text-center space-y-6">
+                <div>
+                  <Title
+                    level={3}
+                    style={{
+                      color: loadedTheme?.headerText || '#1F2937',
+                    }}
+                  >
+                    Ready to Get Started?
+                  </Title>
+                  <Paragraph style={{ color: '#6B7280' }}>
+                    {inviteToken
+                      ? 'Complete your registration to join the workspace'
+                      : 'Sign in to access your workspace'}
+                  </Paragraph>
+                </div>
+
+                <Button
+                  type="primary"
+                  size="large"
+                  onClick={handleContinue}
+                  icon={<ArrowRightOutlined />}
+                  style={{
+                    width: '100%',
+                    height: '48px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    backgroundColor: loadedTheme?.primaryColor || '#3B82F6',
+                    borderColor: loadedTheme?.primaryColor || '#3B82F6',
+                  }}
+                >
+                  {inviteToken ? 'Complete Registration' : 'Sign In'}
+                </Button>
+
+                {inviteToken && (
+                  <Card
+                    className="border-0"
+                    style={{
+                      backgroundColor: `${loadedTheme?.primaryColor || '#3B82F6'}08`,
+                    }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <CheckCircleOutlined
+                        style={{
+                          color: '#10B981',
+                          fontSize: '24px',
+                        }}
+                      />
+                      <Text
+                        style={{
+                          color: loadedTheme?.headerText || '#1F2937',
+                          fontWeight: '500',
+                        }}
+                      >
+                        Invitation Valid
+                      </Text>
+                      <Text style={{ color: '#6B7280', fontSize: '14px' }}>
+                        Use the link above to create your account and join
+                      </Text>
+                    </Space>
+                  </Card>
+                )}
+
+                <Divider />
+
+                <div>
+                  <Text style={{ color: '#6B7280' }}>
+                    Already have an account?
+                  </Text>
+                  <Button
+                    type="link"
+                    onClick={() => navigate('/login')}
+                    style={{
+                      marginLeft: '8px',
+                      color: loadedTheme?.primaryColor || '#3B82F6',
+                      fontWeight: '500',
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Security Info */}
+            <Card
+              className="border-0 mt-4"
+              style={{
+                backgroundColor: `${loadedTheme?.primaryColor || '#3B82F6'}08`,
+                border: `1px solid ${loadedTheme?.borderColor || '#E5E7EB'}`,
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <LockOutlined
+                  style={{
+                    color: loadedTheme?.primaryColor || '#3B82F6',
+                    fontSize: '18px',
+                    marginTop: '2px',
+                    flex: '0 0 auto',
+                  }}
+                />
+                <div>
+                  <Text
+                    strong
+                    style={{
+                      color: loadedTheme?.headerText || '#1F2937',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Your Data is Secure
+                  </Text>
+                  <Text style={{ color: '#6B7280', fontSize: '14px' }}>
+                    We use industry-standard encryption to protect your
+                    information
+                  </Text>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
     </div>
   );
 }

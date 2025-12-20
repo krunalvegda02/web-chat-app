@@ -28,6 +28,7 @@ const initialState = {
   members: [],
   memberChats: [],
   messages: [],
+  currentRoom: null,
   loading: false,
   chatsLoading: false,
   messagesLoading: false,
@@ -78,6 +79,7 @@ const adminChatSlice = createSlice({
       .addCase(fetchMemberChatHistory.fulfilled, (state, action) => {
         state.messagesLoading = false;
         state.messages = action.payload.data?.messages || [];
+        state.currentRoom = action.payload.data?.room || null;
       })
       .addCase(fetchMemberChatHistory.rejected, (state, action) => {
         state.messagesLoading = false;

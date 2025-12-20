@@ -26,7 +26,7 @@ export const fetchMessages = createAsyncThunkHandler(
 export const fetchAvailableUsers = createAsyncThunkHandler(
   'chat/fetchAvailableUsers',
   _get,
-  API.CHAT.AVAILABLE_USERS
+  (payload) => buildUrlWithParams(API.CHAT.AVAILABLE_USERS, payload || {})
 );
 
 
@@ -218,7 +218,17 @@ const chatSlice = createSlice({
     socketMessageReceived(state, action) {
       const { roomId, message } = action.payload;
 
-      console.log('🔍 [DEBUG] Socket message received:', message._id, message.content);
+      console.log('🔍 [DEBUG] Socket message received:', message._id, message.content, message.type);
+      if (message.type === 'call') {
+        console.log('📞 [DEBUG] CALL MESSAGE RECEIVED:', {
+          _id: message._id,
+          type: message.type,
+          content: message.content,
+          callLog: message.callLog,
+          senderId: message.senderId,
+          sender: message.sender
+        });
+      }
 
       if (!state.messagesByRoom[roomId]) {
         state.messagesByRoom[roomId] = [];
@@ -251,7 +261,7 @@ const chatSlice = createSlice({
         // Ensure media array is preserved
         media: Array.isArray(message.media) ? message.media : [],
         // Ensure type is set
-        type: message.type || (message.media && message.media.length > 0 ? 'image' : 'text'),
+        type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
       };
 
       console.log('✅ [DEBUG] Adding real message with sender:', finalMessage.sender?.name);
@@ -519,6 +529,7 @@ const chatSlice = createSlice({
         state.loadingMessages[roomId] = false;
 
         const messagesArray = action.payload?.data?.messages || action.payload?.messages || [];
+        const roomData = action.payload?.data?.room;
         
         state.messagesByRoom[roomId] = Array.isArray(messagesArray) 
           ? messagesArray.map(msg => ({
@@ -529,7 +540,7 @@ const chatSlice = createSlice({
               // Ensure media array is preserved
               media: Array.isArray(msg.media) ? msg.media : [],
               // Ensure type is set
-              type: msg.type || (msg.media && msg.media.length > 0 ? 'image' : 'text'),
+              type: msg.type || (msg.media && msg.media.length > 0 ? (msg.media[0].type || 'image') : 'text'),
             }))
           : [];
 
@@ -538,6 +549,16 @@ const chatSlice = createSlice({
             state.messageDeliveryStatus[msg._id] = msg.status || 'read';
           }
         });
+
+        // Update room details if provided
+        if (roomData && Array.isArray(state.rooms)) {
+          const roomIndex = state.rooms.findIndex(r => r._id === roomId);
+          if (roomIndex !== -1) {
+            state.rooms[roomIndex] = { ...state.rooms[roomIndex], ...roomData };
+          } else {
+            state.rooms.push(roomData);
+          }
+        }
 
         console.log(`✅ [REDUX] Fetched ${state.messagesByRoom[roomId].length} messages for room ${roomId}`);
       })

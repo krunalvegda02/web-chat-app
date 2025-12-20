@@ -1,6 +1,18 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { Input, Button, Space, Tooltip, message as antMessage, Upload, Image } from 'antd';
-import { SendOutlined, PaperClipOutlined, CloseCircleOutlined, PlayCircleOutlined, FileOutlined } from '@ant-design/icons';
+import { Input, Button, Space, Tooltip, message as antMessage, Upload, Image, Popover } from 'antd';
+import { 
+  SendOutlined, 
+  PaperClipOutlined, 
+  CloseCircleOutlined, 
+  PlayCircleOutlined, 
+  FileOutlined, 
+  AudioOutlined, 
+  SmileOutlined, 
+  CameraOutlined,
+  DeleteOutlined,
+  LockOutlined,
+  UnlockOutlined,
+} from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { addMessage, uploadChatMedia, sendMessageAPI } from '../../redux/slices/chatSlice';
 import { useChatSocket } from '../../hooks/useChatSocket';
@@ -15,8 +27,17 @@ const MessageInput = memo(function MessageInput() {
   const [isComposing, setIsComposing] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [fileList, setFileList] = useState([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [slideOffset, setSlideOffset] = useState(0);
+  const [audioBlob, setAudioBlob] = useState(null);
   const typingTimeoutRef = useRef(null);
   const inputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
+  const touchStartXRef = useRef(0);
+  const recordButtonRef = useRef(null);
 
   const { activeRoomId } = useSelector((s) => s.chat);
   const { user } = useSelector((s) => s.auth);
@@ -74,33 +95,35 @@ const MessageInput = memo(function MessageInput() {
         const formData = new FormData();
         fileList.forEach(file => {
           const fileObj = file.originFileObj || file;
-          // Ensure we have a valid File/Blob object
           if (!(fileObj instanceof File) && !(fileObj instanceof Blob)) {
             console.error('❌ Invalid file object:', fileObj);
             throw new Error('Invalid file object');
           }
-          console.log('📎 Appending file:', fileObj.name, fileObj.type, fileObj.size, 'isFile:', fileObj instanceof File);
           formData.append('files', fileObj, fileObj.name);
         });
-        console.log('📦 FormData entries:', Array.from(formData.entries()).length);
-        // Log FormData contents for debugging
-        for (const [key, value] of formData.entries()) {
-          console.log(`📋 FormData[${key}]:`, value instanceof File ? `File(${value.name}, ${value.size} bytes)` : value);
-        }
+        
         const uploadResult = await dispatch(uploadChatMedia(formData)).unwrap();
-        mediaUrls = uploadResult.data.media;
+        mediaUrls = uploadResult.data.media.map(media => {
+          if (media.type === 'audio' && media.mimeType?.includes('webm')) {
+            return { ...media, type: 'voice', isVoiceNote: true };
+          }
+          return media;
+        });
       }
 
       const messageType = mediaUrls.length > 0 
-        ? (mediaUrls[0].type === 'video' ? 'video' : mediaUrls[0].type === 'image' ? 'image' : 'file')
+        ? (mediaUrls[0].type === 'video' ? 'video' 
+          : mediaUrls[0].type === 'image' ? 'image' 
+          : mediaUrls[0].type === 'voice' ? 'voice'
+          : mediaUrls[0].type === 'audio' ? 'audio'
+          : 'file')
         : 'text';
 
-      // Add optimistic message for immediate UI feedback
       const tempId = `temp_${Date.now()}_${Math.random()}`;
       const optimisticMessage = {
         _id: tempId,
         roomId: activeRoomId,
-        content: trimmed,
+        content: trimmed || '',
         type: messageType,
         media: mediaUrls,
         senderId: user._id,
@@ -111,14 +134,14 @@ const MessageInput = memo(function MessageInput() {
           avatar: user.avatar,
           role: user.role,
         },
-        status: 'sending',
+        status: 'sent', // ✅ FIX: Show tick mark immediately
         optimistic: true,
         createdAt: new Date().toISOString(),
       };
 
       dispatch(addMessage({ roomId: activeRoomId, message: optimisticMessage }));
 
-      await sendMessage(activeRoomId, trimmed, messageType, mediaUrls);
+      await sendMessage(activeRoomId, trimmed || '', messageType, mediaUrls);
 
       setValue('');
       setFileList([]);
@@ -152,6 +175,8 @@ const MessageInput = memo(function MessageInput() {
     }
   };
 
+  const [popoverVisible, setPopoverVisible] = useState(false);
+
   const uploadProps = {
     beforeUpload: (file) => {
       if (fileList.length >= 5) {
@@ -170,6 +195,7 @@ const MessageInput = memo(function MessageInput() {
           preview: e.target.result,
         };
         setFileList([...fileList, newFile]);
+        setPopoverVisible(false); // Close popover after file selection
       };
       reader.readAsDataURL(file);
       return false;
@@ -181,6 +207,172 @@ const MessageInput = memo(function MessageInput() {
     setFileList(fileList.filter(f => f.uid !== uid));
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      // Start timer
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      antMessage.error('Microphone access denied');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsLocked(false);
+      setSlideOffset(0);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsLocked(false);
+      setSlideOffset(0);
+      setAudioBlob(null);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      // Stop all tracks
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  };
+
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    startRecording();
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isRecording || isLocked) return;
+    
+    const currentX = e.touches[0].clientX;
+    const diff = touchStartXRef.current - currentX;
+    
+    if (diff > 0) {
+      setSlideOffset(Math.min(diff, 150));
+      
+      // Cancel if slid too far
+      if (diff > 120) {
+        cancelRecording();
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isRecording) return;
+    
+    if (isLocked) {
+      // Keep recording if locked
+      return;
+    }
+    
+    if (slideOffset > 120) {
+      // Already cancelled
+      return;
+    }
+    
+    // Stop and send
+    stopRecording();
+    setSlideOffset(0);
+  };
+
+  const handleMouseDown = () => {
+    startRecording();
+  };
+
+  const handleMouseUp = () => {
+    if (!isRecording || isLocked) return;
+    stopRecording();
+  };
+
+  const toggleLock = () => {
+    setIsLocked(!isLocked);
+  };
+
+  const formatRecordingTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const sendAudioMessage = async () => {
+    if (!audioBlob || !activeRoomId) return;
+
+    setIsSending(true);
+    try {
+      const formData = new FormData();
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+      formData.append('files', audioFile);
+
+      const uploadResult = await dispatch(uploadChatMedia(formData)).unwrap();
+      let mediaUrls = uploadResult.data.media;
+      
+      // Mark as voice note
+      mediaUrls = mediaUrls.map(media => ({
+        ...media,
+        type: 'voice',
+        isVoiceNote: true
+      }));
+
+      // Add optimistic message for immediate UI feedback
+      const tempId = `temp_${Date.now()}_${Math.random()}`;
+      const optimisticMessage = {
+        _id: tempId,
+        roomId: activeRoomId,
+        content: 'Voice message',
+        type: 'voice',
+        media: mediaUrls,
+        senderId: user._id,
+        sender: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          role: user.role,
+        },
+        status: 'sending',
+        optimistic: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      dispatch(addMessage({ roomId: activeRoomId, message: optimisticMessage }));
+
+      await sendMessage(activeRoomId, 'Voice message', 'voice', mediaUrls);
+      setAudioBlob(null);
+      antMessage.success('Voice message sent');
+    } catch (error) {
+      antMessage.error('Failed to send voice message');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const renderFilePreview = (file) => {
     const isImage = file.type?.startsWith('image/');
     const isVideo = file.type?.startsWith('video/');
@@ -190,12 +382,12 @@ const MessageInput = memo(function MessageInput() {
         key={file.uid}
         style={{
           position: 'relative',
-          width: '120px',
-          height: '120px',
+          width: '100px',
+          height: '100px',
           borderRadius: '8px',
           overflow: 'hidden',
-          border: `2px solid ${theme.borderColor}`,
-          backgroundColor: theme.secondaryColor,
+          border: '2px solid #E5E7EB',
+          backgroundColor: '#F9FAFB',
         }}
       >
         {isImage && (
@@ -243,12 +435,12 @@ const MessageInput = memo(function MessageInput() {
               padding: '8px',
             }}
           >
-            <FileOutlined style={{ fontSize: '32px', color: theme.primaryColor }} />
+            <FileOutlined style={{ fontSize: '28px', color: '#10B981' }} />
             <div
               style={{
-                marginTop: '8px',
-                fontSize: '12px',
-                color: theme.headerText,
+                marginTop: '6px',
+                fontSize: '11px',
+                color: '#6B7280',
                 textAlign: 'center',
                 wordBreak: 'break-word',
               }}
@@ -276,20 +468,31 @@ const MessageInput = memo(function MessageInput() {
   };
 
   return (
-    <div
-      style={{
-        padding: '16px',
-        borderTop: `1px solid ${theme.borderColor}`,
-        backgroundColor: theme.backgroundColor,
-      }}
-    >
+    <>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes waveform {
+          0% { transform: scaleY(0.3); }
+          100% { transform: scaleY(1); }
+        }
+      `}</style>
+      <div
+        style={{
+          padding: '10px 16px',
+          backgroundColor: '#F0F2F5',
+          position: 'relative',
+        }}
+      >
       {fileList.length > 0 && (
         <div style={{ 
-          marginBottom: '12px',
-          padding: '12px',
-          backgroundColor: theme.secondaryColor,
-          borderRadius: '12px',
-          border: `1px solid ${theme.borderColor}`,
+          marginBottom: '8px',
+          padding: '8px',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '8px',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
         }}>
           <div style={{ 
             display: 'flex', 
@@ -303,73 +506,356 @@ const MessageInput = memo(function MessageInput() {
       )}
       <div style={{ 
         display: 'flex', 
-        gap: '12px', 
-        alignItems: 'center',
-        padding: '8px',
-        backgroundColor: theme.secondaryColor,
-        borderRadius: '12px',
-        border: `1px solid ${theme.borderColor}`,
+        gap: '6px', 
+        alignItems: 'flex-end',
       }}>
-        <Upload {...uploadProps} maxCount={5}>
-          <Tooltip title="Attach files (images, videos, documents)">
-            <Button
-              type="text"
-              icon={<PaperClipOutlined style={{ fontSize: '18px' }} />}
-              disabled={!activeRoomId || isSending}
+        {/* Left icons - Emoji, Attach, Camera */}
+        {!audioBlob && !isRecording && (
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {/* <Tooltip title="Emoji">
+              <Button
+                type="text"
+                icon={<SmileOutlined style={{ fontSize: '24px', color: '#54656F' }} />}
+                disabled={!activeRoomId || isSending}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '40px',
+                  padding: 0,
+                }}
+              />
+            </Tooltip> */}
+
+            <Popover
+              content={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <Upload {...uploadProps} maxCount={5}>
+                    <Button type="text" icon={<FileOutlined />} block>Document</Button>
+                  </Upload>
+                  <Upload {...uploadProps} accept="image/*" maxCount={5}>
+                    <Button type="text" icon={<CameraOutlined />} block>Photos</Button>
+                  </Upload>
+                </div>
+              }
+              trigger="click"
+              placement="topLeft"
+              open={popoverVisible}
+              onOpenChange={setPopoverVisible}
+            >
+              <Button
+                type="text"
+                icon={<PaperClipOutlined style={{ fontSize: '24px', color: '#54656F' }} />}
+                disabled={!activeRoomId || isSending}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '40px',
+                  padding: 0,
+                }}
+              />
+            </Popover>
+          </div>
+        )}
+
+        {/* Recording UI - WhatsApp Style */}
+        {isRecording && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: '#F0F2F5',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px 16px',
+              gap: '12px',
+              zIndex: 10,
+              transform: `translateX(-${slideOffset}px)`,
+              transition: isLocked ? 'none' : 'transform 0.1s ease-out',
+            }}
+          >
+            {/* Cancel button (slide to cancel) */}
+            <div
+              onClick={cancelRecording}
               style={{
-                color: theme.primaryColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#EF4444',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: slideOffset > 60 ? 1 : 0.7,
+                transform: slideOffset > 60 ? 'scale(1.1)' : 'scale(1)',
+              }}
+            >
+              <DeleteOutlined style={{ fontSize: '20px', color: '#FFFFFF' }} />
+            </div>
+
+            {/* Recording indicator and time */}
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '24px',
+              padding: '10px 16px',
+            }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                backgroundColor: '#EF4444',
+                animation: 'pulse 1.5s infinite',
+              }} />
+              <span style={{ 
+                color: '#111B21', 
+                fontSize: '15px',
+                fontWeight: 500,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {formatRecordingTime(recordingTime)}
+              </span>
+              
+              {/* Waveform animation */}
+              <div style={{ 
+                flex: 1, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '2px',
+                height: '24px',
+              }}>
+                {[...Array(30)].map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#00A884',
+                      borderRadius: '2px',
+                      height: `${20 + Math.random() * 80}%`,
+                      animation: `waveform ${0.5 + Math.random() * 0.5}s ease-in-out infinite alternate`,
+                      animationDelay: `${i * 0.05}s`,
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Lock button */}
+              {!isLocked && (
+                <Tooltip title="Lock recording">
+                  <Button
+                    type="text"
+                    icon={<LockOutlined style={{ fontSize: '18px', color: '#54656F' }} />}
+                    onClick={toggleLock}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '36px',
+                      height: '36px',
+                      padding: 0,
+                    }}
+                  />
+                </Tooltip>
+              )}
+              {isLocked && (
+                <UnlockOutlined style={{ fontSize: '18px', color: '#00A884' }} />
+              )}
+            </div>
+
+            {/* Send button */}
+            <Button
+              type="primary"
+              shape="circle"
+              icon={<SendOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />}
+              onClick={stopRecording}
+              style={{
+                backgroundColor: '#00A884',
+                borderColor: '#00A884',
+                width: '48px',
+                height: '48px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            />
+
+            {/* Slide to cancel hint */}
+            {!isLocked && slideOffset < 60 && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                bottom: '-30px',
+                transform: 'translateX(-50%)',
+                color: '#54656F',
+                fontSize: '13px',
+                whiteSpace: 'nowrap',
+                opacity: 0.7,
+              }}>
+                ← Slide to cancel
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Recording indicator */}
+        {isRecording && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '24px',
+            flex: 1,
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#EF4444',
+              animation: 'pulse 1.5s infinite',
+            }} />
+            <span style={{ color: '#54656F', fontSize: '15px' }}>Recording...</span>
+          </div>
+        )}
+
+        {/* Audio preview */}
+        {audioBlob && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '24px',
+            flex: 1,
+          }}>
+            <AudioOutlined style={{ fontSize: '20px', color: '#00A884' }} />
+            <span style={{ color: '#54656F', fontSize: '15px' }}>Voice message ready</span>
+            <CloseCircleOutlined
+              onClick={() => setAudioBlob(null)}
+              style={{ fontSize: '18px', color: '#54656F', cursor: 'pointer' }}
+            />
+          </div>
+        )}
+
+        {/* Input area */}
+        {!audioBlob && !isRecording && (
+          <div style={{
+            flex: 1,
+            backgroundColor: '#FFFFFF',
+            borderRadius: '24px',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            <Input.TextArea
+              ref={inputRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              placeholder="Type a message"
+              disabled={!activeRoomId || isSending}
+              maxLength={5000}
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              style={{
+                flex: 1,
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#111B21',
+                fontSize: '15px',
+                resize: 'none',
+                padding: 0,
+              }}
+              bordered={false}
+            />
+          </div>
+        )}
+
+        {/* Right button - Microphone or Send */}
+        {!isRecording && audioBlob ? (
+          <Tooltip title="Send voice message">
+            <Button
+              type="primary"
+              shape="circle"
+              icon={<SendOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />}
+              onClick={sendAudioMessage}
+              loading={isSending}
+              style={{
+                backgroundColor: '#00A884',
+                borderColor: '#00A884',
+                width: '48px',
+                height: '48px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             />
           </Tooltip>
-        </Upload>
-
-        <Input.TextArea
-          ref={inputRef}
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => setIsComposing(false)}
-          placeholder="Type a message..."
-          disabled={!activeRoomId || isSending}
-          maxLength={5000}
-          autoSize={{ minRows: 1, maxRows: 4 }}
-          style={{
-            flex: 1,
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: theme.headerText,
-            fontSize: `${theme.messageFontSize}px`,
-            resize: 'none',
-            padding: '4px 8px',
-          }}
-          bordered={false}
-        />
-
-        <Tooltip title={isSending ? 'Sending...' : 'Send (Enter)'}>
+        ) : !isRecording && (value.trim() || fileList.length > 0) ? (
           <Button
             type="primary"
             shape="circle"
-            icon={<SendOutlined style={{ fontSize: '16px' }} />}
+            icon={<SendOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />}
             onClick={handleSend}
-            disabled={(!value.trim() && fileList.length === 0) || !activeRoomId || isSending}
-            loading={isSending}
-            size="large"
+            disabled={!activeRoomId || isSending || isRecording}
             style={{
-              backgroundColor: (!value.trim() && fileList.length === 0) ? theme.borderColor : theme.primaryColor,
-              borderColor: (!value.trim() && fileList.length === 0) ? theme.borderColor : theme.primaryColor,
+              backgroundColor: '#00A884',
+              borderColor: '#00A884',
+              width: '48px',
+              height: '48px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.3s ease',
             }}
           />
-        </Tooltip>
+        ) : !isRecording ? (
+          <div
+            ref={recordButtonRef}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{ touchAction: 'none' }}
+          >
+            <Tooltip title="Hold to record">
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<AudioOutlined style={{ fontSize: '20px', color: '#FFFFFF' }} />}
+                disabled={!activeRoomId || isSending}
+                style={{
+                  backgroundColor: '#00A884',
+                  borderColor: '#00A884',
+                  width: '48px',
+                  height: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              />
+            </Tooltip>
+          </div>
+        ) : null}
       </div>
     </div>
+    </>
   );
 });
 

@@ -13,6 +13,7 @@ import {
   ProfileFilled,
   ProfileOutlined,
   UserSwitchOutlined,
+  ContactsOutlined,
 } from '@ant-design/icons';
 import { FaPersonBooth, FaPhone, FaUserAlt, FaUserEdit } from 'react-icons/fa';
 
@@ -34,6 +35,7 @@ export const getMenuItems = (role, navigate) => {
     ],
     USER: [
       { key: '/user/chats', icon: <MessageOutlined className='text-[25px]' />, label: 'Chats', path: '/user/chats' },
+      { key: '/user/contacts', icon: <ContactsOutlined className='text-[25px]' />, label: 'Contacts', path: '/user/contacts' },
       { key: '/user/calls', icon: <PhoneOutlined className='text-[25px]' />, label: 'Calls', path: '/user/calls' },
       { key: '/user/profile', icon: <UserOutlined className='text-[25px]' />, label: 'Profile', path: '/user/profile' },
     ],

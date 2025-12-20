@@ -9,7 +9,7 @@ import { format, isToday, isYesterday } from 'date-fns';
 import { useTheme } from '../../hooks/useTheme';
 
 
-export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null }) {
+export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null, onRoomClick = null }) {
   const dispatch = useDispatch();
   const { theme } = useTheme();
   const { rooms, activeRoomId, loadingRooms } = useSelector((s) => s.chat);
@@ -41,31 +41,73 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
 
   // ✅ Get room display name
   const getRoomDisplayName = useCallback((room) => {
-    if (room.type === 'ADMIN_CHAT') {
-      const otherParticipant = room.participants?.find(
-        (p) => p.userId?._id !== user?._id
-      );
-      return otherParticipant?.userId?.name || room.name || 'Admin Chat';
+    // For regular chats, always extract participant names from participants array
+    const participants = room.participants || [];
+    const otherParticipants = participants.filter(p => {
+      const participantId = p.userId?._id || p._id;
+      return participantId !== user?._id;
+    });
+    
+    if (otherParticipants.length > 0) {
+      const names = otherParticipants
+        .map(p => p.userId?.name || p.name)
+        .filter(Boolean);
+      if (names.length > 0) {
+        return names.join(', ');
+      }
     }
-    return room.name || 'Unnamed Room';
+    
+    // Fallback to room name only if it doesn't contain 'Chat -' pattern
+    if (room.name && !room.name.includes('Chat -')) {
+      return room.name;
+    }
+    
+    return 'Chat';
   }, [user?._id]);
 
   // ✅ Get last message text
   const getLastMessageText = useCallback((room) => {
     // Show first unread message if there are unread messages
     if (room.unreadCount > 0 && room.firstUnreadMessage) {
-      return room.firstUnreadMessage.content || 'New message';
+      const msg = room.firstUnreadMessage;
+      if (msg.content) return msg.content.substring(0, 50);
+      if (msg.type === 'image') return '📷 Photo';
+      if (msg.type === 'video') return '🎥 Video';
+      if (msg.type === 'voice') return '🎤 Voice message';
+      if (msg.type === 'audio') return '🎵 Audio';
+      if (msg.type === 'file') return '📎 File';
+      return 'New message';
     }
     
     // Otherwise show last message
     const lastMessage = room.lastMessage;
     if (!lastMessage) return 'No messages yet';
-    if (typeof lastMessage === 'object' && lastMessage.content) {
-      return lastMessage.content.substring(0, 50);
+    
+    if (typeof lastMessage === 'object') {
+      // Check for content first
+      if (lastMessage.content) {
+        return lastMessage.content.substring(0, 50);
+      }
+      // Check message type for media
+      if (lastMessage.type === 'image') return '📷 Photo';
+      if (lastMessage.type === 'video') return '🎥 Video';
+      if (lastMessage.type === 'voice') return '🎤 Voice message';
+      if (lastMessage.type === 'audio') return '🎵 Audio';
+      if (lastMessage.type === 'file') return '📎 File';
+      // Check if media array exists
+      if (lastMessage.media && lastMessage.media.length > 0) {
+        const mediaType = lastMessage.media[0].type;
+        if (mediaType === 'image') return '📷 Photo';
+        if (mediaType === 'video') return '🎥 Video';
+        if (mediaType === 'audio' || mediaType === 'voice') return '🎤 Voice message';
+        if (mediaType === 'file') return '📎 File';
+      }
     }
+    
     if (typeof lastMessage === 'string') {
       return lastMessage.substring(0, 50);
     }
+    
     return 'No messages yet';
   }, []);
 
@@ -108,94 +150,115 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: theme?.backgroundColor || '#ffffff',
-        borderRight: `1px solid ${theme?.borderColor || '#e0e0e0'}`,
+        backgroundColor: '#FFFFFF',
+        borderRight: '1px solid #E5E7EB',
       }}
     >
-      {/* ===== HEADER ===== */}
+      {/* ===== HEADER - WhatsApp Style ===== */}
       <div
         style={{
-          padding: '12px 16px',
-          borderBottom: `1px solid ${theme?.borderColor || '#e0e0e0'}`,
-          background: theme?.headerBackground || theme?.backgroundColor || '#ffffff',
+          padding: '13px',
+          background: '#008069',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Title and Action Button */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2
+            style={{
+              fontSize: '20px',
+              fontWeight: '500',
+              color: '#FFFFFF',
+              margin: 0,
+            }}
+          >
+            Chats
+          </h2>
+          {onCreateRoom && (
+            <Button
+              type="text"
+              icon={<PlusOutlined style={{ fontSize: '20px', color: '#FFFFFF' }} />}
+              onClick={onCreateRoom}
+              size="large"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div style={{ padding: '12px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E9EDEF' }}>
+        <Input
+          placeholder="Search or start new chat"
+          prefix={<SearchOutlined style={{ color: '#667781' }} />}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          allowClear
+          style={{
+            borderRadius: '8px',
+            backgroundColor: '#F0F2F5',
+            border: 'none',
+          }}
+          size="large"
+        />
+      </div>
+
+      {/* ===== ROOM LIST - WhatsApp Style ===== */}
+      <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#FFFFFF' }}>
+        {filteredRooms.length === 0 ? (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
+              height: '100%',
+              flexDirection: 'column',
+              gap: '20px',
+              padding: '40px',
             }}
           >
-            <h2
+            <div
               style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: theme?.headerText || '#000',
-                margin: 0,
+                width: '120px',
+                height: '120px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #008069 0%, #00A884 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(0, 128, 105, 0.25)',
               }}
             >
-              Messages
-            </h2>
-            {onCreateRoom && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={onCreateRoom}
-                size="small"
-                style={{
-                  backgroundColor: theme?.primaryColor || '#1890ff',
-                  borderColor: theme?.primaryColor || '#1890ff',
-                }}
-              />
-            )}
+              <MessageOutlined style={{ fontSize: '50px', color: '#FFFFFF' }} />
+            </div>
+            <div style={{ textAlign: 'center', maxWidth: '300px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111B21', marginBottom: '8px' }}>
+                {searchTerm ? 'No chats found' : 'No conversations yet'}
+              </h3>
+              <p style={{ fontSize: '13px', color: '#667781', lineHeight: '1.5', marginBottom: '16px' }}>
+                {searchTerm ? 'Try searching with different keywords' : 'Start a new conversation by clicking the + button'}
+              </p>
+              {onCreateRoom && !searchTerm && (
+                <Button
+                  type="primary"
+                  icon={<MessageOutlined />}
+                  onClick={onCreateRoom}
+                  style={{
+                    backgroundColor: '#008069',
+                    borderColor: '#008069',
+                    borderRadius: '8px',
+                    height: '40px',
+                    fontSize: '14px',
+                  }}
+                >
+                  Start a Conversation
+                </Button>
+              )}
+            </div>
           </div>
-
-          {/* ✅ Search input with theme colors */}
-          <Input
-            placeholder="Search conversations..."
-            prefix={<SearchOutlined />}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            allowClear
-            style={{
-              borderColor: theme?.borderColor || '#d9d9d9',
-              backgroundColor: theme?.secondaryColor || '#fafafa',
-              color: theme?.headerText || '#000',
-            }}
-            size="large"
-          />
-        </div>
-      </div>
-
-      {/* ===== ROOM LIST ===== */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {filteredRooms.length === 0 ? (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={
-              <span style={{ color: theme?.borderColor || '#999' }}>
-                {searchTerm ? 'No rooms found' : 'No conversations yet'}
-              </span>
-            }
-            style={{ marginTop: '50px' }}
-          >
-            {onCreateRoom && !searchTerm && (
-              <Button
-                type="primary"
-                icon={<MessageOutlined />}
-                onClick={onCreateRoom}
-                style={{
-                  backgroundColor: theme?.primaryColor || '#1890ff',
-                  borderColor: theme?.primaryColor || '#1890ff',
-                }}
-              >
-                Start a Conversation
-              </Button>
-            )}
-          </Empty>
         ) : (
           
           <List
@@ -209,27 +272,22 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
               return (
                 <List.Item
                   key={`${room._id}-${room.lastMessageTime || ''}-${room.unreadCount || 0}`}
-                  onClick={() => dispatch(setActiveRoom(room._id))}
+                  onClick={() => {
+                    dispatch(setActiveRoom(room._id));
+                    if (onRoomClick) onRoomClick(room._id);
+                  }}
                   style={{
-                    backgroundColor: isActive
-                      ? theme?.secondaryColor || '#f5f5f5'
-                      : 'transparent',
-                    borderBottom: `1px solid ${theme?.borderColor || '#f0f0f0'}`,
+                    backgroundColor: isActive ? '#F0F2F5' : '#FFFFFF',
+                    borderBottom: '1px solid #F0F2F5',
                     padding: '12px 16px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    borderLeft: isActive
-                      ? `4px solid ${theme?.primaryColor || '#1890ff'}`
-                      : '4px solid transparent',
+                    transition: 'background-color 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      theme?.secondaryColor || '#f5f5f5';
+                    if (!isActive) e.currentTarget.style.backgroundColor = '#F5F6F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isActive
-                      ? theme?.secondaryColor || '#f5f5f5'
-                      : 'transparent';
+                    e.currentTarget.style.backgroundColor = isActive ? '#F0F2F5' : '#FFFFFF';
                   }}
                 >
                   <List.Item.Meta
@@ -239,7 +297,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
                           count={unreadCount}
                           offset={[-10, 10]}
                           style={{
-                            backgroundColor: theme?.primaryColor || '#1890ff',
+                            backgroundColor: '#25D366',
                             fontSize: '10px',
                             minWidth: '20px',
                           }}
@@ -282,8 +340,9 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
                       >
                         <span
                           style={{
-                            fontWeight: isActive ? '600' : '500',
-                            color: theme?.headerText || '#000',
+                            fontWeight: '500',
+                            color: '#111B21',
+                            fontSize: '16px',
                           }}
                         >
                           {getRoomDisplayName(room)}
@@ -291,7 +350,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
                         <span
                           style={{
                             fontSize: '12px',
-                            color: theme?.borderColor || '#8c8c8c',
+                            color: '#667781',
                           }}
                         >
                           {formatMessageTime(room.lastMessageTime)}
@@ -308,13 +367,13 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null 
                       >
                         <span
                           style={{
-                            fontSize: '12px',
-                            color: theme?.borderColor || '#8c8c8c',
+                            fontSize: '14px',
+                            color: unreadCount > 0 ? '#111B21' : '#667781',
                             flex: 1,
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
-                            fontWeight: unreadCount > 0 ? 600 : 400,
+                            fontWeight: unreadCount > 0 ? 500 : 400,
                           }}
                         >
                           {getLastMessageText(room)}

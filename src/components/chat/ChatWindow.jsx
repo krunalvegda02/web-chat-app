@@ -277,24 +277,26 @@ import {
 } from '../../redux/slices/chatSlice';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import VideoCallModal from './VideoCallModal';
 import { Spin, Empty, Button, Avatar, Space, Tooltip, message } from 'antd';
 import {
   PhoneOutlined,
   VideoCameraOutlined,
   MoreOutlined,
   ArrowLeftOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import OnlineStatus from './OnlineStatus';
 import TypingIndicator from './TypingIndicator';
 import { useTheme } from '../../hooks/useTheme';
 import { useChatSocket } from '../../hooks/useChatSocket';
+import { useCall } from '../../contexts/CallContext';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
 
-export default function ChatWindow({ isMobile = false }) {
+export default function ChatWindow({ isMobile = false, showMobileHeader = false, onBack, readOnly = false }) {
   const dispatch = useDispatch();
   const { theme } = useTheme();
   const { joinRoom, leaveRoom, markMessagesAsRead } = useChatSocket();
+  const { callState, initiateCall } = useCall();
 
   const {
     activeRoomId,
@@ -308,9 +310,6 @@ export default function ChatWindow({ isMobile = false }) {
   const [roomDetails, setRoomDetails] = useState(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const hasJoinedRoom = useRef(false);
-  const [callModalVisible, setCallModalVisible] = useState(false);
-  const [callType, setCallType] = useState('audio');
-  const [incomingCall, setIncomingCall] = useState(null);
 
   // ✅ Get room details from rooms (memoized)
   const currentRoom = useMemo(() => {
@@ -324,30 +323,73 @@ export default function ChatWindow({ isMobile = false }) {
   // ✅ Memoize messages to prevent re-renders
   const messages = useMemo(() => messagesByRoom[activeRoomId] || [], [messagesByRoom, activeRoomId]);
 
-  // ✅ Get other participant
+  // ✅ Get other participant or all participants for display
   const otherParticipant = useMemo(() => {
     if (!roomDetails || !roomDetails.participants) return null;
-    return roomDetails.participants.find(
+    const other = roomDetails.participants.find(
       (p) => p.userId && p.userId._id !== user?._id
     )?.userId;
+    return other;
   }, [roomDetails, user]);
 
-  const isOtherUserOnline = useMemo(
-    () => otherParticipant && onlineUsers.includes(otherParticipant._id),
-    [otherParticipant, onlineUsers]
-  );
+  // Get display name for header - show all participants
+  const displayName = useMemo(() => {
+    console.log('🔍 DisplayName Debug:', { readOnly, roomDetails, otherParticipant });
+    
+    // For read-only mode (admin monitoring), show all participants
+    if (readOnly && roomDetails?.participants) {
+      console.log('📋 Participants:', roomDetails.participants);
+      const participantNames = roomDetails.participants
+        .map(p => p.userId?.name || p.name)
+        .filter(Boolean)
+        .join(' & ');
+      console.log('✅ Participant Names:', participantNames);
+      if (participantNames) return participantNames;
+    }
+    
+    // For regular chat, show other participant
+    if (otherParticipant) return otherParticipant.name;
+    
+    // Fallback to otherParticipants array
+    if (roomDetails?.otherParticipants && roomDetails.otherParticipants.length > 0) {
+      const names = roomDetails.otherParticipants
+        .map(p => p.name)
+        .filter(Boolean)
+        .join(' & ');
+      if (names) return names;
+    }
+    
+    // Last resort: room name
+    if (roomDetails?.name) return roomDetails.name;
+    
+    return 'Loading...';
+  }, [otherParticipant, roomDetails, readOnly]);
+
+  const isOtherUserOnline = useMemo(() => {
+    console.log('🔍 Online Check:', { 
+      otherParticipant, 
+      otherParticipantId: otherParticipant?._id,
+      onlineUsers,
+      includes: otherParticipant && onlineUsers.includes(otherParticipant._id)
+    });
+    return otherParticipant && onlineUsers.includes(otherParticipant._id);
+  }, [otherParticipant, onlineUsers]);
 
   // ✅ Update room details only when room changes
   useEffect(() => {
+    console.log('🔄 Room Update:', { readOnly, currentRoom });
     if (currentRoom) {
+      console.log('✅ Using currentRoom:', currentRoom);
       setRoomDetails(currentRoom);
     }
-  }, [currentRoom]);
+  }, [currentRoom, readOnly]);
 
   // ✅ Join room and fetch messages ONLY when activeRoomId changes
   useEffect(() => {
     if (!activeRoomId) {
       hasJoinedRoom.current = false;
+      setMessagesLoaded(false);
+      setRoomDetails(null);
       return;
     }
 
@@ -361,7 +403,7 @@ export default function ChatWindow({ isMobile = false }) {
 
     const loadRoom = async () => {
       try {
-        setMessagesLoaded(false); // Start loading
+        setMessagesLoaded(false);
         joinRoom(activeRoomId);
 
         await dispatch(fetchMessages({
@@ -376,7 +418,7 @@ export default function ChatWindow({ isMobile = false }) {
       } catch (error) {
         console.error(`❌ Failed to load room:`, error);
         if (isMounted) {
-          setMessagesLoaded(true); // Still show UI even on error
+          setMessagesLoaded(true);
         }
       }
     };
@@ -389,7 +431,7 @@ export default function ChatWindow({ isMobile = false }) {
       leaveRoom(activeRoomId);
       hasJoinedRoom.current = false;
     };
-  }, [activeRoomId, dispatch]); // ✅ REMOVED joinRoom, leaveRoom - they're stable callbacks
+  }, [activeRoomId, dispatch]);
 
   // ❌ REMOVED: Auto-mark-as-read logic that was causing infinite loop
   // Messages are marked as read via socket events when user joins room
@@ -399,9 +441,7 @@ export default function ChatWindow({ isMobile = false }) {
   useEffect(() => {
     const handleIncomingCall = ({ callerId, callerName, callType, roomId }) => {
       if (roomId === activeRoomId) {
-        setIncomingCall({ callerId, callerName, callType });
-        setCallType(callType);
-        setCallModalVisible(true);
+        // Call hook handles incoming call state
       }
     };
 
@@ -412,7 +452,7 @@ export default function ChatWindow({ isMobile = false }) {
     };
   }, [activeRoomId]);
 
-  const handleStartCall = (type) => {
+  const handleStartCall = () => {
     if (!otherParticipant) {
       message.error('Cannot start call: No participant found');
       return;
@@ -421,14 +461,7 @@ export default function ChatWindow({ isMobile = false }) {
       message.warning('User is offline');
       return;
     }
-    setCallType(type);
-    setIncomingCall(null);
-    setCallModalVisible(true);
-  };
-
-  const handleCloseCall = () => {
-    setCallModalVisible(false);
-    setIncomingCall(null);
+    initiateCall(otherParticipant, activeRoomId);
   };
 
   // ✅ Show empty state if no room selected
@@ -440,10 +473,41 @@ export default function ChatWindow({ isMobile = false }) {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100%',
-          background: theme?.backgroundColor || '#f5f5f5',
+          background: '#F0F2F5',
+          flexDirection: 'column',
+          gap: '20px',
+          padding: '40px',
         }}
       >
-        <Empty description="Select a chat to start messaging" />
+        <div
+          style={{
+            width: '200px',
+            height: '200px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #008069 0%, #00A884 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 40px rgba(0, 128, 105, 0.3)',
+            animation: 'pulse 2s ease-in-out infinite',
+          }}
+        >
+          <MessageOutlined style={{ fontSize: '80px', color: '#FFFFFF' }} />
+        </div>
+        <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#111B21', marginBottom: '12px' }}>
+            WhatsApp Web
+          </h2>
+          <p style={{ fontSize: '14px', color: '#667781', lineHeight: '1.6' }}>
+            Select a chat from the list to start messaging or click the + button to start a new conversation
+          </p>
+        </div>
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -476,29 +540,40 @@ export default function ChatWindow({ isMobile = false }) {
         background: theme?.backgroundColor || '#ffffff',
       }}
     >
-      {/* Header */}
+      {/* Header - WhatsApp Style - Fixed */}
       <div
         style={{
-          padding: '12px 20px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          padding: showMobileHeader ? '10px 16px' : '12px 20px',
           borderBottom: `1px solid ${theme?.borderColor || '#e0e0e0'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: theme?.headerBackground || '#fafafa',
+          background: '#008069',
+          flexShrink: 0,
         }}
       >
-        <Space>
-          {isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+          {showMobileHeader && (
             <Button
               type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => dispatch(setActiveRoom(''))}
+              icon={<ArrowLeftOutlined style={{ fontSize: '20px' }} />}
+              onClick={() => {
+                if (onBack) {
+                  onBack();
+                } else {
+                  dispatch(setActiveRoom(''));
+                }
+              }}
+              style={{ color: '#FFFFFF', padding: '4px' }}
             />
           )}
 
           {otherParticipant ? (
             <>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
                 <Avatar src={otherParticipant.avatar} size={40}>
                   {otherParticipant.name?.[0]?.toUpperCase()}
                 </Avatar>
@@ -511,79 +586,82 @@ export default function ChatWindow({ isMobile = false }) {
                       width: '12px',
                       height: '12px',
                       borderRadius: '50%',
-                      backgroundColor: '#52c41a',
-                      border: '2px solid white',
+                      backgroundColor: '#25D366',
+                      border: '2px solid #FFFFFF',
                     }}
                   />
                 )}
               </div>
-              <div>
-                <div style={{ fontWeight: 600 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, color: '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {otherParticipant.name}
                 </div>
-                <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                  {isOtherUserOnline ? 'Online' : 'Offline'}
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                  {isOtherUserOnline ? 'online' : 'offline'}
                 </div>
               </div>
             </>
           ) : (
-            <div style={{ fontWeight: 600 }}>{roomDetails?.name}</div>
+            <>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <Avatar size={40} style={{ backgroundColor: '#00A884' }}>
+                  {displayName?.[0]?.toUpperCase()}
+                </Avatar>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, color: '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {displayName}
+                </div>
+              </div>
+            </>
           )}
-        </Space>
+        </div>
 
-        <Space>
-          <Tooltip title="Audio Call">
+        <Space size="small">
+          <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
             <Button
               type="text"
-              icon={<PhoneOutlined />}
-              onClick={() => handleStartCall('audio')}
-              disabled={!isOtherUserOnline}
-            />
-          </Tooltip>
-          <Tooltip title="Video Call">
-            <Button
-              type="text"
-              icon={<VideoCameraOutlined />}
-              onClick={() => handleStartCall('video')}
-              disabled={!isOtherUserOnline}
+              icon={<PhoneOutlined style={{ fontSize: '18px' }} />}
+              onClick={handleStartCall}
+              disabled={!isOtherUserOnline || readOnly || callState.isInCall}
+              style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : '#FFFFFF' }}
             />
           </Tooltip>
           <Tooltip title="More">
-            <Button type="text" icon={<MoreOutlined />} />
+            <Button 
+              type="text" 
+              icon={<MoreOutlined style={{ fontSize: '18px' }} />}
+              style={{ color: '#FFFFFF' }}
+            />
           </Tooltip>
         </Space>
       </div>
 
-      {/* Messages */}
+      {/* Messages - WhatsApp Background - Scrollable */}
       <div
         style={{
           flex: 1,
-          overflow: 'auto',
+          overflowY: 'auto',
+          overflowX: 'hidden',
           padding: '20px',
           display: 'flex',
           flexDirection: 'column-reverse',
+          background: '#E5DDD5',
         }}
       >
         <MessageList messages={messages} roomId={activeRoomId} />
       </div>
 
-      {/* Typing Indicator */}
-      <TypingIndicator />
+      {/* Typing Indicator - Fixed */}
+      <div style={{ flexShrink: 0 }}>
+        <TypingIndicator />
+      </div>
 
-      {/* Input */}
-      <MessageInput roomId={activeRoomId} />
-
-      {/* Video/Audio Call Modal */}
-      {callModalVisible && (
-        <VideoCallModal
-          visible={callModalVisible}
-          onClose={handleCloseCall}
-          callType={callType}
-          targetUserId={otherParticipant?._id}
-          targetUserName={otherParticipant?.name}
-          isIncoming={!!incomingCall}
-          callerId={incomingCall?.callerId}
-        />
+      {/* Input - Fixed Bottom */}
+      {!readOnly && (
+        <div style={{ flexShrink: 0, background: '#F0F0F0' }}>
+          <MessageInput roomId={activeRoomId} />
+        </div>
       )}
     </div>
   );

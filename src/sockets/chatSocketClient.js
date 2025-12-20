@@ -171,6 +171,39 @@ class ChatSocketClient {
   isReady() {
     return this.socket?.connected ?? false;
   }
+
+  // Call methods
+  initiateCall(targetUserId, callType, roomId) {
+    return this.emit('call_initiate', { targetUserId, callType, roomId });
+  }
+
+  acceptCall(callId, callerId) {
+    return this.emit('call_accepted', { callId, callerId });
+  }
+
+  rejectCall(callId, callerId) {
+    return this.emit('call_rejected', { callId, callerId });
+  }
+
+  missedCall(callId, callerId) {
+    return this.emit('call_missed', { callId, callerId });
+  }
+
+  endCall(callId, targetUserId, duration) {
+    return this.emit('call_ended', { callId, targetUserId, duration });
+  }
+
+  sendWebRTCOffer(callId, targetUserId, offer) {
+    return this.emit('webrtc_offer', { callId, targetUserId, offer });
+  }
+
+  sendWebRTCAnswer(callId, targetUserId, answer) {
+    return this.emit('webrtc_answer', { callId, targetUserId, answer });
+  }
+
+  sendICECandidate(callId, targetUserId, candidate) {
+    return this.emit('webrtc_ice_candidate', { callId, targetUserId, candidate });
+  }
 }
 
 export const chatSocketClient = new ChatSocketClient();

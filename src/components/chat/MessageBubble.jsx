@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Avatar, Tooltip, Dropdown, Modal, Input, message as antMessage, Button, Image } from 'antd';
+import { Avatar, Tooltip, Dropdown, Modal, Input, message as antMessage, Button, Image, Slider } from 'antd';
 import {
   CheckOutlined,
   CheckCircleOutlined,
@@ -16,8 +16,11 @@ import {
   PictureOutlined,
   PlayCircleOutlined,
   SoundOutlined,
+  CaretRightOutlined,
+  PauseOutlined,
+  AudioOutlined,
 } from '@ant-design/icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { useDispatch } from 'react-redux';
 import { editMessage, deleteMessage } from '../../redux/slices/chatSlice';
@@ -40,6 +43,8 @@ export default function MessageBubble({
   const [editContent, setEditContent] = useState(message.content);
   const [previewImage, setPreviewImage] = useState(null);
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+  const [audioStates, setAudioStates] = useState({});
+  const audioRefs = useRef({});
 
   // ✅ Determine if message is from current user
   const messageSenderId = typeof message.senderId === 'object' && message.senderId?._id
@@ -142,15 +147,156 @@ export default function MessageBubble({
     setImagePreviewVisible(true);
   };
 
-  // ✅ Handle file download
-  const handleFileDownload = (url, fileName) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName || getFileName(url);
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // ✅ Get download URL - Only Cloudinary URLs, skip local URLs
+  const getDownloadUrl = (url) => {
+    if (!url || url.includes('/api/v1/uploads/') || url.includes('localhost') || url.includes('127.0.0.1')) {
+      return null;
+    }
+    
+    if (url.includes('cloudinary.com')) {
+      // For PDFs, use fl_attachment with proper filename
+      if (url.includes('.pdf')) {
+        const fileName = url.split('/').pop().split('?')[0];
+        return url.replace('/upload/', `/upload/fl_attachment:${fileName}/`);
+      }
+      // For raw files (old uploads), convert to image URL
+      if (url.includes('/raw/upload/')) {
+        return url.replace('/raw/upload/', '/image/upload/fl_attachment/');
+      }
+      // For image/video files, add fl_attachment
+      return url.replace('/upload/', '/upload/fl_attachment/');
+    }
+    
+    return url;
+  };
+
+  // ✅ Handle document download programmatically
+  const handleDocumentDownload = async (url, fileName) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+      window.open(url, '_blank');
+    }
+  };
+
+  // ✅ Audio player controls
+  const toggleAudioPlay = (audioId) => {
+    const audio = audioRefs.current[audioId];
+    if (!audio) return;
+
+    if (audioStates[audioId]?.isPlaying) {
+      audio.pause();
+    } else {
+      // Pause all other audios
+      Object.keys(audioRefs.current).forEach(id => {
+        if (id !== audioId && audioRefs.current[id]) {
+          audioRefs.current[id].pause();
+        }
+      });
+      audio.play();
+    }
+  };
+
+  const handleAudioTimeUpdate = (audioId) => {
+    const audio = audioRefs.current[audioId];
+    if (!audio) return;
+
+    setAudioStates(prev => ({
+      ...prev,
+      [audioId]: {
+        ...prev[audioId],
+        currentTime: audio.currentTime,
+        duration: audio.duration || 0,
+      }
+    }));
+  };
+
+  const handleAudioEnded = (audioId) => {
+    setAudioStates(prev => ({
+      ...prev,
+      [audioId]: {
+        ...prev[audioId],
+        isPlaying: false,
+        currentTime: 0,
+      }
+    }));
+  };
+
+  const handleAudioPlay = (audioId) => {
+    setAudioStates(prev => ({
+      ...prev,
+      [audioId]: { ...prev[audioId], isPlaying: true }
+    }));
+  };
+
+  const handleAudioPause = (audioId) => {
+    setAudioStates(prev => ({
+      ...prev,
+      [audioId]: { ...prev[audioId], isPlaying: false }
+    }));
+  };
+
+  const handleSeek = (audioId, value) => {
+    const audio = audioRefs.current[audioId];
+    if (audio) {
+      audio.currentTime = value;
+    }
+  };
+
+  const formatAudioTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // ✅ Reusable download button component
+  const DownloadButton = ({ url, fileName, size = 'md' }) => {
+    const downloadUrl = getDownloadUrl(url);
+    
+    // Don't render button for local URLs
+    if (!downloadUrl) return null;
+    
+    const sizeClasses = {
+      sm: 'w-6 h-6',
+      md: 'w-7 h-7',
+      lg: 'w-8 h-8'
+    };
+    
+    const iconSizes = {
+      sm: 'text-[10px]',
+      md: 'text-xs',
+      lg: 'text-sm'
+    };
+    
+    return (
+      <a
+        href={downloadUrl}
+        download={fileName}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className={`absolute top-2 right-2 ${sizeClasses[size]} rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100 pointer-events-auto`}
+        style={{ backdropFilter: 'blur(4px)' }}
+      >
+        <DownloadOutlined className={`text-white ${iconSizes[size]}`} />
+      </a>
+    );
+  };
+
+  // ✅ Check if URL is downloadable (Cloudinary only)
+  const isDownloadable = (url) => {
+    return getDownloadUrl(url) !== null;
   };
 
   // ✅ Get sender info
@@ -180,13 +326,15 @@ export default function MessageBubble({
     return (
       <div className={`flex mb-3 ${isMine ? 'justify-end' : 'justify-start'}`}>
         <div
-          className="opacity-50 italic py-2 px-4 text-xs rounded-lg"
+          className="opacity-60 italic py-2 px-3 text-sm rounded-lg"
           style={{
-            color: theme.borderColor,
+            color: '#667781',
             borderRadius: bubbleRadius,
-            backgroundColor: theme.secondaryColor,
+            backgroundColor: isMine ? '#DCF8C6' : '#FFFFFF',
+            boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
           }}
         >
+          <DeleteOutlined style={{ marginRight: '6px', fontSize: '12px' }} />
           This message was deleted
         </div>
       </div>
@@ -236,45 +384,57 @@ export default function MessageBubble({
     });
   };
 
-  // ✅ Context menu items
-  const menuItems = [
-    isMine && {
+  // ✅ Context menu items - WhatsApp style
+  // Only allow edit for text messages without media
+  const canEdit = message.type === 'text' && (!message.media || message.media.length === 0);
+  
+  const menuItems = isMine ? [
+    ...(canEdit ? [{
       key: 'edit',
-      label: 'Edit',
-      icon: <EditOutlined />,
-      onClick: onEdit || handleEdit,
-    },
-    isMine && {
+      label: (
+        <div className="flex items-center gap-2">
+          <EditOutlined />
+          <span>Edit</span>
+        </div>
+      ),
+      onClick: handleEdit,
+    }] : []),
+    {
       key: 'delete',
-      label: 'Delete',
-      icon: <DeleteOutlined />,
-      onClick: onDelete || handleDelete,
+      label: (
+        <div className="flex items-center gap-2">
+          <DeleteOutlined />
+          <span>Delete</span>
+        </div>
+      ),
+      onClick: handleDelete,
       danger: true,
     },
-  ].filter(Boolean);
+  ] : [];
 
-  // Dynamic styles for theme
+  // WhatsApp-style bubble colors
   const bubbleStyle = {
     borderRadius: bubbleRadius,
-    backgroundColor: isMine ? theme.chatBubbleAdmin : theme.chatBubbleUser,
-    color: isMine ? theme.chatBubbleAdminText : theme.chatBubbleUserText,
-    fontSize: `${theme.messageFontSize}px`,
+    backgroundColor: isMine ? '#DCF8C6' : '#FFFFFF',
+    color: '#111827',
+    fontSize: '14.2px',
+    boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
   };
 
   const maxWidthClass = message.type === 'image' || message.type === 'video'
     ? 'max-w-[280px]'
     : message.type === 'file'
       ? 'min-w-[250px]'
-      : 'max-w-[60%]';
+      : 'max-w-[75%] sm:max-w-[60%]';
 
   return (
     <div className={`flex mb-3 gap-2 items-end ${isMine ? 'justify-end' : 'justify-start'}`}>
       {/* ✅ Avatar for other users */}
-      {!isMine && theme.showAvatars && (
+      {!isMine && (
         <Avatar
           size={32}
           src={sender.avatar}
-          style={{ backgroundColor: theme.accentColor }}
+          style={{ backgroundColor: '#10B981' }}
         >
           {sender.name?.charAt(0)?.toUpperCase() || 'U'}
         </Avatar>
@@ -290,9 +450,9 @@ export default function MessageBubble({
             className={`relative ${maxWidthClass} transition-all shadow-sm hover:shadow-md ${menuItems.length > 0 ? 'cursor-context-menu' : 'cursor-default'}`}
             style={{ ...bubbleStyle, wordWrap: 'break-word' }}
           >
-            {/* Sender name for other users */}
+            {/* Sender name for other users - WhatsApp style */}
             {!isMine && (
-              <div className="text-xs font-semibold mb-1.5 opacity-90 pt-2 px-3">
+              <div className="text-xs font-semibold mb-1 pt-2 px-3" style={{ color: '#10B981' }}>
                 {sender.name}
               </div>
             )}
@@ -301,6 +461,7 @@ export default function MessageBubble({
             {message.type === 'image' && message.media && message.media.length > 0 && (
               <div className="relative">
                 {message.media.length === 1 ? (
+                  // Single image
                   <div className="relative overflow-hidden" style={{ borderRadius: `${bubbleRadius} ${bubbleRadius} 0 0` }}>
                     <img
                       src={message.media[0].thumbnail || message.media[0].url}
@@ -313,21 +474,19 @@ export default function MessageBubble({
                         e.target.style.display = 'none';
                       }}
                     />
+                    <DownloadButton url={message.media[0].url} fileName={`image_${Date.now()}.jpg`} size="lg" />
                   </div>
-                ) : (
-                  <div
-                    className="grid gap-0.5 overflow-hidden"
-                    style={{
-                      gridTemplateColumns: message.media.length === 2 ? '1fr 1fr' : message.media.length === 3 ? '1fr 1fr' : 'repeat(2, 1fr)',
-                      borderRadius: `${bubbleRadius} ${bubbleRadius} 0 0`,
-                      width: message.media.length === 1 ? '250px' : message.media.length === 2 ? '300px' : '250px',
-                    }}
-                  >
-                    {message.media.slice(0, 4).map((m, i) => (
+                ) : message.media.length === 2 ? (
+                  // Two images - side by side
+                  <div className="grid grid-cols-2 gap-0.5" style={{ width: '300px', maxWidth: '100%' }}>
+                    {message.media.map((m, i) => (
                       <div
                         key={i}
-                        className="relative cursor-pointer"
-                        style={{ paddingTop: '100%', backgroundColor: theme.secondaryColor }}
+                        className="relative cursor-pointer overflow-hidden"
+                        style={{ 
+                          paddingTop: '100%',
+                          borderRadius: i === 0 ? `${bubbleRadius} 0 0 0` : `0 ${bubbleRadius} 0 0`
+                        }}
                         onClick={() => handleImageClick(m.url)}
                       >
                         <img
@@ -335,21 +494,112 @@ export default function MessageBubble({
                           alt={`image ${i + 1}`}
                           className="absolute top-0 left-0 w-full h-full object-cover"
                           loading="lazy"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
+                          onError={(e) => e.target.style.display = 'none'}
                         />
-                        {message.media.length > 4 && i === 3 && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-2xl font-bold">
+                        <DownloadButton url={m.url} fileName={`image_${i + 1}_${Date.now()}.jpg`} size="md" />
+                      </div>
+                    ))}
+                  </div>
+                ) : message.media.length === 3 ? (
+                  // Three images - 1 large + 2 small
+                  <div className="grid gap-0.5" style={{ width: '300px', maxWidth: '100%' }}>
+                    <div
+                      className="relative cursor-pointer overflow-hidden group"
+                      style={{ paddingTop: '66.67%', borderRadius: `${bubbleRadius} ${bubbleRadius} 0 0` }}
+                      onClick={() => handleImageClick(message.media[0].url)}
+                    >
+                      <img
+                        src={message.media[0].thumbnail || message.media[0].url}
+                        alt="image 1"
+                        className="absolute top-0 left-0 w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                      <a
+                        href={getDownloadUrl(message.media[0].url)}
+                        download={`image_1_${Date.now()}.jpg`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100"
+                        style={{ backdropFilter: 'blur(4px)' }}
+                      >
+                        <DownloadOutlined className="text-white text-xs" />
+                      </a>
+                    </div>
+                    <div className="grid grid-cols-2 gap-0.5">
+                      {message.media.slice(1, 3).map((m, i) => (
+                        <div
+                          key={i}
+                          className="relative cursor-pointer overflow-hidden group"
+                          style={{ paddingTop: '100%' }}
+                          onClick={() => handleImageClick(m.url)}
+                        >
+                          <img
+                            src={m.thumbnail || m.url}
+                            alt={`image ${i + 2}`}
+                            className="absolute top-0 left-0 w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => e.target.style.display = 'none'}
+                          />
+                          <a
+                            href={getDownloadUrl(m.url)}
+                            download={`image_${i + 2}_${Date.now()}.jpg`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100"
+                            style={{ backdropFilter: 'blur(4px)' }}
+                          >
+                            <DownloadOutlined className="text-white text-[10px]" />
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  // Four or more images - 2x2 grid with +N overlay
+                  <div className="grid grid-cols-2 gap-0.5" style={{ width: '300px', maxWidth: '100%' }}>
+                    {message.media.slice(0, 4).map((m, i) => (
+                      <div
+                        key={i}
+                        className="relative cursor-pointer overflow-hidden group"
+                        style={{ 
+                          paddingTop: '100%',
+                          borderRadius: i === 0 ? `${bubbleRadius} 0 0 0` : i === 1 ? `0 ${bubbleRadius} 0 0` : '0'
+                        }}
+                        onClick={() => handleImageClick(m.url)}
+                      >
+                        <img
+                          src={m.thumbnail || m.url}
+                          alt={`image ${i + 1}`}
+                          className="absolute top-0 left-0 w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => e.target.style.display = 'none'}
+                        />
+                        {message.media.length > 4 && i === 3 ? (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-2xl font-bold">
                             +{message.media.length - 4}
                           </div>
+                        ) : (
+                          <a
+                            href={getDownloadUrl(m.url)}
+                            download={`image_${i + 1}_${Date.now()}.jpg`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100"
+                            style={{ backdropFilter: 'blur(4px)' }}
+                          >
+                            <DownloadOutlined className="text-white text-[10px]" />
+                          </a>
                         )}
                       </div>
                     ))}
                   </div>
                 )}
                 {message.content && (
-                  <div className={`px-3 pb-2 bg-black/5 ${isMine ? 'pr-20' : 'pr-16'}`}>
+                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '70px', minWidth: '100px' }}>
                     {message.content}
                   </div>
                 )}
@@ -362,7 +612,7 @@ export default function MessageBubble({
                 {message.media.map((m, i) => (
                   <div
                     key={i}
-                    className={`relative overflow-hidden ${i < message.media.length - 1 ? 'mb-2' : ''}`}
+                    className={`relative overflow-hidden group ${i < message.media.length - 1 ? 'mb-2' : ''}`}
                     style={{
                       borderRadius: i === 0 ? `${bubbleRadius} ${bubbleRadius} 0 0` : '0',
                       width: '250px',
@@ -377,34 +627,159 @@ export default function MessageBubble({
                       className="w-full h-auto block"
                       style={{ borderRadius: i === 0 ? `${bubbleRadius} ${bubbleRadius} 0 0` : '0' }}
                     />
+                    {/* Download button */}
+                    <a
+                      href={getDownloadUrl(m.url)}
+                      download={`video_${i + 1}_${Date.now()}.mp4`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100"
+                      style={{ backdropFilter: 'blur(4px)' }}
+                    >
+                      <DownloadOutlined className="text-white text-sm" />
+                    </a>
                   </div>
                 ))}
                 {message.content && (
-                  <div className={`px-3 pb-2 bg-black/5 ${isMine ? 'pr-20' : 'pr-16'}`}>
+                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '70px', minWidth: '100px' }}>
                     {message.content}
                   </div>
                 )}
               </div>
             )}
 
-            {/* ✅ AUDIO MESSAGES */}
-            {message.type === 'audio' && message.media && message.media.length > 0 && (
-              <div className="p-3">
-                {message.media.map((m, i) => (
-                  <div key={i} className={i < message.media.length - 1 ? 'mb-3' : ''}>
-                    <div className="flex items-center gap-3">
-                      <SoundOutlined className="text-2xl opacity-80" />
-                      <audio src={m.url} controls className="flex-1" />
+            {/* ✅ AUDIO/VOICE MESSAGES - WhatsApp Style */}
+            {(message.type === 'audio' || message.type === 'voice') && message.media && message.media.length > 0 && (
+              <div className="py-2 px-3">
+                {message.media.map((m, i) => {
+                  const audioId = `${message._id}-${i}`;
+                  const state = audioStates[audioId] || { isPlaying: false, currentTime: 0, duration: 0 };
+                  const isVoiceNote = m.mimeType?.includes('ogg') || m.mimeType?.includes('webm') || m.isVoiceNote;
+
+                  return (
+                    <div key={i} className={i < message.media.length - 1 ? 'mb-3' : ''}>
+                      {isVoiceNote ? (
+                        // WhatsApp-style voice note player
+                        <div className="flex items-center gap-2 min-w-[200px]">
+                          <button
+                            onClick={() => toggleAudioPlay(audioId)}
+                            className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                            style={{
+                              backgroundColor: isMine ? '#FFFFFF' : '#008069',
+                              color: isMine ? '#008069' : '#FFFFFF',
+                            }}
+                          >
+                            {state.isPlaying ? (
+                              <PauseOutlined className="text-lg" />
+                            ) : (
+                              <CaretRightOutlined className="text-lg ml-0.5" />
+                            )}
+                          </button>
+
+                          <div className="flex-1 flex flex-col gap-1">
+                            {/* Waveform visualization placeholder - can be replaced with actual waveform */}
+                            <div className="flex items-center gap-0.5 h-6">
+                              {[...Array(40)].map((_, idx) => {
+                                const height = Math.random() * 100;
+                                const isPassed = state.duration > 0 && (idx / 40) <= (state.currentTime / state.duration);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="flex-1 rounded-full transition-all"
+                                    style={{
+                                      height: `${Math.max(20, height)}%`,
+                                      backgroundColor: isPassed
+                                        ? (isMine ? '#FFFFFF' : '#FFFFFF')
+                                        : (isMine ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.2)'),
+                                      opacity: isPassed ? 1 : 0.5,
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] opacity-70 min-w-[35px] text-right">
+                            {state.isPlaying || state.currentTime > 0
+                              ? formatAudioTime(state.currentTime)
+                              : formatAudioTime(state.duration)}
+                          </div>
+
+                          <audio
+                            ref={el => audioRefs.current[audioId] = el}
+                            src={m.url}
+                            onTimeUpdate={() => handleAudioTimeUpdate(audioId)}
+                            onEnded={() => handleAudioEnded(audioId)}
+                            onPlay={() => handleAudioPlay(audioId)}
+                            onPause={() => handleAudioPause(audioId)}
+                            onLoadedMetadata={() => handleAudioTimeUpdate(audioId)}
+                            preload="metadata"
+                            className="hidden"
+                          />
+                        </div>
+                      ) : (
+                        // Regular audio player
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => toggleAudioPlay(audioId)}
+                              className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105"
+                              style={{
+                                backgroundColor: isMine ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)',
+                              }}
+                            >
+                              {state.isPlaying ? (
+                                <PauseOutlined className="text-lg" />
+                              ) : (
+                                <CaretRightOutlined className="text-lg ml-0.5" />
+                              )}
+                            </button>
+
+                            <div className="flex-1 flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <AudioOutlined className="text-sm opacity-70" />
+                                <span className="text-xs font-medium">Audio</span>
+                              </div>
+                              <Slider
+                                min={0}
+                                max={state.duration || 100}
+                                value={state.currentTime}
+                                onChange={(value) => handleSeek(audioId, value)}
+                                tooltip={{ formatter: formatAudioTime }}
+                                trackStyle={{ backgroundColor: isMine ? '#FFFFFF' : '#008069' }}
+                                handleStyle={{ borderColor: isMine ? '#FFFFFF' : '#008069' }}
+                              />
+                            </div>
+
+                            <div className="text-[11px] opacity-70">
+                              {formatAudioTime(state.currentTime)} / {formatAudioTime(state.duration)}
+                            </div>
+
+                            <audio
+                              ref={el => audioRefs.current[audioId] = el}
+                              src={m.url}
+                              onTimeUpdate={() => handleAudioTimeUpdate(audioId)}
+                              onEnded={() => handleAudioEnded(audioId)}
+                              onPlay={() => handleAudioPlay(audioId)}
+                              onPause={() => handleAudioPause(audioId)}
+                              onLoadedMetadata={() => handleAudioTimeUpdate(audioId)}
+                              preload="metadata"
+                              className="hidden"
+                            />
+                          </div>
+                          {m.size && (
+                            <div className="text-[11px] opacity-70">
+                              {formatFileSize(m.size)}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {m.size && (
-                      <div className="text-[11px] opacity-70 mt-1">
-                        {formatFileSize(m.size)}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
                 {message.content && (
-                  <div className={`mt-2 pt-2 border-t ${isMine ? 'border-white/20' : 'border-black/10'} pb-2 ${isMine ? 'pr-20' : 'pr-16'}`}>
+                  <div className="mt-2 pt-2 border-t pb-2" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '70px', minWidth: '100px' }}>
                     {message.content}
                   </div>
                 )}
@@ -413,34 +788,47 @@ export default function MessageBubble({
 
             {/* ✅ FILE MESSAGES */}
             {message.type === 'file' && message.media && message.media.length > 0 && (
-              <div className="p-3">
+              <div className="p-3 pb-4">
                 {message.media.map((m, i) => {
-                  const fileName = getFileName(m.url);
+                  const fileName = m.fileName || getFileName(m.url);
+                  const fileExt = fileName.split('.').pop()?.toUpperCase() || 'FILE';
+                  const isCloudinary = m.url.includes('cloudinary.com');
+                  
                   return (
                     <div
                       key={i}
-                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors mb-2 ${isMine ? 'bg-white/10 hover:bg-white/15' : 'bg-black/5 hover:bg-black/8'}`}
-                      onClick={() => handleFileDownload(m.url, fileName)}
+                      onClick={() => isCloudinary && handleDocumentDownload(m.url, fileName)}
+                      className={`flex items-center gap-3 p-3 rounded-lg transition-all mb-2 last:mb-0 ${isMine ? 'bg-white/20 hover:bg-white/30' : 'bg-black/5 hover:bg-black/10'} ${isCloudinary ? 'cursor-pointer' : ''}`}
+                      style={{ minWidth: '280px', maxWidth: '100%' }}
                     >
-                      <div className="text-[32px]">
-                        {getFileIcon(m.mimeType, fileName)}
+                      <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center" style={{
+                        backgroundColor: isMine ? 'rgba(255,255,255,0.3)' : 'rgba(0,128,105,0.1)'
+                      }}>
+                        <div className="text-center">
+                          <div className="text-[20px] mb-0.5">
+                            {getFileIcon(m.mimeType, fileName)}
+                          </div>
+                          <div className="text-[9px] font-semibold opacity-70">
+                            {fileExt}
+                          </div>
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
+                        <div className="font-medium text-[14px] truncate mb-0.5">
                           {fileName}
                         </div>
                         {m.size && (
-                          <div className="text-[11px] opacity-70 mt-0.5">
+                          <div className="text-[12px] opacity-70">
                             {formatFileSize(m.size)}
                           </div>
                         )}
                       </div>
-                      <DownloadOutlined className="text-lg opacity-70" />
+                      <DownloadOutlined className="text-[20px] opacity-70 flex-shrink-0" />
                     </div>
                   );
                 })}
                 {message.content && (
-                  <div className={`mt-2 pt-2 border-t ${isMine ? 'border-white/20' : 'border-black/10'} pb-2 ${isMine ? 'pr-20' : 'pr-16'}`}>
+                  <div className="mt-3 pt-3 border-t" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '70px', minWidth: '100px' }}>
                     {message.content}
                   </div>
                 )}
@@ -449,22 +837,35 @@ export default function MessageBubble({
 
             {/* ✅ TEXT MESSAGES WITH MEDIA (Mixed) - WhatsApp Style */}
             {message.type === 'text' && message.media && message.media.length > 0 && (
-              <div className="pt-2 px-3">
+              <div className="pt-2 px-3 pb-2">
                 <div className={`flex flex-wrap gap-1 ${message.content ? 'mb-2' : ''}`}>
                   {message.media.map((m, i) => (
                     <div key={i}>
                       {m.type === 'image' && (
-                        <img
-                          src={m.thumbnail || m.url}
-                          alt="attachment"
-                          onClick={() => handleImageClick(m.url)}
-                          className="w-[120px] h-[120px] rounded-lg cursor-pointer object-cover border transition-opacity hover:opacity-90"
-                          style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }}
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
+                        <div className="relative">
+                          <img
+                            src={m.thumbnail || m.url}
+                            alt="attachment"
+                            onClick={() => handleImageClick(m.url)}
+                            className="w-[120px] h-[120px] rounded-lg cursor-pointer object-cover border transition-opacity hover:opacity-90"
+                            style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }}
+                            loading="lazy"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                          <a
+                            href={getDownloadUrl(m.url)}
+                            download={`image_${i + 1}_${Date.now()}.jpg`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100"
+                            style={{ backdropFilter: 'blur(4px)' }}
+                          >
+                            <DownloadOutlined className="text-white text-[10px]" />
+                          </a>
+                        </div>
                       )}
                       {m.type === 'video' && (
                         <div className="relative w-[120px] h-[120px]">
@@ -476,24 +877,39 @@ export default function MessageBubble({
                             style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }}
                           />
                           <PlayCircleOutlined className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[32px] text-white bg-black/50 rounded-full p-2" />
+                          <a
+                            href={getDownloadUrl(m.url)}
+                            download={`video_${i + 1}_${Date.now()}.mp4`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-100 z-10"
+                            style={{ backdropFilter: 'blur(4px)' }}
+                          >
+                            <DownloadOutlined className="text-white text-[10px]" />
+                          </a>
                         </div>
                       )}
                       {m.type === 'file' && (
-                        <div
-                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer min-w-[120px] ${isMine ? 'bg-white/15' : 'bg-black/8'}`}
-                          onClick={() => handleFileDownload(m.url, getFileName(m.url))}
+                        <a
+                          href={getDownloadUrl(m.url)}
+                          download={getFileName(m.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-center gap-2 p-2 rounded-lg min-w-[120px] ${isMine ? 'bg-white/15 hover:bg-white/25' : 'bg-black/8 hover:bg-black/12'} transition-colors`}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {getFileIcon(m.mimeType, getFileName(m.url))}
                           <div className="text-[11px] truncate flex-1">
                             {getFileName(m.url)}
                           </div>
-                        </div>
+                        </a>
                       )}
                     </div>
                   ))}
                 </div>
                 {message.content && (
-                  <div className={`px-0 pb-2 mt-2 ${isMine ? 'pr-20' : 'pr-16'}`}>
+                  <div className="px-0" style={{ paddingRight: '70px', minWidth: '100px' }}>
                     {message.content}
                   </div>
                 )}
@@ -502,7 +918,7 @@ export default function MessageBubble({
 
             {/* ✅ PURE TEXT MESSAGES */}
             {message.type === 'text' && (!message.media || message.media.length === 0) && message.content && (
-              <div className={`px-3 py-2 pb-2 ${isMine ? 'pr-20' : 'pr-16'}`}>
+              <div className="px-3 py-2 pb-2" style={{ paddingRight: '70px', minWidth: '100px' }}>
                 {message.content}
               </div>
             )}
@@ -553,11 +969,9 @@ export default function MessageBubble({
               </span>
            
 
-              {/* Status icon for own messages */}
-              {isMine && theme.showReadStatus && (
-                <span
-                  className={`inline-flex items-center ml-1 text-xs  ${message.status === "read" ? "text-blue-400" : "text-gray-400"}`}
-                >
+              {/* Status icon for own messages - WhatsApp style */}
+              {isMine && (
+                <span className="inline-flex items-center ml-1">
                   {statusConfig.icon}
                 </span>
               )}
@@ -566,16 +980,7 @@ export default function MessageBubble({
         </Tooltip>
       </Dropdown>
 
-      {/* ✅ Avatar for current user */}
-      {isMine && theme.showAvatars && (
-        <Avatar
-          size={32}
-          src={currentUser?.avatar}
-          style={{ backgroundColor: theme.accentColor }}
-        >
-          {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
-        </Avatar>
-      )}
+      {/* Avatar removed for own messages - WhatsApp style */}
 
       {/* ✅ Edit Modal */}
       <Modal

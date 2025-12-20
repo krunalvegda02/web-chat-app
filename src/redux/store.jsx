@@ -53,6 +53,8 @@ import tenantReducer from './slices/tenantSlice.jsx';
 import userReducer from './slices/userSlice.jsx';
 import themeReducer from './slices/themeSlice.jsx';
 import adminChatReducer from './slices/adminChatSlice.jsx';
+import contactReducer from './slices/contactSlice.js';
+import callLogReducer from './slices/callLogSlice.js';
 
 const persistConfig = {
   key: 'root',
@@ -67,6 +69,8 @@ const rootReducer = combineReducers({
   user: userReducer,
   theme: themeReducer,
   adminChat: adminChatReducer,
+  contacts: contactReducer,
+  callLogs: callLogReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

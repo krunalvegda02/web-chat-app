@@ -1,10 +1,13 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../components/common/Sidebar";
 import Topbar from "../components/common/Topbar";
 
 export default function LayoutWrapper({ hasSidebar, hasTopbar, footer }) {
+  const location = useLocation();
+  const isInChat = location.pathname.includes('/chat') || location.pathname.includes('/user');
+  
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full" style={{ overscrollBehavior: 'none' }}>
 
       {/* Topbar */}
       {hasTopbar && <Topbar />}
@@ -17,22 +20,18 @@ export default function LayoutWrapper({ hasSidebar, hasTopbar, footer }) {
         className={`
           w-full 
           transition-all 
-          ${hasTopbar ? "pt-" : ""}
-          ${hasSidebar ? "pl-[72px]" : ""}
+          ${hasSidebar 
+            ? "sm:pl-20"
+            : "pl-0"}
+          ${isInChat ? "" : "mb-14 md:mb-0"}
         `}
-
-     style={{
-        background: `
-          radial-gradient(circle at 20% 30%, rgba(255,255,255,0.9) 0%, rgba(244,247,255,0.85) 40%, rgba(235,240,255,0.75) 100%),
-          linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(240,245,255,0.85) 100%)
-        `,
-        backdropFilter: "blur(10px)",
-      }}
+        style={{
+          minHeight: '97vh',
+          backgroundColor: '#F9FAFB',
+        }}
       >
         {/* Outlet content */}
-        <div className="p-6">
-          <Outlet />
-        </div>
+        <Outlet />
       </main>
 
       {/* {footer && (

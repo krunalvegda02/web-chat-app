@@ -48,11 +48,17 @@ export const useSocket = () => {
             console.log('✅ [SOCKET] message_received:', data);
             console.log('📦 [SOCKET] Dispatching socketMessageReceived for room:', data?.roomId);
             if (data && data.roomId) {
+              // ✅ FIX: Ensure status is 'sent' for immediate tick mark
+              const messageWithStatus = {
+                ...data,
+                status: data.status || 'sent'
+              };
+              
               dispatch(socketMessageReceived({
                 roomId: data.roomId,
-                message: data
+                message: messageWithStatus
               }));
-              console.log('✅ [SOCKET] Message added to Redux state');
+              console.log('✅ [SOCKET] Message added to Redux state with status:', messageWithStatus.status);
 
               // ✅ Auto-mark as read if message is from someone else and we're viewing this room
               const state = window.__REDUX_STORE__?.getState();

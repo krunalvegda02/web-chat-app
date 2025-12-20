@@ -1,48 +1,37 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Dropdown, Avatar, Badge } from 'antd';
+import { useSelector } from 'react-redux';
+import { Dropdown, Avatar, Badge, Drawer, Button } from 'antd';
 import {
   LogoutOutlined,
   SettingOutlined,
   UserOutlined,
   BellOutlined,
   QuestionCircleOutlined,
+  MenuOutlined,
+  CloseOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
+import { getMenuItems } from '../../routes/pageData';
 
 export default function Topbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeRoomId = useSelector((s) => s.chat?.activeRoomId || '');
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatTime = (date) =>
-    date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-
-  const formatDate = (date) =>
-    date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
+  const isInChat = location.pathname.includes('/chat') || location.pathname.includes('/user');
+  const isInActiveChat = isInChat && activeRoomId && activeRoomId !== '';
+  const menuItems = getMenuItems(user?.role, navigate);
+  const activeKey = location.pathname;
 
   const getPageTitle = () => {
-    if (location.pathname.includes('admin')) return 'Admin Dashboard';
-    if (location.pathname.includes('super-admin')) return 'Super Admin Dashboard';
-    if (location.pathname.includes('chat')) return 'Messages';
+    if (location.pathname.includes('chat')) return 'Chats';
     if (location.pathname.includes('profile')) return 'Profile';
     if (location.pathname.includes('settings')) return 'Settings';
-    return 'Dashboard';
+    return 'WhatsApp';
   };
 
   const userMenu = [
@@ -82,98 +71,99 @@ export default function Topbar() {
     },
   ];
 
-  const notifications = [
-    {
-      key: '1',
-      label: (
-        <div className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg w-64 md:w-80">
-          <div className="w-10 h-10 rounded-lg bg-blue-500 flex-shrink-0 flex items-center justify-center">
-            <BellOutlined className="text-white text-sm" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">New message</p>
-            <p className="text-xs text-gray-500">2 min ago</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: '2',
-      label: (
-        <div className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg w-64 md:w-80">
-          <div className="w-10 h-10 rounded-lg bg-green-500 flex-shrink-0 flex items-center justify-center">
-            <UserOutlined className="text-white text-sm" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">New user joined</p>
-            <p className="text-xs text-gray-500">1 hr ago</p>
-          </div>
-        </div>
-      ),
-    },
-    { type: 'divider' },
-    {
-      key: 'viewall',
-      label: (
-        <p
-          className="text-center text-green-600 font-medium cursor-pointer py-2 hover:text-green-700 text-sm"
-          onClick={() => navigate('/notifications')}
-        >
-          View All
-        </p>
-      ),
-    },
-  ];
+
+
+
 
   return (
-    <header className="sticky top-0 z-30 h-14 md:h-16 border-b border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between h-full px-3 md:px-6 gap-3 md:gap-4" style={{ marginLeft: '64px', marginLeft: 'calc(64px)' }}>
-        <div className="flex flex-col min-w-0 flex-1">
-          <h1 className="text-base md:text-lg font-semibold text-gray-900 truncate">
-            {getPageTitle()}
-          </h1>
-          <p className="text-xs text-gray-500 hidden sm:block">
-            {formatDate(currentTime)} • {formatTime(currentTime)}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* NOTIFICATIONS */}
-          <Dropdown menu={{ items: notifications }} trigger={['click']} placement="bottomRight">
-            <Badge count={3} size="small" className="cursor-pointer">
-              <button className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
-                <BellOutlined className="text-base" />
+    <>
+      {/* MOBILE BOTTOM NAVIGATION - WhatsApp Style */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100] bg-[#F0F2F5] shadow-[0_-1px_3px_rgba(0,0,0,0.08)]">
+        <div className="flex items-center justify-around h-14 px-1">
+          {menuItems.slice(0, 3).map((item) => {
+            const isActive = activeKey === item.path;
+            return (
+              <button
+                key={item.key}
+                onClick={item.onClick}
+                className="flex flex-col items-center justify-center flex-1 h-full gap-1 transition-all relative"
+              >
+                <div className={`flex items-center justify-center w-12 h-8 rounded-full transition-all ${
+                  isActive ? 'bg-[#D1F4E0]' : ''
+                }`}>
+                  <span style={{ fontSize: '24px', color: isActive ? '#00A884' : '#667781' }}>{item.icon}</span>
+                </div>
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: isActive ? '#00A884' : '#667781', 
+                  fontWeight: isActive ? 600 : 400,
+                  letterSpacing: '0.2px'
+                }}>
+                  {item.label}
+                </span>
               </button>
-            </Badge>
-          </Dropdown>
-
-          <div className="hidden sm:block w-px h-6 bg-gray-200" />
-
-          {/* USER MENU */}
-          <Dropdown menu={{ items: userMenu }} trigger={['click']} placement="bottomRight">
-            <div className="flex items-center gap-2 md:gap-3 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded-lg transition-colors">
-              <div className="hidden md:flex flex-col items-end">
-                <span className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                  {user?.name}
-                </span>
-                <span className="text-xs text-gray-500 capitalize">
-                  {user?.role?.replace('_', ' ')}
-                </span>
-              </div>
-
-              <Avatar
-                size={36}
-                src={user?.avatar}
-                icon={<UserOutlined />}
-                className="border-2 border-gray-200 flex-shrink-0"
-                style={{
-                  backgroundColor: '#10B981',
-                }}
-              />
+            );
+          })}
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex flex-col items-center justify-center flex-1 h-full gap-1 transition-all"
+          >
+            <div className="flex items-center justify-center w-12 h-8 rounded-full">
+              <MenuOutlined style={{ fontSize: '24px', color: '#667781' }} />
             </div>
-          </Dropdown>
+            <span style={{ fontSize: '10px', color: '#667781', fontWeight: 400, letterSpacing: '0.2px' }}>More</span>
+          </button>
         </div>
-      </div>
-    </header>
+      </nav>
+
+      {/* DRAWER - WhatsApp Style */}
+      <Drawer
+        title={null}
+        placement="bottom"
+        onClose={() => setDrawerOpen(false)}
+        open={drawerOpen}
+        bodyStyle={{ padding: 0, borderRadius: '16px 16px 0 0' }}
+        height="auto"
+        headerStyle={{ display: 'none' }}
+        closeIcon={null}
+      >
+        <div className="flex flex-col bg-white" style={{ borderRadius: '16px 16px 0 0' }}>
+          <div className="flex items-center justify-center py-2">
+            <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+          <div className="bg-[#F0F2F5] px-4 py-3 flex items-center gap-3 border-b border-gray-200">
+            <Avatar size={48} src={user?.avatar} icon={<UserOutlined />} style={{ backgroundColor: '#00A884' }} />
+            <div>
+              <p className="text-gray-900 font-medium text-base">{user?.name}</p>
+              <p className="text-gray-500 text-sm">{user?.role === 'USER' ? user?.email : user?.role?.replace('_', ' ')}</p>
+            </div>
+          </div>
+          <nav className="py-2">
+            {menuItems.map((item) => {
+              const isActive = activeKey === item.path;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => { item.onClick(); setDrawerOpen(false); }}
+                  className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors active:bg-gray-100"
+                  style={{ backgroundColor: isActive ? '#E7F8F0' : 'transparent' }}
+                >
+                  <span style={{ fontSize: '22px', color: isActive ? '#00A884' : '#667781' }}>{item.icon}</span>
+                  <span style={{ fontSize: '16px', color: isActive ? '#00A884' : '#111827', fontWeight: isActive ? 500 : 400 }}>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="border-t border-gray-200 p-4 space-y-2">
+            <button onClick={() => { navigate(user?.role === 'USER' ? '/user/profile' : '/profile'); setDrawerOpen(false); }} className="w-full py-3 rounded-lg bg-[#00A884] text-white font-medium hover:bg-[#008F6D] transition-colors active:bg-[#007A5E]">
+              View Profile
+            </button>
+            <button onClick={() => { logout(); setDrawerOpen(false); navigate('/login'); }} className="w-full py-3 rounded-lg bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors active:bg-gray-100">
+              Logout
+            </button>
+          </div>
+        </div>
+      </Drawer>
+    </>
   );
 }

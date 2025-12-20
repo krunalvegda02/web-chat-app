@@ -22,6 +22,8 @@ import SuperAdminChat from "../pages/superAdmin/SuperAdminChat";
 
 // User Pages
 import UserChatPage from "../pages/user/UserChatPage";
+import Contacts from "../pages/user/Contacts";
+import CallLogs from "../pages/user/CallLogs";
 
 // Error Pages
 import Unauthorized from "../pages/common/Unauthorized";
@@ -73,8 +75,9 @@ export const pageRoutes = [
         requiredRoles: ["USER"],
         routes: [
             { path: "/user/chats", element: UserChatPage },
-            {path: "/user/calls", element: UserChatPage },
-            {path: "/user/profile", element: UserChatPage },
+            { path: "/user/calls", element: CallLogs },
+            { path: "/user/profile", element: UserChatPage },
+            { path: "/user/contacts", element: Contacts },
         ],
     },
 

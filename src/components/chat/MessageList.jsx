@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import MessageBubble from './MessageBubble';
+import CallLogBubble from './CallLogBubble';
 import TypingIndicator from './TypingIndicator';
 import { useSelector, useDispatch } from 'react-redux';
 import { Empty, Divider, Spin } from 'antd';
@@ -21,16 +22,47 @@ const MessageList = memo(function MessageList({ messages = [] }) {
 
   // ✅ Validate and memoize messages for performance
   const validMessages = useMemo(() => {
-    if (!Array.isArray(messages)) return [];
+    console.log('🔍 MessageList - Raw messages:', messages);
+    if (!Array.isArray(messages)) {
+      console.log('❌ Messages is not an array');
+      return [];
+    }
 
-    return messages
+    const filtered = messages
       .filter((message) => {
-        if (!message || typeof message !== 'object') return false;
-        if (!message._id) return false;
+        if (!message || typeof message !== 'object') {
+          console.log('❌ Invalid message object:', message);
+          return false;
+        }
+        if (!message._id) {
+          console.log('❌ Message missing _id:', message);
+          return false;
+        }
+        // Log call messages specifically
+        if (message.type === 'call') {
+          console.log('📞 CALL MESSAGE FOUND:', {
+            _id: message._id,
+            type: message.type,
+            content: message.content,
+            callLog: message.callLog,
+            senderId: message.senderId,
+            sender: message.sender,
+            createdAt: message.createdAt
+          });
+        }
         // Allow messages with content OR media (image/video/file messages may have empty content)
-        if (!message.content && (!message.media || !Array.isArray(message.media) || message.media.length === 0)) return false;
-        if (!message.createdAt) return false;
-        if (!message.sender && !message.senderId) return false;
+        if (!message.content && (!message.media || !Array.isArray(message.media) || message.media.length === 0)) {
+          console.log('❌ Message has no content or media:', message);
+          return false;
+        }
+        if (!message.createdAt) {
+          console.log('❌ Message missing createdAt:', message);
+          return false;
+        }
+        if (!message.sender && !message.senderId) {
+          console.log('❌ Message missing sender:', message);
+          return false;
+        }
         return true;
       })
       .map((message) => {
@@ -53,6 +85,9 @@ const MessageList = memo(function MessageList({ messages = [] }) {
           media: Array.isArray(message.media) ? message.media : [],
         };
       });
+
+    console.log('✅ MessageList - Valid messages:', filtered.length, filtered);
+    return filtered;
   }, [messages]);
 
   // ✅ Auto-scroll to bottom on new messages
@@ -134,98 +169,114 @@ const MessageList = memo(function MessageList({ messages = [] }) {
   // ✅ Show empty state with theme colors
   if (validMessages.length === 0) {
     return (
-      <Empty
-        image={
-          <InboxOutlined
-            style={{
-              fontSize: '48px',
-              color: theme.borderColor,
-            }}
-          />
-        }
-        description="Start a conversation!"
+      <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
+          justifyContent: 'center',
           height: '100%',
-          backgroundColor: theme.backgroundColor,
-          color: theme.borderColor,
+          flexDirection: 'column',
+          gap: '16px',
+          padding: '40px',
+          background: '#E5DDD5',
         }}
-      />
+      >
+        <div
+          style={{
+            width: '100px',
+            height: '100px',
+            borderRadius: '50%',
+            background: 'rgba(0, 128, 105, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <InboxOutlined style={{ fontSize: '48px', color: '#8696A0' }} />
+        </div>
+        <div style={{ textAlign: 'center', maxWidth: '300px' }}>
+          <p style={{ fontSize: '14px', color: '#667781', lineHeight: '1.5', margin: 0 }}>
+            No messages in this conversation yet
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
     <div
       style={{
-        overflowY: 'auto',
-        padding: '16px',
-        height: '100%',
-        backgroundColor: theme.backgroundColor,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        padding: '12px 8px',
       }}
     >
       {Object.keys(groupedMessages)
         .sort()
         .map((dateKey) => (
           <div key={dateKey}>
-            {/* ✅ Date divider - WhatsApp style (subtle and centered) */}
+            {/* WhatsApp-style Date Label */}
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: 'center',
-                margin: '16px 0',
-                position: 'relative',
+                margin: '12px 0',
               }}
             >
               <div
                 style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  height: '1px',
-                  backgroundColor: theme.borderColor,
-                  opacity: 0.3,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: '12.5px',
-                  color: theme.headerText,
-                  backgroundColor: theme.backgroundColor,
-                  padding: '0 12px',
-                  position: 'relative',
-                  fontWeight: 400,
-                  opacity: 0.8,
-                  letterSpacing: '0.3px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#667781',
+                  fontWeight: 500,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
                 }}
               >
                 {formatDateLabel(new Date(dateKey))}
-              </span>
+              </div>
             </div>
 
-            {/* ✅ Messages for this date */}
-            {groupedMessages[dateKey].map((message) => (
-              <MessageBubble
-                key={message._id}
-                message={message}
-                currentUser={user}
-                showAvatar={theme.showAvatars}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
+            {/* Messages for this date */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {groupedMessages[dateKey].map((message) => {
+                // Check if this is a call log
+                if (message.type === 'call' && message.callLog) {
+                  return (
+                    <CallLogBubble
+                      key={message._id}
+                      callLog={message.callLog}
+                      timestamp={message.createdAt}
+                      currentUser={user}
+                      senderId={message.senderId}
+                    />
+                  );
+                }
+                
+                // Regular message
+                return (
+                  <MessageBubble
+                    key={message._id}
+                    message={message}
+                    currentUser={user}
+                    showAvatar={false}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
+            </div>
           </div>
         ))}
 
-      {/* ✅ Typing indicator with theme control */}
-      {theme.enableTypingIndicator && typingUsers.length > 0 && (
+      {/* Typing indicator */}
+      {typingUsers.length > 0 && (
         <TypingIndicator typingUsers={typingUsers} />
       )}
 
-      {/* ✅ Auto-scroll anchor */}
+      {/* Auto-scroll anchor */}
       <div ref={messagesEndRef} />
     </div>
   );

@@ -51,53 +51,58 @@ export default function TypingIndicator() {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        padding: '8px 12px',
-        backgroundColor: theme?.backgroundColor || '#f5f5f5',
-        borderTop: `1px solid ${theme?.borderColor || '#e0e0e0'}`,
-        fontSize: '12px',
-        color: theme?.textSecondary || '#666666',
+        padding: '12px 16px',
+        backgroundColor: '#F0F2F5',
+        fontSize: '13px',
+        color: '#6B7280',
       }}
     >
-      {/* Typing dots animation */}
-      <div style={{ display: 'flex', gap: '3px' }}>
+      {/* Typing dots animation - WhatsApp style */}
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
         <div
           style={{
-            width: '6px',
-            height: '6px',
+            width: '8px',
+            height: '8px',
             borderRadius: '50%',
-            backgroundColor: theme?.primaryColor || '#1890ff',
+            backgroundColor: '#10B981',
             animation: 'bounce 1.4s infinite ease-in-out',
           }}
         />
         <div
           style={{
-            width: '6px',
-            height: '6px',
+            width: '8px',
+            height: '8px',
             borderRadius: '50%',
-            backgroundColor: theme?.primaryColor || '#1890ff',
+            backgroundColor: '#10B981',
             animation: 'bounce 1.4s infinite ease-in-out 0.2s',
           }}
         />
         <div
           style={{
-            width: '6px',
-            height: '6px',
+            width: '8px',
+            height: '8px',
             borderRadius: '50%',
-            backgroundColor: theme?.primaryColor || '#1890ff',
+            backgroundColor: '#10B981',
             animation: 'bounce 1.4s infinite ease-in-out 0.4s',
           }}
         />
       </div>
 
-      <span>
-        <strong>{userNames}</strong> {verb} typing...
+      <span style={{ fontWeight: '400' }}>
+        {userNames} {verb} typing...
       </span>
 
       <style>
         {`
           @keyframes bounce {
-            0%, 80%, 100% { transform: scale(1); }
-            40% { transform: scale(1.3); }
+            0%, 80%, 100% { 
+              transform: translateY(0); 
+              opacity: 0.7;
+            }
+            40% { 
+              transform: translateY(-4px); 
+              opacity: 1;
+            }
           }
         `}
       </style>
