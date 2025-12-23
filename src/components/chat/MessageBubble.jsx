@@ -376,17 +376,110 @@ export default function MessageBubble({
     antMessage.success('Message edited');
   };
 
-  // ✅ Handle delete message
+  // ✅ Handle delete message - WhatsApp style
   const handleDelete = () => {
     Modal.confirm({
-      title: 'Delete Message',
-      content: 'Are you sure you want to delete this message?',
-      okText: 'Delete',
-      okType: 'danger',
+      title: null,
+      icon: null,
+      content: (
+        <div style={{ padding: '8px 0' }}>
+          <div style={{ fontSize: '16px', fontWeight: 500, color: '#111B21', marginBottom: '8px' }}>
+            Delete message?
+          </div>
+          <div style={{ fontSize: '14px', color: '#667781', lineHeight: '20px' }}>
+            {/* Empty - buttons will be in footer */}
+          </div>
+        </div>
+      ),
+      okText: 'DELETE FOR EVERYONE',
+      cancelText: 'DELETE FOR ME',
+      okButtonProps: {
+        style: {
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: '#EA4335',
+          fontWeight: 500,
+          fontSize: '14px',
+          height: '48px',
+          boxShadow: 'none',
+          textTransform: 'uppercase',
+        },
+        onMouseEnter: (e) => {
+          e.target.style.backgroundColor = '#F5F5F5';
+        },
+        onMouseLeave: (e) => {
+          e.target.style.backgroundColor = 'transparent';
+        },
+      },
+      cancelButtonProps: {
+        style: {
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: '#EA4335',
+          fontWeight: 500,
+          fontSize: '14px',
+          height: '48px',
+          boxShadow: 'none',
+          textTransform: 'uppercase',
+        },
+        onMouseEnter: (e) => {
+          e.target.style.backgroundColor = '#F5F5F5';
+        },
+        onMouseLeave: (e) => {
+          e.target.style.backgroundColor = 'transparent';
+        },
+      },
+      width: 320,
+      centered: true,
+      closable: false,
+      maskClosable: true,
+      styles: {
+        body: { padding: '24px 24px 8px' },
+        footer: { padding: '0', marginTop: '0', borderTop: 'none' },
+      },
+      footer: (_, { OkBtn, CancelBtn }) => (
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          <div style={{ borderTop: '1px solid #E9EDEF' }}>
+            <CancelBtn />
+          </div>
+          <div style={{ borderTop: '1px solid #E9EDEF' }}>
+            <OkBtn />
+          </div>
+          <div style={{ borderTop: '1px solid #E9EDEF' }}>
+            <button
+              onClick={() => Modal.destroyAll()}
+              style={{
+                width: '100%',
+                height: '48px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#008069',
+                fontWeight: 500,
+                fontSize: '14px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#F5F5F5';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              CANCEL
+            </button>
+          </div>
+        </div>
+      ),
       onOk: () => {
-        chatSocketClient.emit('delete_message', { messageId: message._id });
+        chatSocketClient.emit('delete_message', { messageId: message._id, deleteType: 'forEveryone' });
         dispatch(deleteMessage({ messageId: message._id }));
-        antMessage.success('Message deleted');
+        antMessage.success('Message deleted for everyone');
+      },
+      onCancel: () => {
+        chatSocketClient.emit('delete_message', { messageId: message._id, deleteType: 'forMe' });
+        dispatch(deleteMessage({ messageId: message._id }));
+        antMessage.success('Message deleted for you');
       },
     });
   };

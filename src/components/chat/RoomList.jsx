@@ -142,8 +142,10 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
 
   // ✅ Get unread count
   const getUnreadCount = useCallback((room) => {
-    const count = room.unreadCount || 0;
-    console.log(`🔔 [ROOMLIST] Room ${room._id} unread count:`, count);
+    // console.log(" =============first rppm unread", room)
+      // Backend sends unreadCount as a number directly
+    const count = typeof room.unreadCount === 'number' ? room.unreadCount : 0;
+    // console.log(`🔔 [ROOMLIST] Room ${room._id} unread count:`, count, 'raw:', room.unreadCount);
     return count;
   }, []);
 

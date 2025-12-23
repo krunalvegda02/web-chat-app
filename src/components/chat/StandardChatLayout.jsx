@@ -1293,6 +1293,7 @@ export default function StandardChatLayout() {
           <div className="fixed inset-0 flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
             <ChatWindow 
               showMobileHeader={true}
+              readOnly={false}
               onBack={() => {
                 dispatch(setActiveRoom(''));
                 setTimeout(() => setChatOpened(false), 0);
@@ -1477,6 +1478,7 @@ export default function StandardChatLayout() {
           {activeRoomId ? (
             <ChatWindow 
               showMobileHeader={false}
+              readOnly={false}
               onBack={() => dispatch(setActiveRoom(''))}
             />
           ) : (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, memo, useState } from 'react';
 import MessageBubble from './MessageBubble';
 import CallLogBubble from './CallLogBubble';
 import TypingIndicator from './TypingIndicator';
@@ -6,7 +6,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Empty, Divider, Spin } from 'antd';
 import { format, isToday, isYesterday } from 'date-fns';
 import { InboxOutlined } from '@ant-design/icons';
-import { deleteMessage, editMessage } from '../../redux/slices/chatSlice';
+import { deleteMessage, editMessage, fetchMessages } from '../../redux/slices/chatSlice';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -19,7 +19,11 @@ const MessageList = memo(function MessageList({ messages = [] }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const previousMessagesLength = useRef(0);
-  const markedAsReadRef = useRef(new Set()); // Track which messages we've already marked
+  const markedAsReadRef = useRef(new Set());
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const previousScrollHeight = useRef(0);
   const { deleteMessage: deleteMessageSocket, editMessage: editMessageSocket, markMessagesAsRead } =
     useChatSocket();
 
@@ -40,6 +44,13 @@ const MessageList = memo(function MessageList({ messages = [] }) {
         if (!message._id) {
           console.log('❌ Message missing _id:', message);
           return false;
+        }
+        // Filter out messages deleted for current user
+        if (message.deletedForUsers && Array.isArray(message.deletedForUsers)) {
+          if (message.deletedForUsers.includes(user?._id)) {
+            console.log('🗑️ Message deleted for current user:', message._id);
+            return false;
+          }
         }
         // Log call messages specifically
         if (message.type === 'call') {
@@ -91,7 +102,7 @@ const MessageList = memo(function MessageList({ messages = [] }) {
 
     console.log('✅ MessageList - Valid messages:', filtered.length, filtered);
     return filtered;
-  }, [messages]);
+  }, [messages, user?._id]);
 
   // ✅ Auto-scroll to bottom on new messages (only if user is at bottom or sent the message)
   const scrollToBottom = useCallback((force = false) => {
@@ -110,19 +121,22 @@ const MessageList = memo(function MessageList({ messages = [] }) {
     }
   }, []);
 
+  // Scroll to bottom only on initial load
   useEffect(() => {
-    // Only auto-scroll if:
-    // 1. New message was added (not just status update)
-    // 2. User sent the message OR user is already at bottom
-    if (validMessages.length > previousMessagesLength.current) {
+    if (validMessages.length > 0 && previousMessagesLength.current === 0) {
+      setTimeout(() => scrollToBottom(true), 100);
+    }
+  }, [validMessages.length, scrollToBottom]);
+
+  useEffect(() => {
+    // Only auto-scroll for NEW messages (not pagination)
+    if (validMessages.length > previousMessagesLength.current && previousMessagesLength.current > 0) {
       const lastMessage = validMessages[validMessages.length - 1];
       const isMyMessage = lastMessage?.senderId === user?._id;
       
       if (isMyMessage) {
-        // Always scroll for own messages
         scrollToBottom(true);
       } else {
-        // Only scroll if already at bottom
         scrollToBottom(false);
       }
     }
@@ -165,7 +179,65 @@ const MessageList = memo(function MessageList({ messages = [] }) {
   // Clear marked messages when room changes
   useEffect(() => {
     markedAsReadRef.current.clear();
+    setPage(1);
+    setHasMore(true);
   }, [activeRoomId]);
+
+  // Load more messages on scroll to top
+  const handleScroll = useCallback(async () => {
+    const container = messagesContainerRef.current?.parentElement;
+    if (!container || loadingMore || !hasMore) return;
+
+    // Only load when scrolled to top (within 100px)
+    if (container.scrollTop < 100) {
+      setLoadingMore(true);
+      previousScrollHeight.current = container.scrollHeight;
+      
+      try {
+        const result = await dispatch(fetchMessages({ roomId: activeRoomId, page: page + 1, limit: 20 })).unwrap();
+        const newMessages = result?.data?.messages || result?.messages || [];
+        
+        if (newMessages.length === 0 || newMessages.length < 20) {
+          setHasMore(false);
+        }
+        
+        if (newMessages.length > 0) {
+          setPage(prev => prev + 1);
+          // Maintain scroll position
+          setTimeout(() => {
+            const container = messagesContainerRef.current?.parentElement;
+            if (container) {
+              const newScrollHeight = container.scrollHeight;
+              container.scrollTop = newScrollHeight - previousScrollHeight.current;
+            }
+          }, 0);
+        }
+      } catch (error) {
+        console.error('Failed to load more messages:', error);
+      } finally {
+        setLoadingMore(false);
+      }
+    }
+  }, [dispatch, activeRoomId, page, hasMore, loadingMore]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current?.parentElement;
+    if (!container) return;
+
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, [handleScroll]);
 
   // ✅ Format date label - WhatsApp style
   const formatDateLabel = (date) => {
@@ -204,8 +276,8 @@ const MessageList = memo(function MessageList({ messages = [] }) {
     }
   };
 
-  // ✅ Show loading state
-  if (loadingMessages[activeRoomId]) {
+  // ✅ Show loading state - ONLY for initial load
+  if (loadingMessages[activeRoomId] && !validMessages.length) {
     return (
       <div
         style={{
@@ -268,6 +340,13 @@ const MessageList = memo(function MessageList({ messages = [] }) {
         padding: '12px 8px',
       }}
     >
+      {/* Loading more indicator */}
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '10px' }}>
+          <Spin size="small" />
+        </div>
+      )}
+      
       {Object.keys(groupedMessages)
         .sort()
         .map((dateKey) => (

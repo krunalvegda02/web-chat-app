@@ -184,10 +184,10 @@ const chatSlice = createSlice({
       const previousRoomId = state.activeRoomId;
       state.activeRoomId = roomId;
       
-      // Only clear unread count if switching to a different room
-      if (roomId && roomId !== previousRoomId && Array.isArray(state.rooms)) {
+      // ✅ Clear unread count when switching to a room
+      if (roomId && Array.isArray(state.rooms)) {
         state.rooms = state.rooms.map(room => {
-          if (room._id === roomId && room.unreadCount > 0) {
+          if (room._id === roomId) {
             console.log(`📥 [REDUX] Clearing unread count for room: ${roomId}`);
             return { ...room, unreadCount: 0 };
           }
@@ -537,6 +537,25 @@ const chatSlice = createSlice({
       }
     },
 
+    // ✅ Delete message for current user only
+    deleteMessageForMe(state, action) {
+      const { messageId, userId } = action.payload;
+
+      for (const roomId in state.messagesByRoom) {
+        const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
+        if (message) {
+          if (!message.deletedForUsers) {
+            message.deletedForUsers = [];
+          }
+          if (!message.deletedForUsers.includes(userId)) {
+            message.deletedForUsers.push(userId);
+          }
+          console.log(`🗑️ [REDUX] Message deleted for user ${userId}: ${messageId}`);
+          return;
+        }
+      }
+    },
+
 
     addReaction(state, action) {
       const { messageId, emoji, userId } = action.payload;
@@ -572,15 +591,19 @@ const chatSlice = createSlice({
 
     updateRoomUnreadCount(state, action) {
       const { roomId, unreadCount } = action.payload;
-      const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
-      const room = roomsArray.find(r => r._id === roomId);
-      if (room) {
-        room.unreadCount = unreadCount;
-        state.rooms = roomsArray;
-        console.log(`🔔 [REDUX] Unread count updated for room ${roomId}: ${unreadCount}`);
-      } else {
-        console.warn(`⚠️ [REDUX] Room ${roomId} not found for unread count update`);
-      }
+      console.log("=========action", action.payload);
+      if (!Array.isArray(state.rooms)) return;
+      
+      // ✅ Ensure unreadCount is a valid number
+      const validUnreadCount = typeof unreadCount === 'number' && unreadCount >= 0 ? unreadCount : 0;
+      
+      state.rooms = state.rooms.map(room => {
+        if (room._id === roomId) {
+          console.log(`🔔 [REDUX] Unread count updated for room ${roomId}: ${room.unreadCount} → ${validUnreadCount}`);
+          return { ...room, unreadCount: validUnreadCount };
+        }
+        return room;
+      });
     },
 
     clearError(state) {
@@ -621,27 +644,27 @@ const chatSlice = createSlice({
       })
       .addCase(fetchMessages.pending, (state, action) => {
         const roomId = action.meta.arg.roomId;
-        state.loadingMessages[roomId] = true;
+        const page = action.meta.arg.page || 1;
+        // Only show loading for initial page load
+        if (page === 1) {
+          state.loadingMessages[roomId] = true;
+        }
       })
       .addCase(fetchMessages.fulfilled, (state, action) => {
         const roomId = action.meta.arg.roomId;
+        const page = action.meta.arg.page || 1;
         state.loadingMessages[roomId] = false;
 
         const messagesArray = action.payload?.data?.messages || action.payload?.messages || [];
         const roomData = action.payload?.data?.room;
-        const currentUserId = action.meta.arg.userId; // Get current user ID if available
         
-        state.messagesByRoom[roomId] = Array.isArray(messagesArray) 
+        const normalizedMessages = Array.isArray(messagesArray) 
           ? messagesArray.map(msg => {
-              // Determine correct status based on sender and readBy
               let messageStatus = msg.status || 'sent';
               
-              // If message has readBy array with entries, it's read
               if (msg.readBy && Array.isArray(msg.readBy) && msg.readBy.length > 0) {
                 messageStatus = 'read';
-              }
-              // If message is from current user and has been delivered
-              else if (msg.status === 'delivered') {
+              } else if (msg.status === 'delivered') {
                 messageStatus = 'delivered';
               }
               
@@ -650,21 +673,31 @@ const chatSlice = createSlice({
                 sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
                 senderId: msg.senderId?._id || msg.senderId,
                 status: messageStatus,
-                // Ensure media array is preserved
                 media: Array.isArray(msg.media) ? msg.media : [],
-                // Ensure type is set
                 type: msg.type || (msg.media && msg.media.length > 0 ? (msg.media[0].type || 'image') : 'text'),
               };
             })
           : [];
 
-        messagesArray.forEach(msg => {
+        // Reverse messages since backend returns newest first
+        const reversedMessages = [...normalizedMessages].reverse();
+
+        // Page 1: replace messages, Page 2+: prepend old messages
+        if (page === 1) {
+          state.messagesByRoom[roomId] = reversedMessages;
+        } else {
+          const existing = state.messagesByRoom[roomId] || [];
+          const existingIds = new Set(existing.map(m => m._id));
+          const newMessages = reversedMessages.filter(m => !existingIds.has(m._id));
+          state.messagesByRoom[roomId] = [...newMessages, ...existing];
+        }
+
+        normalizedMessages.forEach(msg => {
           if (msg._id) {
             state.messageDeliveryStatus[msg._id] = msg.status || 'read';
           }
         });
 
-        // Update room details if provided
         if (roomData && Array.isArray(state.rooms)) {
           const roomIndex = state.rooms.findIndex(r => r._id === roomId);
           if (roomIndex !== -1) {
@@ -674,7 +707,7 @@ const chatSlice = createSlice({
           }
         }
 
-        console.log(`✅ [REDUX] Fetched ${state.messagesByRoom[roomId].length} messages for room ${roomId}`);
+        console.log(`✅ [REDUX] Fetched ${normalizedMessages.length} messages for room ${roomId} (page ${page})`);
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         const roomId = action.meta.arg.roomId;
@@ -700,6 +733,7 @@ export const {
   updateMessagesReadStatus,
   editMessage,
   deleteMessage,
+  deleteMessageForMe,
   addReaction,
   removeReaction,
   updateRoomUnreadCount,

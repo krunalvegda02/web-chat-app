@@ -55,6 +55,7 @@ import themeReducer from './slices/themeSlice.jsx';
 import adminChatReducer from './slices/adminChatSlice.jsx';
 import contactReducer from './slices/contactSlice.js';
 import callLogReducer from './slices/callLogSlice.js';
+import notificationReducer from './slices/notificationSlice.jsx';
 
 const persistConfig = {
   key: 'root',
@@ -71,6 +72,7 @@ const rootReducer = combineReducers({
   adminChat: adminChatReducer,
   contacts: contactReducer,
   callLogs: callLogReducer,
+  notification: notificationReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

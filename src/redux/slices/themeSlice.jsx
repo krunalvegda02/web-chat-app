@@ -3,10 +3,33 @@ import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
 import { _get, _put, _post } from '../../helper/apiClient';
 import API from '../../constants/ApiEndpoints';
 
-export const fetchTenantTheme = createAsyncThunkHandler(
+export const fetchTenantTheme = createAsyncThunk(
   'theme/fetchTenantTheme',
-  _get,
-  (payload) => API.TENANT.GET_THEME.replace(':tenantId', payload)
+  async (tenantId, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const token = state.auth.token;
+      
+      const response = await _get(API.TENANT.GET_THEME.replace(':tenantId', tenantId), {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  },
+  {
+    condition: (tenantId, { getState }) => {
+      const state = getState();
+      // Only prevent if already loading to avoid race conditions
+      return !state.theme.loading;
+    }
+  }
 );
 
 export const updateTenantTheme = createAsyncThunkHandler(
@@ -68,10 +91,6 @@ const themeSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchTenantTheme.pending, (state, action) => {
-        const tenantId = action.meta.arg;
-        if (state.fetchedTenantIds?.includes(tenantId)) {
-          return;
-        }
         state.loading = true;
         state.error = null;
       })

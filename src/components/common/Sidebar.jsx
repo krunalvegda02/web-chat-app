@@ -55,7 +55,7 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside ref={sidebarRef} className="hidden sm:block fixed left-0 top-0 bottom-0 z-40 w-20 border-r" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
+    <aside ref={sidebarRef} className="hidden md:block fixed left-0 top-0 bottom-0 z-40 w-20 border-r" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
       <div className="flex flex-col h-full">
         <nav className="flex-1 flex flex-col items-center gap-4 py-6 overflow-y-auto">
           {menuItems.map((item) => {

@@ -12,6 +12,7 @@ import {
   updateRoomUnreadCount,
   editMessage,
   deleteMessage,
+  deleteMessageForMe,
 } from '../redux/slices/chatSlice';
 
 let globalListenersInitialized = false;
@@ -232,6 +233,17 @@ export const useSocket = () => {
               dispatch(deleteMessage({
                 messageId: data.messageId,
                 deletedAt: data.deletedAt
+              }));
+            }
+          });
+
+          // ✅ Message deleted for me
+          chatSocketClient.on('message_deleted_for_me', (data) => {
+            console.log('🗑️ [SOCKET] message_deleted_for_me:', data);
+            if (data && data.messageId && data.userId) {
+              dispatch(deleteMessageForMe({
+                messageId: data.messageId,
+                userId: data.userId
               }));
             }
           });

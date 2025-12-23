@@ -73,9 +73,10 @@ export const useTheme = () => {
   useEffect(() => {
     const alreadyFetched = Array.isArray(fetchedTenantIds) && fetchedTenantIds.includes(user?.tenantId);
     if (user?.tenantId && user?.role === 'USER' && !alreadyFetched && !loading) {
+      console.log('🎨 Fetching theme for tenant:', user.tenantId);
       dispatch(fetchTenantTheme(user.tenantId));
     }
-  }, [user?.tenantId, user?.role, dispatch, fetchedTenantIds, loading]);
+  }, [user?.tenantId, user?.role]);
 
   useEffect(() => {
     // USER role sees tenant's custom theme (if set by admin)
@@ -93,11 +94,9 @@ export const useTheme = () => {
         }
       });
       
-      console.log('✅ Applied custom theme for USER:', mergedTheme);
       setTheme(mergedTheme);
     } else {
       // ADMIN/TENANT_ADMIN/SUPER_ADMIN or no custom theme: use default WhatsApp theme
-      console.log('✅ Applied default WhatsApp theme for:', user?.role || 'guest');
       setTheme(DEFAULT_THEME);
     }
     setIsLoading(loading || false);
