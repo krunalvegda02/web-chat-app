@@ -115,7 +115,8 @@ export default function Topbar() {
             <button onClick={() => { navigate('/profile'); setDrawerOpen(false); }} className="w-full py-3 rounded-lg text-white font-medium transition-colors" style={{ backgroundColor: theme?.primaryColor || '#00A884' }}>
               View Profile
             </button>
-            <button onClick={() => { logout(); setDrawerOpen(false); navigate('/login'); }} className="w-full py-3 rounded-lg bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors active:bg-gray-100">
+            <button onClick={() => { logout(); setDrawerOpen(false); navigate('/login'); }} className="w-full py-3 rounded-lg bg-white border-2 border-red-500 text-red-500 font-medium hover:bg-red-500 hover:text-white hover:shadow-lg hover:scale-[1.02] transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2">
+              <LogoutOutlined />
               Logout
             </button>
           </div>

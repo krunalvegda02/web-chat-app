@@ -1,27 +1,41 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { Form, Input, Button, Card, Typography, Alert, Divider, Steps, message, Tabs } from 'antd';
 import { LockOutlined, MailOutlined, PhoneOutlined, CheckCircleOutlined } from '@ant-design/icons';
-
+import { forgotPassword, verifyResetOTP, resetPassword } from '../../redux/slices/authSlice';
+import { useTheme } from '../../hooks/useTheme';
+import OTPInput from '../../components/common/OTPInput';
 
 const { Title, Text, Paragraph } = Typography;
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { theme } = useTheme();
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
   
-  // State management
-  const [step, setStep] = useState(0); // 0: request, 1: verify, 2: reset, 3: success
-  const [resetMethod, setResetMethod] = useState('email'); // 'email' or 'phone'
-  const [resetToken, setResetToken] = useState(null);
+  const [step, setStep] = useState(0);
+  const [resetMethod, setResetMethod] = useState('email');
+  const [resetIdentifier, setResetIdentifier] = useState(null);
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [resendTimer, setResendTimer] = useState(0);
 
-  // Check if token provided in URL
   const tokenFromURL = searchParams.get('token');
+  const primaryColor = theme?.primaryColor || '#008069';
+  const bgColor = theme?.sidebarBackgroundColor || '#F0F2F5';
+  const borderColor = theme?.borderColor || '#E9EDEF';
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
 
   // ✅ Validate password strength
   const validatePasswordStrength = (_, value) => {
@@ -58,16 +72,17 @@ export default function ResetPasswordPage() {
 
       const payload = resetMethod === 'email' 
         ? { email: values.email }
-        : { phone: values.phone.replace(/\\D/g, '') };
+        : { phone: values.phone.replace(/\D/g, '') };
 
-      // TODO: Call POST /api/auth/forgot-password
-      // const response = await api.post('/auth/forgot-password', payload);
+      await dispatch(forgotPassword(payload)).unwrap();
 
+      setResetIdentifier(resetMethod === 'email' ? values.email : values.phone.replace(/\D/g, ''));
       setStep(1);
-      message.success(`Reset link sent to your ${resetMethod}`);
+      setResendTimer(30);
+      message.success(`OTP sent to your ${resetMethod}`);
       form.resetFields();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send reset link');
+      setError(err || 'Failed to send OTP');
       message.error('Please try again');
     } finally {
       setLoading(false);
@@ -75,24 +90,28 @@ export default function ResetPasswordPage() {
   };
 
   // ✅ Handle verification code (Step 1)
-  const handleVerifyCode = async (values) => {
+  const handleVerifyCode = async () => {
+    if (otp.length !== 6) {
+      message.error('Please enter 6-digit OTP');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      // TODO: Call POST /api/auth/verify-reset-code
-      // const response = await api.post('/auth/verify-reset-code', {
-      //   code: values.code,
-      //   method: resetMethod
-      // });
+      const payload = {
+        [resetMethod]: resetIdentifier,
+        otp
+      };
 
-      setResetToken(values.code);
+      await dispatch(verifyResetOTP(payload)).unwrap();
+
       setStep(2);
-      message.success('Code verified. Set your new password');
-      form.resetFields();
+      message.success('OTP verified! Enter your new password');
     } catch (err) {
-      setError('Invalid verification code');
-      message.error('Please try again');
+      setError(err || 'Invalid or expired OTP');
+      message.error(err || 'Invalid or expired OTP');
     } finally {
       setLoading(false);
     }
@@ -105,13 +124,13 @@ export default function ResetPasswordPage() {
       setError(null);
 
       const payload = {
-        token: resetToken || tokenFromURL,
+        [resetMethod]: resetIdentifier,
+        otp,
         password: values.password,
         confirmPassword: values.confirmPassword
       };
 
-      // TODO: Call POST /api/auth/reset-password
-      // const response = await api.post('/auth/reset-password', payload);
+      await dispatch(resetPassword(payload)).unwrap();
 
       setStep(3);
       message.success('Password reset successfully!');
@@ -120,7 +139,7 @@ export default function ResetPasswordPage() {
         navigate('/login');
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reset password');
+      setError(err || 'Failed to reset password');
       message.error('Please try again');
     } finally {
       setLoading(false);
@@ -190,13 +209,7 @@ export default function ResetPasswordPage() {
       />
 
       <Form.Item style={{ marginTop: 16 }}>
-        <Button
-          type="primary"
-          size="large"
-          htmlType="submit"
-          loading={loading}
-          block
-        >
+        <Button type="primary" size="large" htmlType="submit" loading={loading} block style={{ backgroundColor: primaryColor, borderColor: primaryColor }}>
           Send Reset Link
         </Button>
       </Form.Item>
@@ -205,51 +218,56 @@ export default function ResetPasswordPage() {
 
   // ✅ Step 1: Verify Code
   const VerifyCodeForm = (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={handleVerifyCode}
-      autoComplete="off"
-    >
+    <div>
       <Alert
-        message="Verification Code Sent"
+        message="OTP Sent Successfully"
         description={`Check your ${resetMethod} for the 6-digit code`}
-        type="info"
+        type="success"
         showIcon
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: 24 }}
       />
 
-      <Form.Item
-        name="code"
-        rules={[
-          { required: true, message: 'Verification code is required' },
-          { len: 6, message: 'Code must be 6 digits' }
-        ]}
+      <div style={{ marginBottom: 24 }}>
+        <OTPInput value={otp} onChange={setOtp} disabled={loading} />
+      </div>
+
+      <Button 
+        type="primary" 
+        size="large" 
+        onClick={handleVerifyCode} 
+        loading={loading} 
+        block 
+        style={{ backgroundColor: primaryColor, borderColor: primaryColor, marginBottom: 12 }}
       >
-        <Input
-          size="large"
-          placeholder="000000"
-          maxLength={6}
-          autoComplete="off"
-        />
-      </Form.Item>
+        Continue
+      </Button>
 
-      <Form.Item>
-        <Button
-          type="primary"
-          size="large"
-          htmlType="submit"
-          loading={loading}
-          block
+      <div style={{ textAlign: 'center' }}>
+        <Button 
+          type="link" 
+          disabled={resendTimer > 0}
+          style={{ color: resendTimer > 0 ? '#999' : primaryColor }} 
+          onClick={async () => {
+            setOtp('');
+            const payload = resetMethod === 'email' 
+              ? { email: resetIdentifier }
+              : { phone: resetIdentifier };
+            try {
+              setLoading(true);
+              await dispatch(forgotPassword(payload)).unwrap();
+              setResendTimer(30);
+              message.success('OTP resent successfully');
+            } catch (err) {
+              message.error('Failed to resend OTP');
+            } finally {
+              setLoading(false);
+            }
+          }}
         >
-          Verify Code
+          {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
         </Button>
-      </Form.Item>
-
-      <Form.Item style={{ textAlign: 'center', marginTop: 8 }}>
-        <Button type="link">Resend Code</Button>
-      </Form.Item>
-    </Form>
+      </div>
+    </div>
   );
 
   // ✅ Step 2: Reset Password
@@ -305,123 +323,52 @@ export default function ResetPasswordPage() {
       </div>
 
       <Form.Item>
-        <Button
-          type="primary"
-          size="large"
-          htmlType="submit"
-          loading={loading}
-          block
-        >
+        <Button type="primary" size="large" htmlType="submit" loading={loading} block style={{ backgroundColor: primaryColor, borderColor: primaryColor }}>
           Reset Password
         </Button>
       </Form.Item>
     </Form>
   );
 
-  // ✅ Step 3: Success
   const SuccessMessage = (
-    <div style={{ textAlign: 'center' }}>
-      <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
-      <Title level={3}>Password Reset ✅</Title>
-      <Paragraph>
-        Your password has been reset successfully
-      </Paragraph>
+    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+      <CheckCircleOutlined style={{ fontSize: 64, color: primaryColor, marginBottom: 16 }} />
+      <Title level={3} style={{ color: primaryColor }}>Password Reset ✅</Title>
+      <Paragraph>Your password has been reset successfully</Paragraph>
       <Text type="secondary">Redirecting to login...</Text>
     </div>
   );
 
   // If token in URL, skip to reset password step
   if (tokenFromURL && step === 0) {
-    return (
-      <div className="reset-password-container">
-        <Card className="reset-card" style={{ maxWidth: 400 }}>
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <LockOutlined style={{ fontSize: 32, marginBottom: 8 }} />
-            <Title level={2}>Reset Password</Title>
-          </div>
-
-          {error && (
-            <Alert
-              message="Error"
-              description={error}
-              type="error"
-              showIcon
-              closable
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          <Steps
-            current={2}
-            items={[
-              { title: 'Request' },
-              { title: 'Verify' },
-              { title: 'Reset', icon: <LockOutlined /> }
-            ]}
-            style={{ marginBottom: 24 }}
-          />
-
-          {ResetPasswordForm}
-
-          <Divider style={{ margin: '24px 0' }} />
-
-          <div style={{ textAlign: 'center' }}>
-            <Link to="/login">Back to Login</Link>
-          </div>
-        </Card>
-      </div>
-    );
+    return null; // OTP flow doesn't support URL tokens
   }
 
   return (
-    <div className="reset-password-container">
-      <Card className="reset-card" style={{ maxWidth: 400 }}>
-        {/* Header */}
+    <div className="fixed inset-0 flex items-center justify-center overflow-auto p-4" style={{ backgroundColor: bgColor }}>
+      <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px', border: `1px solid ${borderColor}` }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <LockOutlined style={{ fontSize: 32, marginBottom: 8 }} />
-          <Title level={2}>Reset Password</Title>
-          <Text type="secondary">
-            We'll help you regain access to your account
-          </Text>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🔒</div>
+          <Title level={2} style={{ color: primaryColor, marginBottom: 8 }}>Reset Password</Title>
+          <Text type="secondary">We'll help you regain access</Text>
         </div>
 
-        {/* Error Alert */}
         {error && (
-          <Alert
-            message="Error"
-            description={error}
-            type="error"
-            showIcon
-            closable
-            onClose={() => setError(null)}
-            style={{ marginBottom: 16 }}
-          />
+          <Alert message="Error" description={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 16 }} />
         )}
 
-        {/* Steps */}
-        <Steps
-          current={step}
-          items={[
-            { title: 'Request', icon: <MailOutlined /> },
-            { title: 'Verify', icon: <PhoneOutlined /> },
-            { title: 'Reset', icon: <LockOutlined /> },
-            { title: 'Complete', icon: <CheckCircleOutlined /> }
-          ]}
-          style={{ marginBottom: 24 }}
-        />
+        <Steps current={step} items={[{ title: 'Request' }, { title: 'Verify' }, { title: 'Reset' }, { title: 'Done' }]} style={{ marginBottom: 24 }} size="small" responsive />
 
-        {/* Step Content */}
         {step === 0 && RequestResetForm}
         {step === 1 && VerifyCodeForm}
         {step === 2 && ResetPasswordForm}
         {step === 3 && SuccessMessage}
 
-        {/* Navigation */}
         {step < 3 && (
           <>
             <Divider style={{ margin: '24px 0' }} />
             <div style={{ textAlign: 'center' }}>
-              <Link to="/login">Back to Login</Link>
+              <Link to="/login" style={{ color: primaryColor }}>Back to Login</Link>
             </div>
           </>
         )}

@@ -250,7 +250,7 @@ export default function LoginPage() {
         </div> */}
 
         <div style={{ textAlign: 'center', marginBottom: 0 }}>
-          <Link to="/auth/forgot-password" style={{ fontSize: 12, color: theme?.primaryColor || '#008069' }}>
+          <Link to="/reset-password" style={{ fontSize: 12, color: theme?.primaryColor || '#008069' }}>
             Forgot password?
           </Link>
         </div>

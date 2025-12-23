@@ -34,6 +34,12 @@ export const forgotPassword = createAsyncThunkHandler(
   '/auth/forgot-password'
 );
 
+export const verifyResetOTP = createAsyncThunkHandler(
+  'auth/verifyResetOTP',
+  _post,
+  '/auth/verify-reset-otp'
+);
+
 export const resetPassword = createAsyncThunkHandler(
   'auth/resetPassword',
   _post,

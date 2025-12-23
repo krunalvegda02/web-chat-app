@@ -355,9 +355,18 @@ export default function Profile() {
                   <div className="flex-1 min-w-0 w-full sm:w-auto">
                     {!editing ? (
                       <div className="space-y-2 sm:space-y-3">
-                        <div>
-                          <h2 className="text-xl sm:text-2xl md:text-4xl font-bold truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{name}</h2>
-                          <p className="text-xs sm:text-sm font-medium truncate" style={{ color: theme.timestampColor || '#667781' }}>@{user?.username || 'username'}</p>
+                        {/* Mobile: Name and Status in Row */}
+                        <div className="flex sm:block items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h2 className="text-xl sm:text-2xl md:text-4xl font-bold truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{name}</h2>
+                          </div>
+                          <div className="sm:hidden flex-shrink-0">
+                            <Badge 
+                              icon={<GlobalOutlined />} 
+                              color={user?.status === 'ACTIVE' ? 'success' : 'default'} 
+                              text={<span className="text-xs font-medium">{user?.status || 'Active'}</span>} 
+                            />
+                          </div>
                         </div>
                         
                         {bio && (
@@ -366,18 +375,32 @@ export default function Profile() {
                           </p>
                         )}
                         
-                        <div className="flex flex-wrap gap-1 sm:gap-2 pt-1 sm:pt-2">
-                          <Badge 
-                            icon={<CheckCircleOutlined />} 
-                            color="success" 
-                            text={<span className="text-xs font-medium">Verified</span>} 
-                          />
+                        {/* Desktop: Badges */}
+                        <div className="hidden sm:flex flex-wrap gap-1 sm:gap-2 pt-1 sm:pt-2">
+                          {user?.phoneVerified && (
+                            <Badge 
+                              icon={<CheckCircleOutlined />} 
+                              color="success" 
+                              text={<span className="text-xs font-medium">Phone Verified</span>} 
+                            />
+                          )}
                           <Badge 
                             icon={<GlobalOutlined />} 
-                            color="processing" 
-                            text={<span className="text-xs font-medium">Active</span>} 
+                            color={user?.status === 'ACTIVE' ? 'success' : 'default'} 
+                            text={<span className="text-xs font-medium">{user?.status || 'Active'}</span>} 
                           />
                         </div>
+                        
+                        {/* Mobile: Phone Verified Badge Only */}
+                        {user?.phoneVerified && (
+                          <div className="sm:hidden flex pt-1">
+                            <Badge 
+                              icon={<CheckCircleOutlined />} 
+                              color="success" 
+                              text={<span className="text-xs font-medium">Phone Verified</span>} 
+                            />
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3 sm:space-y-4 w-full">
@@ -432,13 +455,8 @@ export default function Profile() {
                   {!editing && windowWidth >= 1024 && (
                     <div className="hidden lg:flex flex-col gap-3 pl-6" style={{ borderLeft: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` }}>
                       <div className="text-center">
-                        <div className="text-2xl font-bold" style={{ color: theme.sendButtonColor || '#10b981' }}>{user?.contactCount || 0}</div>
+                        <div className="text-2xl font-bold" style={{ color: theme.sendButtonColor || '#10b981' }}>{user?.contacts?.length || 0}</div>
                         <div className="text-xs font-medium" style={{ color: theme.timestampColor || '#667781' }}>Contacts</div>
-                      </div>
-                      <Divider style={{ margin: '8px 0' }} />
-                      <div className="text-center">
-                        <div className="text-2xl font-bold" style={{ color: theme.accentColor || '#3b82f6' }}>{user?.messageCount || 0}</div>
-                        <div className="text-xs font-medium" style={{ color: theme.timestampColor || '#667781' }}>Messages</div>
                       </div>
                     </div>
                   )}
@@ -449,24 +467,17 @@ export default function Profile() {
 
           {/* Stats Grid - Tablet & Mobile - Fully Responsive */}
           {!editing && windowWidth < 1024 && (
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
               <Card className="shadow-sm w-full" bodyStyle={{ padding: windowWidth < 640 ? '10px' : '12px' }} style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
                 <Statistic
                   title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Contacts</span>}
-                  value={user?.contactCount || 0}
+                  value={user?.contacts?.length || 0}
                   valueStyle={{ color: theme.accentColor || '#10b981', fontSize: windowWidth < 640 ? '16px' : '18px' }}
                 />
               </Card>
               <Card className="shadow-sm w-full" bodyStyle={{ padding: windowWidth < 640 ? '10px' : '12px' }} style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
                 <Statistic
-                  title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Messages</span>}
-                  value={user?.messageCount || 0}
-                  valueStyle={{ color: theme.sendButtonColor || '#3b82f6', fontSize: windowWidth < 640 ? '16px' : '18px' }}
-                />
-              </Card>
-              <Card className="shadow-sm w-full" bodyStyle={{ padding: windowWidth < 640 ? '10px' : '12px' }} style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
-                <Statistic
-                  title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Member</span>}
+                  title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Member Since</span>}
                   value={new Date(user?.createdAt).getFullYear()}
                   valueStyle={{ color: theme.avatarBackgroundColor || '#8b5cf6', fontSize: windowWidth < 640 ? '16px' : '18px' }}
                 />
@@ -538,7 +549,17 @@ export default function Profile() {
                       <div className="text-right flex-shrink-0">
                         <p className="font-medium text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>{phone ? formatPhoneNumber(phone) : 'Not provided'}</p>
                         {phone && (
-                          <span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Verified</span>
+                          <div className="flex items-center gap-1 justify-end">
+                            <span 
+                              className="text-xs px-2 py-0.5 rounded-full font-medium"
+                              style={{ 
+                                backgroundColor: user?.phoneVerified ? (theme.accentColor || '#52c41a') + '20' : (theme.errorColor || '#ff4d4f') + '20',
+                                color: user?.phoneVerified ? theme.accentColor || '#52c41a' : theme.errorColor || '#ff4d4f'
+                              }}
+                            >
+                              {user?.phoneVerified ? '✓ Verified' : '✗ Not Verified'}
+                            </span>
+                          </div>
                         )}
                       </div>
                       {phone && (
@@ -599,11 +620,17 @@ export default function Profile() {
                     <div>
                       <p className="text-xs font-medium" style={{ color: theme.timestampColor || '#667781' }}>Status</p>
                       <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
-                        <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: theme.accentColor || '#52c41a' }}></div>
-                        <p className="font-semibold text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>Active</p>
+                        <div 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ 
+                            backgroundColor: user?.status === 'ACTIVE' ? theme.accentColor || '#52c41a' : theme.timestampColor || '#999',
+                            animation: user?.status === 'ACTIVE' ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
+                          }}
+                        ></div>
+                        <p className="font-semibold text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>{user?.status || 'Active'}</p>
                       </div>
                     </div>
-                    <EyeOutlined className="text-xl sm:text-2xl opacity-20" style={{ color: theme.accentColor || '#52c41a' }} />
+                    <EyeOutlined className="text-xl sm:text-2xl opacity-20" style={{ color: user?.status === 'ACTIVE' ? theme.accentColor || '#52c41a' : theme.timestampColor }} />
                   </div>
                 </Card>
               </div>

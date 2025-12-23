@@ -42,7 +42,7 @@ apiClient.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
             const currentPath = window.location.pathname;
-            if (!currentPath.includes('/login') && !currentPath.includes('/register') && !currentPath.includes('/join')) {
+            if (!currentPath.includes('/login') && !currentPath.includes('/register') && !currentPath.includes('/join') && !currentPath.includes('/reset-password')) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 store.dispatch(logout());
