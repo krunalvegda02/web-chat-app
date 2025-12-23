@@ -46,7 +46,9 @@ export const useSocket = () => {
           // ✅ Message received event
           chatSocketClient.on('message_received', (data) => {
             console.log('✅ [SOCKET] message_received:', data);
+            console.log('📦 [SOCKET] Current user role:', user?.role);
             console.log('📦 [SOCKET] Dispatching socketMessageReceived for room:', data?.roomId);
+            
             if (data && data.roomId) {
               // ✅ FIX: Ensure status is 'sent' for immediate tick mark
               const messageWithStatus = {
@@ -63,8 +65,12 @@ export const useSocket = () => {
               // ✅ Auto-mark as read if message is from someone else and we're viewing this room
               const state = window.__REDUX_STORE__?.getState();
               const activeRoomId = state?.chat?.activeRoomId;
+              const currentUserId = user?._id?.toString() || user?._id;
+              const senderId = data.senderId?.toString() || data.senderId;
 
-              if (activeRoomId === data.roomId && data.senderId !== user?._id) {
+              console.log('📦 [SOCKET] Auto-read check:', { activeRoomId, currentUserId, senderId, match: activeRoomId === data.roomId, differentSender: senderId !== currentUserId });
+
+              if (activeRoomId === data.roomId && senderId !== currentUserId) {
                 // Mark this message as read
                 setTimeout(() => {
                   chatSocketClient.emit('mark_messages_read', {
@@ -93,6 +99,7 @@ export const useSocket = () => {
           chatSocketClient.on('message_delivered', (data) => {
             console.log('✅ [SOCKET] message_delivered:', data);
             if (data && data.messageId && data.roomId) {
+              console.log(`📦 [SOCKET] Dispatching updateMessageStatus for message ${data.messageId} to delivered`);
               dispatch(updateMessageStatus({
                 roomId: data.roomId,
                 messageId: data.messageId,
@@ -111,6 +118,7 @@ export const useSocket = () => {
 
             if (data && data.roomId && data.messageIds && data.messageIds.length > 0) {
               console.log(`👁️ [SOCKET] ✅ Valid data - Dispatching updateMessagesReadStatus for ${data.messageIds.length} messages`);
+              console.log('👁️ [SOCKET] Current Redux state before update:', window.__REDUX_STORE__?.getState()?.chat?.messagesByRoom[data.roomId]);
 
               dispatch(updateMessagesReadStatus({
                 roomId: data.roomId,
@@ -118,6 +126,7 @@ export const useSocket = () => {
               }));
 
               console.log(`✅ [SOCKET] Redux action dispatched - messages should now show as read`);
+              console.log('👁️ [SOCKET] Current Redux state after update:', window.__REDUX_STORE__?.getState()?.chat?.messagesByRoom[data.roomId]);
             } else {
               console.error('❌ [SOCKET] Invalid messages_read data:', {
                 hasData: !!data,

@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { fetchCallLogs, deleteCallLog } from '../../redux/slices/callLogSlice';
 import { useCall } from '../../contexts/CallContext';
+import { useTheme } from '../../hooks/useTheme';
 import { Avatar, Empty, Spin, Popconfirm, message } from 'antd';
 import { PhoneOutlined, DeleteOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { createDirectRoom } from '../../redux/slices/chatSlice';
 
 export default function CallLogs() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { theme } = useTheme();
   const { logs, loading } = useSelector((s) => s.callLogs);
   const { user } = useSelector((s) => s.auth);
   const { initiateCall } = useCall();
@@ -47,7 +51,7 @@ export default function CallLogs() {
   const getCallIcon = (log) => {
     const isMissed = log.status === 'missed';
     const isIncoming = log.receiverId._id === user._id;
-    const color = isMissed ? '#F44336' : '#25D366';
+    const color = isMissed ? (theme.errorColor || '#F44336') : (theme.accentColor || '#25D366');
     const rotation = isMissed ? '135deg' : isIncoming ? '225deg' : '45deg';
     
     return (
@@ -86,21 +90,21 @@ export default function CallLogs() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-[#F0F2F5]">
+      <div className="flex items-center justify-center h-full" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}>
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div className="fixed top-0 right-0 bottom-0 sm:left-20 left-0 flex flex-col bg-white">
+    <div className="fixed top-0 right-0 bottom-0 sm:left-20 left-0 flex flex-col" style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
       {/* Header */}
-      <div className="bg-[#008069] px-6 py-5 flex items-center justify-between">
-        <h1 className="text-white text-xl font-medium">Calls</h1>
+      <div className="px-6 py-5 flex items-center justify-between" style={{ background: theme?.sidebarHeaderColor || '#008069' }}>
+        <h1 className="text-xl font-medium" style={{ color: theme.headerTextColor || '#FFFFFF' }}>Calls</h1>
       </div>
 
       {/* Call List */}
-      <div className="flex-1 overflow-y-auto bg-white">
+      <div className="flex-1 overflow-y-auto" style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
         {logs.length > 0 ? (
           logs.map((log) => {
             const otherUser = log.callerId._id === user._id ? log.receiverId : log.callerId;
@@ -109,26 +113,40 @@ export default function CallLogs() {
             return (
               <div
                 key={log._id}
-                className="flex items-center gap-3 px-6 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] transition-colors group"
+                className="flex items-center gap-3 px-6 py-3 border-b transition-colors group"
+                style={{ 
+                  borderColor: theme.sidebarBorderColor || '#E9EDEF',
+                  backgroundColor: 'transparent'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <Avatar
-                  src={otherUser.avatar}
-                  size={50}
-                  style={{ backgroundColor: '#008069', flexShrink: 0 }}
+                <div 
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/profile/${otherUser._id}`)}
                 >
-                  {otherUser.name?.charAt(0)?.toUpperCase()}
-                </Avatar>
+                  <Avatar
+                    src={otherUser.avatar}
+                    size={50}
+                    style={{ backgroundColor: theme.avatarBackgroundColor || '#008069', flexShrink: 0 }}
+                  >
+                    {otherUser.name?.charAt(0)?.toUpperCase()}
+                  </Avatar>
+                </div>
 
-                <div className="flex-1 min-w-0">
+                <div 
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => navigate(`/profile/${otherUser._id}`)}
+                >
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium text-[#111B21] text-[16px] truncate">
+                    <p className="font-medium text-[16px] truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>
                       {otherUser.name}
                     </p>
                     {log.status === 'missed' && (
-                      <span className="text-xs text-[#F44336]">(Missed)</span>
+                      <span className="text-xs" style={{ color: theme.errorColor || '#F44336' }}>(Missed)</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-[#667781]">
+                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.timestampColor || '#667781' }}>
                     {getCallIcon(log)}
                     <span>
                       {isIncoming ? 'Incoming' : 'Outgoing'}
@@ -138,15 +156,18 @@ export default function CallLogs() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-[#667781]">
+                  <span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>
                     {formatTime(log.createdAt)}
                   </span>
                   
                   <button
                     onClick={() => handleCall(log)}
-                    className="p-2 rounded-full hover:bg-[#E9EDEF] transition-colors"
+                    className="p-2 rounded-full transition-colors"
+                    style={{ backgroundColor: 'transparent' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#E9EDEF'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <PhoneOutlined style={{ color: '#008069', fontSize: '20px' }} />
+                    <PhoneOutlined style={{ color: theme.sendButtonColor || '#008069', fontSize: '20px' }} />
                   </button>
 
                   <Popconfirm
@@ -158,9 +179,12 @@ export default function CallLogs() {
                   >
                     <button
                       disabled={deletingId === log._id}
-                      className="p-2 rounded-full hover:bg-[#E9EDEF] transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                      style={{ backgroundColor: 'transparent' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#E9EDEF'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <DeleteOutlined style={{ color: '#667781', fontSize: '18px' }} />
+                      <DeleteOutlined style={{ color: theme.timestampColor || '#667781', fontSize: '18px' }} />
                     </button>
                   </Popconfirm>
                 </div>
@@ -170,9 +194,9 @@ export default function CallLogs() {
         ) : (
           <div className="flex items-center justify-center h-full">
             <Empty
-              image={<PhoneOutlined style={{ fontSize: '64px', color: '#8696A0' }} />}
+              image={<PhoneOutlined style={{ fontSize: '64px', color: theme.timestampColor || '#8696A0' }} />}
               description={
-                <span className="text-[#667781] text-sm">
+                <span style={{ color: theme.timestampColor || '#667781' }} className="text-sm">
                   No call history yet
                 </span>
               }

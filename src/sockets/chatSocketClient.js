@@ -55,6 +55,16 @@ class ChatSocketClient {
         this.socket.on('disconnect', (reason) => {
           this.isConnected = false;
           console.log('🔌 [SOCKET] Disconnected:', reason);
+          
+          // Handle token expiration on disconnect (only if not already on login page)
+          const currentPath = window.location.pathname;
+          if ((reason === 'io server disconnect' || reason === 'transport close') && 
+              !currentPath.includes('/login') && !currentPath.includes('/register')) {
+            const token = localStorage.getItem('token');
+            if (!token) {
+              window.location.href = '/login';
+            }
+          }
         });
 
         this.socket.on('connect_error', (error) => {
@@ -69,6 +79,15 @@ class ChatSocketClient {
           console.error('❌ [AUTH] Error:', data.message);
           this.isConnecting = false;
           this.disconnect();
+          
+          // Redirect to login on token expiration (only if not already on login page)
+          const currentPath = window.location.pathname;
+          if ((data.message?.includes('expired') || data.message?.includes('Invalid token')) && 
+              !currentPath.includes('/login') && !currentPath.includes('/register')) {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }
+          
           if (onError) {
             onError({ type: 'AUTH_ERROR', message: data.message });
           }

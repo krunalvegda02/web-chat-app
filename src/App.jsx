@@ -41,18 +41,6 @@ function AppContent() {
 
   if (!initialized) return <LoadingSpinner fullScreen />;
 
-  // If not logged in → redirect except auth pages
-  const publicPaths = ["/login", "/register", "/reset-password", "/join/"];
-  const currentPath = window.location.pathname;
-
-  if (
-    initialized &&
-    !user &&
-    !publicPaths.some((p) => currentPath.startsWith(p))
-  ) {
-    return <Navigate to="/login" replace />;
-  }
-
   // -------------------------------
   // RENDER ROUTES
   // -------------------------------

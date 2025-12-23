@@ -17,7 +17,10 @@ const MessageList = memo(function MessageList({ messages = [] }) {
   const { user } = useSelector((s) => s.auth);
   const { typingUsers, activeRoomId, loadingMessages } = useSelector((s) => s.chat);
   const messagesEndRef = useRef(null);
-  const { deleteMessage: deleteMessageSocket, editMessage: editMessageSocket } =
+  const messagesContainerRef = useRef(null);
+  const previousMessagesLength = useRef(0);
+  const markedAsReadRef = useRef(new Set()); // Track which messages we've already marked
+  const { deleteMessage: deleteMessageSocket, editMessage: editMessageSocket, markMessagesAsRead } =
     useChatSocket();
 
   // ✅ Validate and memoize messages for performance
@@ -90,27 +93,79 @@ const MessageList = memo(function MessageList({ messages = [] }) {
     return filtered;
   }, [messages]);
 
-  // ✅ Auto-scroll to bottom on new messages
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // ✅ Auto-scroll to bottom on new messages (only if user is at bottom or sent the message)
+  const scrollToBottom = useCallback((force = false) => {
+    if (force) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    const container = messagesContainerRef.current?.parentElement;
+    if (!container) return;
+
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    if (isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [validMessages, scrollToBottom]);
+    // Only auto-scroll if:
+    // 1. New message was added (not just status update)
+    // 2. User sent the message OR user is already at bottom
+    if (validMessages.length > previousMessagesLength.current) {
+      const lastMessage = validMessages[validMessages.length - 1];
+      const isMyMessage = lastMessage?.senderId === user?._id;
+      
+      if (isMyMessage) {
+        // Always scroll for own messages
+        scrollToBottom(true);
+      } else {
+        // Only scroll if already at bottom
+        scrollToBottom(false);
+      }
+    }
+    
+    previousMessagesLength.current = validMessages.length;
+  }, [validMessages, scrollToBottom, user?._id]);
 
-  // ✅ Mark messages as read
+  // ✅ Mark messages as read when viewing them (debounced)
   useEffect(() => {
     if (activeRoomId && validMessages.length > 0) {
+      const currentUserId = user?._id?.toString();
+      
       const unreadMessageIds = validMessages
-        .filter((m) => m.status !== 'read' && m.senderId !== user?._id)
+        .filter((m) => {
+          const messageSenderId = m.senderId?.toString();
+          const isNotMine = messageSenderId !== currentUserId;
+          const isUnread = m.status !== 'read';
+          const notMarkedYet = !markedAsReadRef.current.has(m._id);
+          
+          return isNotMine && isUnread && notMarkedYet;
+        })
         .map((m) => m._id);
 
       if (unreadMessageIds.length > 0) {
-        console.log(`📖 Marking ${unreadMessageIds.length} messages as read`);
+        console.log(`📖 [MessageList] Marking ${unreadMessageIds.length} messages as read:`, unreadMessageIds);
+        
+        // Mark them in our ref to prevent duplicate calls
+        unreadMessageIds.forEach(id => markedAsReadRef.current.add(id));
+        
+        // Debounce the socket call
+        const timer = setTimeout(() => {
+          markMessagesAsRead(activeRoomId, unreadMessageIds);
+        }, 500);
+        
+        return () => clearTimeout(timer);
       }
     }
-  }, [activeRoomId, validMessages, user?._id]);
+  }, [activeRoomId, validMessages, user?._id, markMessagesAsRead]);
+  
+  // Clear marked messages when room changes
+  useEffect(() => {
+    markedAsReadRef.current.clear();
+  }, [activeRoomId]);
 
   // ✅ Format date label - WhatsApp style
   const formatDateLabel = (date) => {
@@ -205,6 +260,7 @@ const MessageList = memo(function MessageList({ messages = [] }) {
 
   return (
     <div
+      ref={messagesContainerRef}
       style={{
         display: 'flex',
         flexDirection: 'column',

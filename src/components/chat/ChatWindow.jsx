@@ -270,6 +270,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchMessages,
   joinRoomThunk,
@@ -277,7 +278,7 @@ import {
 } from '../../redux/slices/chatSlice';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import { Spin, Empty, Button, Avatar, Space, Tooltip, message } from 'antd';
+import { Spin, Empty, Button, Space, Tooltip, message } from 'antd';
 import {
   PhoneOutlined,
   VideoCameraOutlined,
@@ -291,9 +292,11 @@ import { useTheme } from '../../hooks/useTheme';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useCall } from '../../contexts/CallContext';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
+import Avatar from '../common/Avatar';
 
 export default function ChatWindow({ isMobile = false, showMobileHeader = false, onBack, readOnly = false }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const { joinRoom, leaveRoom, markMessagesAsRead } = useChatSocket();
   const { callState, initiateCall } = useCall();
@@ -404,9 +407,9 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     const loadRoom = async () => {
       try {
         setMessagesLoaded(false);
-        joinRoom(activeRoomId);
+        joinRoom(activeRoomId, readOnly);
 
-        await dispatch(fetchMessages({
+        const result = await dispatch(fetchMessages({
           roomId: activeRoomId,
           page: 1,
           limit: 50
@@ -414,6 +417,24 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
         if (isMounted) {
           setMessagesLoaded(true);
+          
+          // Mark all messages as read after loading (only if not readOnly)
+          if (!readOnly) {
+            const loadedMessages = result?.data?.messages || result?.messages || [];
+            const unreadMessageIds = loadedMessages
+              .filter(msg => {
+                const senderId = msg.senderId?._id || msg.senderId;
+                return senderId !== user?._id && msg.status !== 'read';
+              })
+              .map(msg => msg._id);
+            
+            if (unreadMessageIds.length > 0) {
+              setTimeout(() => {
+                markMessagesAsRead(activeRoomId, unreadMessageIds);
+                console.log(`📖 Marked ${unreadMessageIds.length} messages as read`);
+              }, 500);
+            }
+          }
         }
       } catch (error) {
         console.error(`❌ Failed to load room:`, error);
@@ -431,7 +452,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       leaveRoom(activeRoomId);
       hasJoinedRoom.current = false;
     };
-  }, [activeRoomId, dispatch]);
+  }, [activeRoomId, dispatch, readOnly, user?._id]);
 
   // ❌ REMOVED: Auto-mark-as-read logic that was causing infinite loop
   // Messages are marked as read via socket events when user joins room
@@ -473,7 +494,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           alignItems: 'center',
           justifyContent: 'center',
           height: '100%',
-          background: '#F0F2F5',
+          background: theme?.secondaryColor || '#F0F2F5',
           flexDirection: 'column',
           gap: '20px',
           padding: '40px',
@@ -484,7 +505,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
             width: '200px',
             height: '200px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #008069 0%, #00A884 100%)',
+            background: theme?.primaryColor || '#008069',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -547,11 +568,11 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           top: 0,
           zIndex: 10,
           padding: showMobileHeader ? '10px 16px' : '12px 20px',
-          borderBottom: `1px solid ${theme?.borderColor || '#e0e0e0'}`,
+          borderBottom: `1px solid ${theme?.sidebarBorderColor || '#e0e0e0'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: '#008069',
+          background: theme?.headerBackgroundColor || '#008069',
           flexShrink: 0,
         }}
       >
@@ -567,16 +588,17 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
                   dispatch(setActiveRoom(''));
                 }
               }}
-              style={{ color: '#FFFFFF', padding: '4px' }}
+              style={{ color: theme?.headerTextColor || '#FFFFFF', padding: '4px' }}
             />
           )}
 
           {otherParticipant ? (
             <>
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <Avatar src={otherParticipant.avatar} size={40}>
-                  {otherParticipant.name?.[0]?.toUpperCase()}
-                </Avatar>
+              <div 
+                style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
+                onClick={() => navigate(`/profile/${otherParticipant._id}`)}
+              >
+                <Avatar src={otherParticipant.avatar} size={40} name={otherParticipant.name} />
                 {isOtherUserOnline && (
                   <div
                     style={{
@@ -586,17 +608,20 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
                       width: '12px',
                       height: '12px',
                       borderRadius: '50%',
-                      backgroundColor: '#25D366',
+                      backgroundColor: theme?.accentColor || '#25D366',
                       border: '2px solid #FFFFFF',
                     }}
                   />
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div 
+                style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                onClick={() => navigate(`/profile/${otherParticipant._id}`)}
+              >
+                <div style={{ fontWeight: 600, color: theme?.headerTextColor || '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {otherParticipant.name}
                 </div>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                <div style={{ fontSize: '12px', color: theme?.headerIconColor || 'rgba(255,255,255,0.8)' }}>
                   {isOtherUserOnline ? 'online' : 'offline'}
                 </div>
               </div>
@@ -604,12 +629,10 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           ) : (
             <>
               <div style={{ position: 'relative', flexShrink: 0 }}>
-                <Avatar size={40} style={{ backgroundColor: '#00A884' }}>
-                  {displayName?.[0]?.toUpperCase()}
-                </Avatar>
+                <Avatar size={40} name={displayName} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontWeight: 600, color: theme?.headerTextColor || '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {displayName}
                 </div>
               </div>
@@ -624,14 +647,14 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
               icon={<PhoneOutlined style={{ fontSize: '18px' }} />}
               onClick={handleStartCall}
               disabled={!isOtherUserOnline || readOnly || callState.isInCall}
-              style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : '#FFFFFF' }}
+              style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : (theme?.headerIconColor || '#FFFFFF') }}
             />
           </Tooltip>
           <Tooltip title="More">
             <Button 
               type="text" 
               icon={<MoreOutlined style={{ fontSize: '18px' }} />}
-              style={{ color: '#FFFFFF' }}
+              style={{ color: theme?.headerIconColor || '#FFFFFF' }}
             />
           </Tooltip>
         </Space>
@@ -646,7 +669,10 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           padding: '20px',
           display: 'flex',
           flexDirection: 'column-reverse',
-          background: '#E5DDD5',
+          background: theme?.chatBackgroundColor || '#E5DDD5',
+          backgroundImage: theme?.chatBackgroundImage ? `url(${theme.chatBackgroundImage})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
         }}
       >
         <MessageList messages={messages} roomId={activeRoomId} />
@@ -659,7 +685,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
       {/* Input - Fixed Bottom */}
       {!readOnly && (
-        <div style={{ flexShrink: 0, background: '#F0F0F0' }}>
+        <div style={{ flexShrink: 0, background: theme?.inputBackgroundColor || '#F0F0F0' }}>
           <MessageInput roomId={activeRoomId} />
         </div>
       )}

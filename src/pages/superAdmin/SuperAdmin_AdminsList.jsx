@@ -18,6 +18,7 @@ import {
   Popconfirm,
   Statistic,
   List,
+  message,
 } from 'antd';
 import {
   UserOutlined,
@@ -30,12 +31,14 @@ import {
   CheckCircleOutlined,
   TeamOutlined,
   AppstoreOutlined,
+  PhoneOutlined,
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   getAllTenants,
   createTenant,
-  deleteTenant,
+  toggleTenantStatus,
+  updateTenant,
 } from '../../redux/slices/tenantSlice.jsx';
 
 const { Title, Text } = Typography;
@@ -47,7 +50,10 @@ export default function SuperAdminAdminsList() {
   const { tenants, loading } = useSelector((state) => state.tenant);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingTenant, setEditingTenant] = useState(null);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
 
   const fetchAdmins = async () => {
     await dispatch(getAllTenants());
@@ -70,9 +76,37 @@ export default function SuperAdminAdminsList() {
     }
   };
 
-  const handleDeleteTenant = async (id) => {
-    await dispatch(deleteTenant(id));
-    await fetchAdmins();
+  const handleToggleStatus = async (id, currentStatus) => {
+    const result = await dispatch(toggleTenantStatus(id));
+    if (result.type === 'tenant/toggleTenantStatus/fulfilled') {
+      message.success(`Admin ${currentStatus === 'ACTIVE' ? 'deactivated' : 'activated'} successfully`);
+      await fetchAdmins();
+    } else {
+      message.error('Failed to update admin status');
+    }
+  };
+
+  const handleEditTenant = (record) => {
+    setEditingTenant(record);
+    editForm.setFieldsValue({
+      name: record.name,
+      email: record.admin?.email,
+      phone: record.admin?.phone,
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleUpdateTenant = async (values) => {
+    const result = await dispatch(updateTenant({ id: editingTenant._id, ...values }));
+    if (result.type === 'tenant/updateTenant/fulfilled') {
+      message.success('Admin workspace updated successfully');
+      editForm.resetFields();
+      setEditModalOpen(false);
+      setEditingTenant(null);
+      await fetchAdmins();
+    } else {
+      message.error('Failed to update admin workspace');
+    }
   };
 
   const columns = [
@@ -116,7 +150,7 @@ export default function SuperAdminAdminsList() {
       title: 'Email',
       dataIndex: ['admin', 'email'],
       key: 'email',
-      responsive: ['md'],
+      responsive: ['sm'],
       render: (email) => (
         <div className="flex items-center gap-2">
           <MailOutlined
@@ -138,26 +172,26 @@ export default function SuperAdminAdminsList() {
     {
       title: 'Status',
       key: 'status',
-      responsive: ['lg'],
-      render: () => (
+      responsive: ['sm'],
+      render: (_, record) => (
         <Tag
-          icon={<CheckCircleOutlined />}
+          icon={record.status === 'ACTIVE' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
           style={{
-            backgroundColor: '#ECFDF5',
-            color: '#10B981',
-            border: '1px solid #10B981',
+            backgroundColor: record.status === 'ACTIVE' ? '#ECFDF5' : '#FEF2F2',
+            color: record.status === 'ACTIVE' ? '#10B981' : '#EF4444',
+            border: `1px solid ${record.status === 'ACTIVE' ? '#10B981' : '#EF4444'}`,
             borderRadius: '6px',
             padding: '2px 8px',
           }}
         >
-          Active
+          {record.status || 'ACTIVE'}
         </Tag>
       ),
     },
     {
       title: 'Created',
       key: 'created',
-      responsive: ['lg'],
+      responsive: ['sm'],
       render: (_, record) => (
         <Text style={{ color: '#6B7280', fontSize: '13px' }}>
           {record.createdAt
@@ -182,28 +216,31 @@ export default function SuperAdminAdminsList() {
               type="text"
               icon={<EditOutlined />}
               size="small"
+              onClick={() => handleEditTenant(record)}
               style={{
                 color: '#008069',
               }}
             />
           </Tooltip>
           <Popconfirm
-            title="Delete Admin"
-            description="Are you sure you want to delete this admin workspace?"
-            icon={<ExclamationCircleOutlined style={{ color: '#EF4444' }} />}
-            onConfirm={() => handleDeleteTenant(record._id)}
+            title={`${record.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} Admin`}
+            description={`Are you sure you want to ${record.status === 'ACTIVE' ? 'deactivate' : 'activate'} this admin workspace?`}
+            icon={<ExclamationCircleOutlined style={{ color: record.status === 'ACTIVE' ? '#F59E0B' : '#10B981' }} />}
+            onConfirm={() => handleToggleStatus(record._id, record.status)}
             okText="Yes"
             cancelText="No"
             okButtonProps={{
-              danger: true,
+              style: { backgroundColor: record.status === 'ACTIVE' ? '#F59E0B' : '#10B981' }
             }}
           >
-            <Tooltip title="Delete">
+            <Tooltip title={record.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}>
               <Button
                 type="text"
-                icon={<DeleteOutlined />}
+                icon={record.status === 'ACTIVE' ? <ExclamationCircleOutlined /> : <CheckCircleOutlined />}
                 size="small"
-                danger
+                style={{
+                  color: record.status === 'ACTIVE' ? '#F59E0B' : '#10B981',
+                }}
               />
             </Tooltip>
           </Popconfirm>
@@ -323,7 +360,7 @@ export default function SuperAdminAdminsList() {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={24} md={8}>
+          {/* <Col xs={24} sm={24} md={8}>
             <Card
               className="border-0"
               style={{
@@ -354,13 +391,13 @@ export default function SuperAdminAdminsList() {
                 }}
               />
             </Card>
-          </Col>
+          </Col> */}
         </Row>
       </div>
 
-      {/* Table */}
+      {/* Table - Desktop */}
       <Card
-        className="border-0"
+        className="border-0 hidden md:block"
         style={{
           backgroundColor: '#FFFFFF',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
@@ -391,42 +428,162 @@ export default function SuperAdminAdminsList() {
         )}
       </Card>
 
+      {/* List - Mobile */}
+      <div className="md:hidden">
+        {tenantsArray.length > 0 ? (
+          <List
+            dataSource={tenantsArray}
+            loading={loading}
+            renderItem={(item) => (
+              <Card
+                className="mb-3 border-0"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  borderRadius: '12px',
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: '#00806920' }}
+                  >
+                    <UserOutlined style={{ color: '#008069', fontSize: '20px' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-base truncate" style={{ color: '#111B21' }}>
+                          {item.name}
+                        </p>
+                        <p className="text-xs" style={{ color: '#9CA3AF' }}>
+                          ID: {item._id?.slice(0, 8)}...
+                        </p>
+                      </div>
+                      <Tag
+                        icon={item.status === 'ACTIVE' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
+                        style={{
+                          backgroundColor: item.status === 'ACTIVE' ? '#ECFDF5' : '#FEF2F2',
+                          color: item.status === 'ACTIVE' ? '#10B981' : '#EF4444',
+                          border: `1px solid ${item.status === 'ACTIVE' ? '#10B981' : '#EF4444'}`,
+                          borderRadius: '6px',
+                          padding: '2px 8px',
+                          marginLeft: '8px',
+                        }}
+                      >
+                        {item.status || 'ACTIVE'}
+                      </Tag>
+                    </div>
+                    <div className="space-y-1 mb-3">
+                      <div className="flex items-center gap-2">
+                        <MailOutlined style={{ color: '#008069', fontSize: '14px' }} />
+                        <Text className="text-sm truncate" style={{ color: '#667781' }}>
+                          {item.admin?.email || 'N/A'}
+                        </Text>
+                      </div>
+                      {item.admin?.phone && (
+                        <div className="flex items-center gap-2">
+                          <PhoneOutlined style={{ color: '#008069', fontSize: '14px' }} />
+                          <Text className="text-sm" style={{ color: '#667781' }}>
+                            {item.admin.phone}
+                          </Text>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Text className="text-xs" style={{ color: '#9CA3AF' }}>
+                          Created: {item.createdAt
+                            ? new Date(item.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })
+                            : 'N/A'}
+                        </Text>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="default"
+                        icon={<EditOutlined />}
+                        size="small"
+                        onClick={() => handleEditTenant(item)}
+                        style={{
+                          color: '#008069',
+                          borderColor: '#008069',
+                          borderRadius: '6px',
+                          flex: 1,
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Popconfirm
+                        title={`${item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} Admin`}
+                        description={`Are you sure you want to ${item.status === 'ACTIVE' ? 'deactivate' : 'activate'} this admin workspace?`}
+                        icon={<ExclamationCircleOutlined style={{ color: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981' }} />}
+                        onConfirm={() => handleToggleStatus(item._id, item.status)}
+                        okText="Yes"
+                        cancelText="No"
+                        okButtonProps={{
+                          style: { backgroundColor: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981' }
+                        }}
+                      >
+                        <Button
+                          type="default"
+                          icon={item.status === 'ACTIVE' ? <ExclamationCircleOutlined /> : <CheckCircleOutlined />}
+                          size="small"
+                          style={{
+                            color: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981',
+                            borderColor: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981',
+                            borderRadius: '6px',
+                            flex: 1,
+                          }}
+                        >
+                          {item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </Popconfirm>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+          />
+        ) : (
+          <Card
+            className="border-0"
+            style={{
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              borderRadius: '12px',
+            }}
+          >
+            <Empty description="No admin workspaces found" style={{ padding: '40px 0' }} />
+          </Card>
+        )}
+      </div>
+
       {/* Create Admin Modal */}
       <Modal
         title={
           <div className="flex items-center gap-3">
             <div
               className="p-2 rounded-lg"
-              style={{
-                backgroundColor: '#00806920',
-              }}
+              style={{ backgroundColor: '#00806920' }}
             >
-              <UserOutlined
-                style={{
-                  color: '#008069',
-                  fontSize: '20px',
-                }}
-              />
+              <UserOutlined style={{ color: '#008069', fontSize: '20px' }} />
             </div>
-            <span
-              style={{
-                color: '#111B21',
-                fontSize: '18px',
-                fontWeight: 600,
-              }}
-            >
+            <span style={{ color: '#111B21', fontSize: '18px', fontWeight: 600 }}>
               Create New Admin Workspace
             </span>
           </div>
         }
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => {
+          setModalOpen(false);
+          form.resetFields();
+        }}
         footer={null}
         width={500}
         centered
-        style={{
-          borderRadius: '12px',
-        }}
       >
         <Form
           form={form}
@@ -509,6 +666,39 @@ export default function SuperAdminAdminsList() {
                   fontWeight: 500,
                 }}
               >
+                Phone Number
+              </span>
+            }
+            name="phone"
+            rules={[
+              {
+                required: false,
+                message: 'Please enter phone number',
+              },
+            ]}
+          >
+            <Input
+              placeholder="+1234567890"
+              size="large"
+              prefix={
+                <PhoneOutlined
+                  style={{ color: '#008069' }}
+                />
+              }
+              style={{
+                borderRadius: '8px',
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={
+              <span
+                style={{
+                  color: '#111B21',
+                  fontWeight: 500,
+                }}
+              >
                 Password
               </span>
             }
@@ -550,6 +740,95 @@ export default function SuperAdminAdminsList() {
               }}
             >
               Create Workspace
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Edit Admin Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2 rounded-lg"
+              style={{ backgroundColor: '#00806920' }}
+            >
+              <EditOutlined style={{ color: '#008069', fontSize: '20px' }} />
+            </div>
+            <span style={{ color: '#111B21', fontSize: '18px', fontWeight: 600 }}>
+              Edit Admin Workspace
+            </span>
+          </div>
+        }
+        open={editModalOpen}
+        onCancel={() => {
+          setEditModalOpen(false);
+          setEditingTenant(null);
+          editForm.resetFields();
+        }}
+        footer={null}
+        width={500}
+        centered
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleUpdateTenant}
+          autoComplete="off"
+        >
+          <Form.Item
+            label={<span style={{ color: '#111B21', fontWeight: 500 }}>Workspace Name</span>}
+            name="name"
+            rules={[{ required: true, message: 'Please enter workspace name' }]}
+          >
+            <Input
+              placeholder="Enter workspace name"
+              size="large"
+              prefix={<UserOutlined style={{ color: '#008069' }} />}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<span style={{ color: '#111B21', fontWeight: 500 }}>Admin Email</span>}
+            name="email"
+            rules={[{ required: true, type: 'email', message: 'Please enter valid email' }]}
+          >
+            <Input
+              placeholder="admin@example.com"
+              size="large"
+              prefix={<MailOutlined style={{ color: '#008069' }} />}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<span style={{ color: '#111B21', fontWeight: 500 }}>Phone Number</span>}
+            name="phone"
+          >
+            <Input
+              placeholder="+1234567890"
+              size="large"
+              prefix={<PhoneOutlined style={{ color: '#008069' }} />}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
+
+          <Form.Item className="mb-0">
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              size="large"
+              style={{
+                backgroundColor: '#008069',
+                borderColor: '#008069',
+                height: '44px',
+                borderRadius: '8px',
+                fontWeight: 500,
+              }}
+            >
+              Update Workspace
             </Button>
           </Form.Item>
         </Form>

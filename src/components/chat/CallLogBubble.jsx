@@ -1,7 +1,10 @@
 import { PhoneOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function CallLogBubble({ callLog, timestamp, currentUser, senderId }) {
+  const { theme } = useTheme();
+  
   // Use senderId from message for positioning (who sent the message)
   const messageSenderId = typeof senderId === 'object' ? senderId?._id : senderId;
   const currentUserIdStr = currentUser?._id;
@@ -58,17 +61,19 @@ export default function CallLogBubble({ callLog, timestamp, currentUser, senderI
     <div className={`flex mb-3 ${isMine ? 'justify-end' : 'justify-start'}`}>
       <div
         style={{
-          backgroundColor: isMine ? '#DCF8C6' : '#FFFFFF',
-          borderRadius: '8px',
+          backgroundColor: isMine ? (theme.chatBubbleUser || '#DCF8C6') : (theme.chatBubbleAdmin || '#FFFFFF'),
+          color: isMine ? (theme.chatBubbleUserText || '#111B21') : (theme.chatBubbleAdminText || '#111B21'),
+          borderRadius: `${theme.messageBorderRadius || 8}px`,
           padding: '8px 12px',
           maxWidth: '280px',
           boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+          fontSize: `${theme.messageFontSize || 14}px`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {getCallIcon()}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '14px', color: '#111B21' }}>
+            <div style={{ fontSize: `${theme.messageFontSize || 14}px` }}>
               {getCallText()}
             </div>
             <div style={{ fontSize: '11px', color: '#667781', marginTop: '2px' }}>

@@ -48,34 +48,13 @@ export const uploadThemeImage = createAsyncThunk(
 );
 
 const initialState = {
-  theme: {
-    appName: 'Chat App',
-    logoUrl: null,
-    logoHeight: 40,
-    primaryColor: '#3B82F6',
-    secondaryColor: '#E8F0FE',
-    accentColor: '#06B6D4',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    headerBackground: '#F8FAFC',
-    headerText: '#1F2937',
-    chatBackgroundImage: null,
-    chatBubbleAdmin: '#3B82F6',
-    chatBubbleUser: '#F3F4F6',
-    chatBubbleAdminText: '#FFFFFF',
-    chatBubbleUserText: '#1F2937',
-    messageFontSize: 14,
-    messageBorderRadius: 12,
-    bubbleStyle: 'rounded',
-    blurEffect: 0.1,
-    showAvatars: true,
-    showReadStatus: true,
-    enableTypingIndicator: true,
-  },
+  theme: {},
+  tenantTheme: {},
   loading: false,
   updating: false,
   uploading: false,
   error: null,
+  fetchedTenantIds: [],
 };
 
 const themeSlice = createSlice({
@@ -88,14 +67,23 @@ const themeSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchTenantTheme.pending, (state) => {
+      .addCase(fetchTenantTheme.pending, (state, action) => {
+        const tenantId = action.meta.arg;
+        if (state.fetchedTenantIds?.includes(tenantId)) {
+          return;
+        }
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchTenantTheme.fulfilled, (state, action) => {
         state.loading = false;
         const themeData = action.payload?.data?.theme || action.payload?.theme || {};
-        state.theme = { ...state.theme, ...themeData };
+        state.theme = themeData;
+        state.tenantTheme = themeData;
+        const tenantId = action.meta.arg;
+        if (!state.fetchedTenantIds?.includes(tenantId)) {
+          state.fetchedTenantIds = [...(state.fetchedTenantIds || []), tenantId];
+        }
       })
       .addCase(fetchTenantTheme.rejected, (state, action) => {
         state.loading = false;
@@ -108,7 +96,8 @@ const themeSlice = createSlice({
       .addCase(updateTenantTheme.fulfilled, (state, action) => {
         state.updating = false;
         const themeData = action.payload?.data?.theme || action.payload?.theme || {};
-        state.theme = { ...state.theme, ...themeData };
+        state.theme = themeData;
+        state.tenantTheme = themeData;
       })
       .addCase(updateTenantTheme.rejected, (state, action) => {
         state.updating = false;

@@ -1,7 +1,8 @@
 
 import { createSlice } from '@reduxjs/toolkit';
 import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
-import { _post, _get } from '../../helper/apiClient';
+import { _post, _get, _put } from '../../helper/apiClient';
+import { updateProfileWithAvatar } from './userSlice';
 
 export const login = createAsyncThunkHandler(
   'auth/login',
@@ -49,6 +50,12 @@ export const registerWithInvite = createAsyncThunkHandler(
   'auth/registerWithInvite',
   _post,
   '/auth/register-with-invite'
+);
+
+export const updateProfile = createAsyncThunkHandler(
+  'auth/updateProfile',
+  _put,
+  '/users/profile'
 );
 
 const initialState = {
@@ -173,6 +180,25 @@ const authSlice = createSlice({
       .addCase(registerWithInvite.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // Update Profile
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = { ...state.user, ...action.payload.data.user };
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Update Profile With Avatar
+      .addCase(updateProfileWithAvatar.fulfilled, (state, action) => {
+        state.user = { ...state.user, ...action.payload.data.user };
       })
 
       .addCase('persist/PURGE', () => {

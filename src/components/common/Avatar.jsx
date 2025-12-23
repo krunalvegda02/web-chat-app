@@ -1,14 +1,27 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useTheme } from '../../hooks/useTheme';
+import { useSelector } from 'react-redux';
+import { Spin } from 'antd';
 
 export default function Avatar({
   name = 'U',
   size = 32,
   src = '',
   className = '',
+  showLoading = false,
 }) {
+  const { theme } = useTheme();
+  const { loading } = useSelector((state) => state.user);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    if (src) {
+      setImageError(false);
+      setImageLoaded(false);
+    }
+  }, [src]);
 
   // Get initials from name
   const getInitials = (name) => {
@@ -20,24 +33,9 @@ export default function Avatar({
     return name.charAt(0).toUpperCase();
   };
 
-  // Generate consistent color based on name
-  const getAvatarColor = (name) => {
-    const colors = [
-      '#10B981', // Green - WhatsApp primary
-      '#3B82F6', // Blue
-      '#8B5CF6', // Purple
-      '#EC4899', // Pink
-      '#F59E0B', // Amber
-      '#EF4444', // Red
-      '#06B6D4', // Cyan
-      '#6366F1', // Indigo
-    ];
-    const index = (name || 'U').charCodeAt(0) % colors.length;
-    return colors[index];
-  };
-
   const initials = getInitials(name);
-  const avatarBg = getAvatarColor(name);
+  const avatarBg = theme.avatarBackgroundColor || '#25D366';
+  const avatarText = theme.avatarTextColor || '#FFFFFF';
 
   if (src && !imageError) {
     return (
@@ -53,13 +51,19 @@ export default function Avatar({
         />
         {!imageLoaded && (
           <div
-            className="absolute inset-0 flex items-center justify-center rounded-full font-semibold text-white"
+            className="absolute inset-0 flex items-center justify-center rounded-full font-semibold"
             style={{
               fontSize: size * 0.4,
               backgroundColor: avatarBg,
+              color: avatarText,
             }}
           >
             {initials}
+          </div>
+        )}
+        {showLoading && loading && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black bg-opacity-50">
+            <Spin size="small" />
           </div>
         )}
       </div>
@@ -67,16 +71,24 @@ export default function Avatar({
   }
 
   return (
-    <div
-      className={`flex items-center justify-center rounded-full font-semibold text-white flex-shrink-0 ${className}`}
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.4,
-        backgroundColor: avatarBg,
-      }}
-    >
-      {initials}
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <div
+        className={`flex items-center justify-center rounded-full font-semibold ${className}`}
+        style={{
+          width: size,
+          height: size,
+          fontSize: size * 0.4,
+          backgroundColor: avatarBg,
+          color: avatarText,
+        }}
+      >
+        {initials}
+      </div>
+      {showLoading && loading && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black bg-opacity-50">
+          <Spin size="small" />
+        </div>
+      )}
     </div>
   );
 }

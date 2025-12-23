@@ -11,6 +11,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   UnlockOutlined,
+  PhoneOutlined,
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { getAdminUsers, generateInviteLink } from '../../redux/slices/tenantSlice.jsx';
@@ -32,7 +33,11 @@ export default function AdminUsersList() {
 
   const handleAddUser = async (values) => {
     try {
-      await dispatch(generateInviteLink({ tenantId: user.tenantId, email: values.email })).unwrap();
+      await dispatch(generateInviteLink({ 
+        tenantId: user.tenantId, 
+        email: values.email,
+        phone: values.phone 
+      })).unwrap();
       message.success('✅ Invite sent successfully');
       form.resetFields();
       setIsModalVisible(false);
@@ -184,7 +189,7 @@ export default function AdminUsersList() {
             </div>
           </div>
         </Card>
-
+{/* 
         <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
@@ -197,7 +202,7 @@ export default function AdminUsersList() {
               <UserOutlined style={{ fontSize: '24px', color: '#10B981' }} />
             </div>
           </div>
-        </Card>
+        </Card> */}
 
         <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
@@ -272,6 +277,22 @@ export default function AdminUsersList() {
             <Input
               placeholder="user@example.com"
               prefix={<MailOutlined />}
+              size="large"
+              className="rounded-lg"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<span className="font-semibold text-gray-700">Phone Number</span>}
+            name="phone"
+            rules={[
+              { required: true, message: 'Please enter phone number' },
+              { pattern: /^[+]?[0-9]{10,15}$/, message: 'Invalid phone number (10-15 digits)' },
+            ]}
+          >
+            <Input
+              placeholder="+1234567890"
+              prefix={<PhoneOutlined />}
               size="large"
               className="rounded-lg"
             />

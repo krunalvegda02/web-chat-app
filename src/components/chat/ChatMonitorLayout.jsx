@@ -17,7 +17,6 @@ import {
   SearchOutlined,
   PhoneOutlined,
   MoreOutlined,
-  CheckOutlined,
   ClockCircleOutlined,
   ArrowLeftOutlined,
   TeamOutlined,
@@ -276,7 +275,6 @@ export default function ChatMonitorLayout({
                     </Text>
                     <Text style={{ fontSize: '11px', marginTop: '4px', color: isOwn ? 'rgba(255,255,255,0.7)' : '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {isOwn && <CheckOutlined />}
                     </Text>
                   </div>
                   {isOwn && (
@@ -489,7 +487,6 @@ export default function ChatMonitorLayout({
                         </Text>
                         <Text style={{ fontSize: '11px', marginTop: '4px', color: isOwn ? 'rgba(255,255,255,0.7)' : '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          {isOwn && <CheckOutlined />}
                         </Text>
                       </div>
                       {isOwn && (

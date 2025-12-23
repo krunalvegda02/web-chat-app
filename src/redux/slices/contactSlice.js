@@ -74,7 +74,7 @@ const contactSlice = createSlice({
       })
       .addCase(fetchContacts.fulfilled, (state, action) => {
         state.loading = false;
-        state.contacts = action.payload.contacts || [];
+        state.contacts = action.payload?.data?.contacts || action.payload?.contacts || [];
       })
       .addCase(fetchContacts.rejected, (state, action) => {
         state.loading = false;
@@ -86,7 +86,7 @@ const contactSlice = createSlice({
       })
       .addCase(searchUsers.fulfilled, (state, action) => {
         state.searchLoading = false;
-        state.searchResults = action.payload.users || [];
+        state.searchResults = action.payload?.data?.users || action.payload?.users || [];
       })
       .addCase(searchUsers.rejected, (state, action) => {
         state.searchLoading = false;

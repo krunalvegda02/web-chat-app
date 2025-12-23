@@ -12,9 +12,18 @@ export const createAsyncThunkHandler = (typePrefix, apiMethod, urlResolver, isMu
       const url = typeof urlResolver === "function" ? urlResolver(payload) : urlResolver;
       console.log(`🎯 [AsyncThunk] ${typePrefix} - URL:`, url);
       
-      // If payload is used in URL (string/number), don't send as body
-      const shouldSendBody = typeof payload === 'object' && payload !== null;
-      const requestBody = shouldSendBody ? payload : {};
+      // Determine request body based on payload structure
+      let requestBody = {};
+      
+      if (typeof payload === 'object' && payload !== null) {
+        // If payload has 'id' property, exclude it from body (it's used in URL)
+        if ('id' in payload) {
+          const { id, ...rest } = payload;
+          requestBody = rest;
+        } else {
+          requestBody = payload;
+        }
+      }
       
       // Detect FormData automatically or use isMultipart flag
       const isFormData = requestBody instanceof FormData;

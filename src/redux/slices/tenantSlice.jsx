@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
-import { _get, _post, _put, _delete } from '../../helper/apiClient';
+import { _get, _post, _put, _delete, _patch } from '../../helper/apiClient';
 import { buildUrlWithParams } from '../../helper/helperFunction';
 
 export const getAllTenants = createAsyncThunkHandler(
@@ -55,6 +55,21 @@ export const getTenantMembers = createAsyncThunkHandler(
   'tenant/getTenantMembers',
   _get,
   '/tenants/members'
+);
+
+export const updateTenant = createAsyncThunkHandler(
+  'tenant/updateTenant',
+  _put,
+  (payload) => {
+    const { id, ...data } = payload;
+    return `/tenants/${id}`;
+  }
+);
+
+export const toggleTenantStatus = createAsyncThunkHandler(
+  'tenant/toggleTenantStatus',
+  _patch,
+  (payload) => `/tenants/${payload}/toggle-status`
 );
 
 export const deleteTenant = createAsyncThunkHandler(
@@ -149,6 +164,51 @@ const tenantSlice = createSlice({
         state.tenantMembers = action.payload.data.members;
       })
       .addCase(getTenantMembers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(updateTenant.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateTenant.fulfilled, (state, action) => {
+        state.loading = false;
+        const updatedTenant = action.payload.data?.tenant || action.payload.data;
+        const index = state.tenants.findIndex(t => t._id === updatedTenant._id);
+        if (index !== -1) {
+          state.tenants[index] = updatedTenant;
+        }
+      })
+      .addCase(updateTenant.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(toggleTenantStatus.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(toggleTenantStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        const updatedTenant = action.payload.data?.tenant || action.payload.data;
+        const index = state.tenants.findIndex(t => t._id === updatedTenant._id);
+        if (index !== -1) {
+          state.tenants[index] = updatedTenant;
+        }
+      })
+      .addCase(toggleTenantStatus.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteTenant.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteTenant.fulfilled, (state, action) => {
+        state.loading = false;
+        const deletedId = action.meta.arg;
+        state.tenants = state.tenants.filter(t => t._id !== deletedId);
+      })
+      .addCase(deleteTenant.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

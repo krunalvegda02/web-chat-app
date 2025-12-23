@@ -2,12 +2,14 @@ import AuthLayout from "../layouts/AuthLayout";
 import AdminLayout from "../layouts/AdminLayout";
 import SuperAdminLayout from "../layouts/SuperAdminLayout";
 import UserChatLayout from "../layouts/UserLayout";
+import SharedLayout from "../layouts/SharedLayout";
+import { Navigate } from "react-router-dom";
 
 // Auth Pages
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
-import UserJoinPage from "../pages/user/UserJoinPage";
+// import UserJoinPage from "../pages/user/UserJoinPage";
 
 // Admin Pages
 import AdminDashboard from "../pages/admin/AdminChats";
@@ -22,8 +24,10 @@ import SuperAdminChat from "../pages/superAdmin/SuperAdminChat";
 
 // User Pages
 import UserChatPage from "../pages/user/UserChatPage";
-import Contacts from "../pages/user/Contacts";
-import CallLogs from "../pages/user/CallLogs";
+import CallLogs from "../pages/common/CallLogsPage";
+import Contacts from "../pages/common/ContactsPage";
+import Profile from "../pages/common/Profile";
+import UserProfile from "../pages/user/UserProfile";
 
 // Error Pages
 import Unauthorized from "../pages/common/Unauthorized";
@@ -42,7 +46,7 @@ export const pageRoutes = [
             { path: "/login", element: LoginPage },
             { path: "/register", element: RegisterPage },
             { path: "/reset-password", element: ResetPasswordPage },
-            { path: "/join/:tenantSlug", element: UserJoinPage },
+            // { path: "/join/:tenantSlug", element: UserJoinPage },
 
             { path: "/join", element: JoinPage },
         ],
@@ -50,13 +54,12 @@ export const pageRoutes = [
 
     {
         layout: AdminLayout,
-        requiredRoles: ["ADMIN"],
+        requiredRoles: ["ADMIN", "TENANT_ADMIN"],
         routes: [
             { path: "/admin", element: AdminDashboard },
             { path: "/admin/theme", element: AdminThemeSettings },
             { path: "/admin/users", element: AdminUsersList },
             { path: "/admin/user-chat", element: AdminUsersChat },
-
         ],
     },
     {
@@ -67,7 +70,6 @@ export const pageRoutes = [
             { path: "/super-admin/admins", element: SuperAdminAdminsList },
             { path: "/super-admin/chat", element: SuperAdminChat },
             { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
-
         ],
     },
     {
@@ -75,9 +77,21 @@ export const pageRoutes = [
         requiredRoles: ["USER"],
         routes: [
             { path: "/user/chats", element: UserChatPage },
-            { path: "/user/calls", element: CallLogs },
-            { path: "/user/profile", element: UserChatPage },
-            { path: "/user/contacts", element: Contacts },
+            // Redirects for backward compatibility
+            { path: "/user/contacts", element: () => <Navigate to="/contacts" replace /> },
+            { path: "/user/calls", element: () => <Navigate to="/calls" replace /> },
+        ],
+    },
+
+    // Shared routes for all authenticated users
+    {
+        layout: SharedLayout,
+        requiredRoles: ["USER", "ADMIN", "TENANT_ADMIN", "SUPER_ADMIN"],
+        routes: [
+            { path: "/profile", element: Profile },
+            { path: "/profile/:userId", element: UserProfile },
+            { path: "/contacts", element: Contacts },
+            { path: "/calls", element: CallLogs },
         ],
     },
 

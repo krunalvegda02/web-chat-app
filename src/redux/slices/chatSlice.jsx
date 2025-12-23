@@ -86,6 +86,13 @@ export const deleteMessageAPI = createAsyncThunkHandler(
 );
 
 
+export const forwardMessageAPI = createAsyncThunkHandler(
+  'chat/forwardMessage',
+  _post,
+  '/chat/forward-message'
+);
+
+
 export const markMessagesDelivered = createAsyncThunkHandler(
   'chat/markDelivered',
   _post,
@@ -174,18 +181,21 @@ const chatSlice = createSlice({
   reducers: {
     setActiveRoom(state, action) {
       const roomId = action.payload;
+      const previousRoomId = state.activeRoomId;
       state.activeRoomId = roomId;
       
-      // Clear unread count for this room
-      const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
-      const room = roomsArray.find(r => r._id === roomId);
-      if (room && room.unreadCount > 0) {
-        room.unreadCount = 0;
-        state.rooms = roomsArray;
-        console.log(`📥 [REDUX] Cleared unread count for room: ${roomId}`);
+      // Only clear unread count if switching to a different room
+      if (roomId && roomId !== previousRoomId && Array.isArray(state.rooms)) {
+        state.rooms = state.rooms.map(room => {
+          if (room._id === roomId && room.unreadCount > 0) {
+            console.log(`📥 [REDUX] Clearing unread count for room: ${roomId}`);
+            return { ...room, unreadCount: 0 };
+          }
+          return room;
+        });
       }
       
-      console.log(`🏠 [REDUX] Active room set to: ${roomId}`);
+      console.log(`🏠 [REDUX] Active room set to: ${roomId} (previous: ${previousRoomId})`);
     },
 
 
@@ -218,7 +228,11 @@ const chatSlice = createSlice({
     socketMessageReceived(state, action) {
       const { roomId, message } = action.payload;
 
-      console.log('🔍 [DEBUG] Socket message received:', message._id, message.content, message.type);
+      console.log('🔵 [REDUX] ========== socketMessageReceived ==========');
+      console.log('🔵 [REDUX] Room ID:', roomId);
+      console.log('🔵 [REDUX] Message:', { _id: message._id, content: message.content, type: message.type, status: message.status });
+      console.log('🔵 [REDUX] Current messages in room:', state.messagesByRoom[roomId]?.length || 0);
+
       if (message.type === 'call') {
         console.log('📞 [DEBUG] CALL MESSAGE RECEIVED:', {
           _id: message._id,
@@ -231,6 +245,7 @@ const chatSlice = createSlice({
       }
 
       if (!state.messagesByRoom[roomId]) {
+        console.log('🆕 [REDUX] Creating new message array for room:', roomId);
         state.messagesByRoom[roomId] = [];
       }
 
@@ -241,66 +256,117 @@ const chatSlice = createSlice({
       }
 
       const beforeCount = state.messagesByRoom[roomId].length;
-      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].filter((m) => {
-        if (!m.optimistic) return true;
-        if (m.content === message.content) {
-          console.log(`🗑️ [REDUX] Removing optimistic message: ${m._id}`);
-          return false;
+      
+      // ✅ Find and replace optimistic message by matching content and sender
+      let replacedOptimistic = false;
+      let finalMessage = null;
+      const messageSenderId = (message.senderId?._id || message.senderId)?.toString();
+      
+      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map((m) => {
+        if (m.optimistic && !replacedOptimistic) {
+          const mSenderId = m.senderId?.toString();
+          
+          // Match by sender and either:
+          // 1. Same content (for text messages)
+          // 2. Same media type and similar timestamp (for media messages)
+          const contentMatch = m.content === message.content;
+          const mediaMatch = m.media?.length > 0 && message.media?.length > 0 && 
+                            m.type === message.type &&
+                            Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000; // Within 5 seconds
+          
+          if (mSenderId === messageSenderId && (contentMatch || mediaMatch)) {
+            console.log(`🔄 [REDUX] Replacing optimistic message ${m._id} with real message ${message._id}`);
+            replacedOptimistic = true;
+            
+            finalMessage = {
+              ...message,
+              sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
+              senderId: message.senderId?._id || message.senderId,
+              status: message.status || 'sent',
+              optimistic: false,
+              media: Array.isArray(message.media) ? message.media : [],
+              type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
+              _updatedAt: Date.now(),
+            };
+            
+            return finalMessage;
+          }
         }
-        return true;
+        return m;
       });
+      
+      // If no optimistic message was replaced, add as new message
+      if (!replacedOptimistic) {
+        finalMessage = {
+          ...message,
+          sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
+          senderId: message.senderId?._id || message.senderId,
+          status: message.status || 'sent',
+          optimistic: false,
+          media: Array.isArray(message.media) ? message.media : [],
+          type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
+          _updatedAt: Date.now(),
+        };
+        
+        console.log('✅ [REDUX] Adding new message:', { _id: finalMessage._id, sender: finalMessage.sender?.name, status: finalMessage.status });
+        state.messagesByRoom[roomId].push(finalMessage);
+      }
+      
       const afterCount = state.messagesByRoom[roomId].length;
-      console.log(`📊 [REDUX] Removed ${beforeCount - afterCount} optimistic messages`);
-
-      const finalMessage = {
-        ...message,
-        sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
-        senderId: message.senderId?._id || message.senderId,
-        status: message.status || 'sent',
-        optimistic: false,
-        // Ensure media array is preserved
-        media: Array.isArray(message.media) ? message.media : [],
-        // Ensure type is set
-        type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
-      };
-
-      console.log('✅ [DEBUG] Adding real message with sender:', finalMessage.sender?.name);
-
-      state.messagesByRoom[roomId].push(finalMessage);
+      console.log(`📊 [REDUX] Messages: ${beforeCount} → ${afterCount}`);
+      
+      console.log('🔵 [REDUX] Total messages in room after add:', state.messagesByRoom[roomId].length);
 
       state.pendingMessageIds = state.pendingMessageIds.filter(id => !id.startsWith('temp-'));
 
-      const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
-      const roomIndex = roomsArray.findIndex(r => r._id === roomId);
-      if (roomIndex !== -1) {
-        const room = roomsArray[roomIndex];
-        room.lastMessage = finalMessage;
-        room.lastMessageTime = finalMessage.createdAt;
-        room.lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
-        roomsArray.splice(roomIndex, 1);
-        roomsArray.unshift(room);
-        state.rooms = roomsArray;
-        console.log(`📋 [REDUX] Room list updated for room: ${roomId}`);
-      } else {
-        console.warn(`⚠️ [REDUX] Room ${roomId} not found in rooms array`);
+      // Update room list only if finalMessage exists
+      if (finalMessage) {
+        const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
+        const roomIndex = roomsArray.findIndex(r => r._id === roomId);
+        if (roomIndex !== -1) {
+          const room = roomsArray[roomIndex];
+          room.lastMessage = finalMessage;
+          room.lastMessageTime = finalMessage.createdAt;
+          room.lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
+          roomsArray.splice(roomIndex, 1);
+          roomsArray.unshift(room);
+          state.rooms = roomsArray;
+          console.log(`📋 [REDUX] Room list updated for room: ${roomId}`);
+        } else {
+          console.warn(`⚠️ [REDUX] Room ${roomId} not found in rooms array`);
+        }
       }
 
-      console.log(`💬 [REDUX] Real message added: ${message._id}, total messages: ${state.messagesByRoom[roomId].length}`);
+      console.log('🔵 [REDUX] ========== END socketMessageReceived ==========');
     },
 
 
     // ✅ Update single message status
     updateMessageStatus(state, action) {
       const { roomId, messageId, status } = action.payload;
+      console.log(`📊 [REDUX] updateMessageStatus called:`, { roomId, messageId, status });
 
-      if (!state.messagesByRoom[roomId]) return;
-
-      const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
-      if (message) {
-        message.status = status;
-        state.messageDeliveryStatus[messageId] = status;
-        console.log(`📊 [REDUX] Message status: ${messageId} → ${status}`);
+      if (!state.messagesByRoom[roomId]) {
+        console.warn(`⚠️ [REDUX] Room ${roomId} not found for updateMessageStatus`);
+        return;
       }
+
+      // Create new array to trigger re-render
+      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
+        if (message._id === messageId || message._id.toString() === messageId.toString()) {
+          console.log(`✅ [REDUX] Updating message ${messageId} status from ${message.status} to ${status}`);
+          return {
+            ...message,
+            status,
+            _updatedAt: Date.now(), // ✅ Force re-render
+            ...(status === 'read' && { readAt: new Date().toISOString() })
+          };
+        }
+        return message;
+      });
+
+      state.messageDeliveryStatus[messageId] = status;
+      console.log(`📊 [REDUX] Message status updated: ${messageId} → ${status}`);
     },
 
 
@@ -389,32 +455,53 @@ const chatSlice = createSlice({
     // ✅ Mark messages as read
     updateMessagesReadStatus(state, action) {
       const { roomId, messageIds } = action.payload;
+      console.log(`🟦 [REDUX] updateMessagesReadStatus called with:`, { roomId, messageIds });
 
       if (!state.messagesByRoom[roomId]) {
         console.warn(`⚠️ [REDUX] Room ${roomId} not found in messagesByRoom`);
+        console.warn(`⚠️ [REDUX] Available rooms:`, Object.keys(state.messagesByRoom));
         return;
       }
 
+      console.log(`🟦 [REDUX] Messages in room before update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
+
       let updatedCount = 0;
       const messageIdStrings = messageIds.map(id => id.toString());
+      console.log(`🟦 [REDUX] Looking for message IDs:`, messageIdStrings);
       
-      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
-        if (messageIdStrings.includes(message._id.toString())) {
-          updatedCount++;
-          return {
-            ...message,
-            status: 'read',
-            readAt: new Date().toISOString()
-          };
+      // Create completely new array to force re-render
+      const updatedMessages = state.messagesByRoom[roomId].map(message => {
+        const messageIdStr = message._id.toString();
+        console.log(`🟦 [REDUX] Checking message ${messageIdStr}, current status: ${message.status}, included: ${messageIdStrings.includes(messageIdStr)}`);
+        
+        if (messageIdStrings.includes(messageIdStr)) {
+          // Only update if status is not already 'read'
+          if (message.status !== 'read') {
+            updatedCount++;
+            console.log(`✅ [REDUX] Updating message ${messageIdStr} from ${message.status} to read`);
+            // Create completely new object with timestamp to force re-render
+            return {
+              ...message,
+              status: 'read',
+              readAt: new Date().toISOString(),
+              _updatedAt: Date.now() // Force React to detect change
+            };
+          } else {
+            console.log(`⏭️ [REDUX] Message ${messageIdStr} already read, skipping`);
+          }
         }
         return message;
       });
 
+      // Replace entire array to ensure React detects change
+      state.messagesByRoom[roomId] = updatedMessages;
+
       messageIds.forEach(id => {
-        state.messageDeliveryStatus[id] = 'read';
+        state.messageDeliveryStatus[id.toString()] = 'read';
       });
 
       console.log(`👁️ [REDUX] Marked ${updatedCount}/${messageIds.length} messages as read in room ${roomId}`);
+      console.log(`🟦 [REDUX] Messages in room after update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
     },
 
 
@@ -510,11 +597,23 @@ const chatSlice = createSlice({
       .addCase(fetchRooms.fulfilled, (state, action) => {
         state.loadingRooms = false;
         const roomsArray = action.payload?.data?.rooms || action.payload?.rooms || action.payload?.data || [];
+        
+        console.log(`📦 [REDUX] fetchRooms.fulfilled - Raw payload:`, action.payload);
+        console.log(`📦 [REDUX] fetchRooms.fulfilled - Rooms array:`, roomsArray.map(r => ({ 
+          id: r._id, 
+          name: r.name, 
+          unreadCount: r.unreadCount 
+        })));
+        
         state.rooms = Array.isArray(roomsArray) ? roomsArray : [];
+        
+        console.log(`📥 [REDUX] Fetched ${state.rooms.length} rooms - State updated`);
+        console.log(`📥 [REDUX] Current activeRoomId:`, state.activeRoomId);
 
-        if (!state.activeRoomId && state.rooms.length > 0) {
-          state.activeRoomId = state.rooms[0]._id;
-        }
+        // Don't auto-set active room - let user click to open
+        // if (!state.activeRoomId && state.rooms.length > 0) {
+        //   state.activeRoomId = state.rooms[0]._id;
+        // }
       })
       .addCase(fetchRooms.rejected, (state, action) => {
         state.loadingRooms = false;
@@ -530,18 +629,33 @@ const chatSlice = createSlice({
 
         const messagesArray = action.payload?.data?.messages || action.payload?.messages || [];
         const roomData = action.payload?.data?.room;
+        const currentUserId = action.meta.arg.userId; // Get current user ID if available
         
         state.messagesByRoom[roomId] = Array.isArray(messagesArray) 
-          ? messagesArray.map(msg => ({
-              ...msg,
-              sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
-              senderId: msg.senderId?._id || msg.senderId,
-              status: msg.status || 'read',
-              // Ensure media array is preserved
-              media: Array.isArray(msg.media) ? msg.media : [],
-              // Ensure type is set
-              type: msg.type || (msg.media && msg.media.length > 0 ? (msg.media[0].type || 'image') : 'text'),
-            }))
+          ? messagesArray.map(msg => {
+              // Determine correct status based on sender and readBy
+              let messageStatus = msg.status || 'sent';
+              
+              // If message has readBy array with entries, it's read
+              if (msg.readBy && Array.isArray(msg.readBy) && msg.readBy.length > 0) {
+                messageStatus = 'read';
+              }
+              // If message is from current user and has been delivered
+              else if (msg.status === 'delivered') {
+                messageStatus = 'delivered';
+              }
+              
+              return {
+                ...msg,
+                sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
+                senderId: msg.senderId?._id || msg.senderId,
+                status: messageStatus,
+                // Ensure media array is preserved
+                media: Array.isArray(msg.media) ? msg.media : [],
+                // Ensure type is set
+                type: msg.type || (msg.media && msg.media.length > 0 ? (msg.media[0].type || 'image') : 'text'),
+              };
+            })
           : [];
 
         messagesArray.forEach(msg => {

@@ -11,8 +11,8 @@ export const useChatSocket = () => {
   return {
     socket: chatSocketClient,
     
-    joinRoom: (roomId) => {
-      chatSocketClient.emit('join_room', { roomId });
+    joinRoom: (roomId, readOnly = false) => {
+      chatSocketClient.emit('join_room', { roomId, readOnly });
     },
     
     leaveRoom: (roomId) => {

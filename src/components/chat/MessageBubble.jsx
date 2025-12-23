@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
-import { Avatar, Tooltip, Dropdown, Modal, Input, message as antMessage, Button, Image, Slider } from 'antd';
+import { Tooltip, Dropdown, Modal, Input, message as antMessage, Button, Image, Slider, Checkbox } from 'antd';
+import Avatar from '../common/Avatar';
 import {
   CheckOutlined,
   CheckCircleOutlined,
@@ -19,11 +20,13 @@ import {
   CaretRightOutlined,
   PauseOutlined,
   AudioOutlined,
+  ShareAltOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../hooks/useTheme';
-import { useDispatch } from 'react-redux';
-import { editMessage, deleteMessage } from '../../redux/slices/chatSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { editMessage, deleteMessage, forwardMessageAPI, fetchRooms } from '../../redux/slices/chatSlice';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
 
 
@@ -39,7 +42,11 @@ export default function MessageBubble({
 }) {
   const { theme } = useTheme();
   const dispatch = useDispatch();
+  const { rooms } = useSelector((s) => s.chat);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
+  const [selectedRooms, setSelectedRooms] = useState([]);
+  const [forwardLoading, setForwardLoading] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [previewImage, setPreviewImage] = useState(null);
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
@@ -54,7 +61,9 @@ export default function MessageBubble({
 
   // ✅ Status icons - WhatsApp style (white for sent messages)
   const statusConfig = useMemo(() => {
-    const status = message.status || 'sent';
+    const status = (message.status || 'sent').toLowerCase();
+    console.log("========status========", status);
+    console.log(`📊 [MessageBubble] Status config for message ${message._id}: ${status}`);
     const configs = {
       sending: {
         icon: (
@@ -80,22 +89,20 @@ export default function MessageBubble({
       read: {
         icon: (
           <span className="inline-flex relative">
-            <CheckOutlined className="text-xs text-blue-500 opacity-100" />
-            <CheckOutlined className="text-xs text-blue-500 opacity-100 -ml-1.5" />
+            <CheckOutlined className="text-xs opacity-100" style={{ color: '#53BDEB' }} />
+            <CheckOutlined className="text-xs opacity-100 -ml-1.5" style={{ color: '#53BDEB' }} />
           </span>
         ),
         label: 'Read',
       },
     };
     return configs[status] || configs.sent;
-  }, [message.status]);
+  }, [message.status, message._id, message._updatedAt]);
 
   // ✅ Dynamic border radius from theme
-  const bubbleRadius = {
-    rounded: `${theme.messageBorderRadius}px`,
-    square: '4px',
-    pill: '24px',
-  }[theme.bubbleStyle] || `${theme.messageBorderRadius}px`;
+  const bubbleRadius = isMine 
+    ? `${theme.senderBubbleRadius || 8}px`
+    : `${theme.receiverBubbleRadius || 8}px`;
 
   // ✅ Format time - WhatsApp style (12-hour format)
   const formatTime = (date) => {
@@ -384,12 +391,48 @@ export default function MessageBubble({
     });
   };
 
+  // ✅ Handle forward message
+  const handleForward = () => {
+    setIsForwardModalOpen(true);
+    setSelectedRooms([]);
+  };
+
+  const handleForwardSubmit = async () => {
+    if (selectedRooms.length === 0) {
+      antMessage.error('Please select at least one chat');
+      return;
+    }
+
+    setForwardLoading(true);
+    try {
+      await dispatch(forwardMessageAPI({ messageId: message._id, roomIds: selectedRooms })).unwrap();
+      antMessage.success(`Forwarded to ${selectedRooms.length} chat(s)`);
+      setIsForwardModalOpen(false);
+      setSelectedRooms([]);
+      dispatch(fetchRooms());
+    } catch (error) {
+      antMessage.error('Failed to forward message');
+    } finally {
+      setForwardLoading(false);
+    }
+  };
+
   // ✅ Context menu items - WhatsApp style
   // Only allow edit for text messages without media
   const canEdit = message.type === 'text' && (!message.media || message.media.length === 0);
   
-  const menuItems = isMine ? [
-    ...(canEdit ? [{
+  const menuItems = [
+    {
+      key: 'forward',
+      label: (
+        <div className="flex items-center gap-2">
+          <ShareAltOutlined />
+          <span>Forward</span>
+        </div>
+      ),
+      onClick: handleForward,
+    },
+    ...(isMine && canEdit ? [{
       key: 'edit',
       label: (
         <div className="flex items-center gap-2">
@@ -399,7 +442,7 @@ export default function MessageBubble({
       ),
       onClick: handleEdit,
     }] : []),
-    {
+    ...(isMine ? [{
       key: 'delete',
       label: (
         <div className="flex items-center gap-2">
@@ -409,14 +452,14 @@ export default function MessageBubble({
       ),
       onClick: handleDelete,
       danger: true,
-    },
-  ] : [];
+    }] : []),
+  ];
 
   // WhatsApp-style bubble colors
   const bubbleStyle = {
     borderRadius: bubbleRadius,
-    backgroundColor: isMine ? '#DCF8C6' : '#FFFFFF',
-    color: '#111827',
+    backgroundColor: isMine ? (theme.senderBubbleColor || '#DCF8C6') : (theme.receiverBubbleColor || '#FFFFFF'),
+    color: isMine ? (theme.senderTextColor || '#111827') : (theme.receiverTextColor || '#111827'),
     fontSize: '14.2px',
     boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
   };
@@ -428,17 +471,28 @@ export default function MessageBubble({
       : 'max-w-[75%] sm:max-w-[60%]';
 
   return (
-    <div className={`flex mb-3 gap-2 items-end ${isMine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex mb-3 gap-2 items-end group ${isMine ? 'justify-end' : 'justify-start'}`}>
       {/* ✅ Avatar for other users */}
       {!isMine && (
         <Avatar
           size={32}
           src={sender.avatar}
-          style={{ backgroundColor: '#10B981' }}
-        >
-          {sender.name?.charAt(0)?.toUpperCase() || 'U'}
-        </Avatar>
+          name={sender.name}
+        />
       )}
+
+      {/* ✅ Forward button - WhatsApp style (appears on hover) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleForward();
+        }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full bg-white shadow-md hover:bg-gray-50 flex items-center justify-center self-end mb-1"
+        style={{ border: '1px solid #E9EDEF' }}
+        title="Forward message"
+      >
+        <ShareAltOutlined style={{ fontSize: '14px', color: '#54656F' }} />
+      </button>
 
       {/* ✅ Message bubble with context menu */}
       <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
@@ -460,6 +514,12 @@ export default function MessageBubble({
             {/* ✅ IMAGE MESSAGES - WhatsApp Style */}
             {message.type === 'image' && message.media && message.media.length > 0 && (
               <div className="relative">
+                {message.isForwarded && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                    <ShareAltOutlined style={{ fontSize: '10px' }} />
+                    <span>Forwarded</span>
+                  </div>
+                )}
                 {message.media.length === 1 ? (
                   // Single image
                   <div className="relative overflow-hidden" style={{ borderRadius: `${bubbleRadius} ${bubbleRadius} 0 0` }}>
@@ -599,7 +659,7 @@ export default function MessageBubble({
                   </div>
                 )}
                 {message.content && (
-                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '70px', minWidth: '100px' }}>
+                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
                     {message.content}
                   </div>
                 )}
@@ -609,6 +669,12 @@ export default function MessageBubble({
             {/* ✅ VIDEO MESSAGES - WhatsApp Style */}
             {message.type === 'video' && message.media && message.media.length > 0 && (
               <div>
+                {message.isForwarded && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                    <ShareAltOutlined style={{ fontSize: '10px' }} />
+                    <span>Forwarded</span>
+                  </div>
+                )}
                 {message.media.map((m, i) => (
                   <div
                     key={i}
@@ -642,7 +708,7 @@ export default function MessageBubble({
                   </div>
                 ))}
                 {message.content && (
-                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '70px', minWidth: '100px' }}>
+                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
                     {message.content}
                   </div>
                 )}
@@ -652,6 +718,12 @@ export default function MessageBubble({
             {/* ✅ AUDIO/VOICE MESSAGES - WhatsApp Style */}
             {(message.type === 'audio' || message.type === 'voice') && message.media && message.media.length > 0 && (
               <div className="py-2 px-3">
+                {message.isForwarded && (
+                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                    <ShareAltOutlined style={{ fontSize: '10px' }} />
+                    <span>Forwarded</span>
+                  </div>
+                )}
                 {message.media.map((m, i) => {
                   const audioId = `${message._id}-${i}`;
                   const state = audioStates[audioId] || { isPlaying: false, currentTime: 0, duration: 0 };
@@ -779,7 +851,7 @@ export default function MessageBubble({
                   );
                 })}
                 {message.content && (
-                  <div className="mt-2 pt-2 border-t pb-2" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '70px', minWidth: '100px' }}>
+                  <div className="mt-2 pt-2 border-t pb-2" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '80px', minWidth: '120px' }}>
                     {message.content}
                   </div>
                 )}
@@ -789,6 +861,12 @@ export default function MessageBubble({
             {/* ✅ FILE MESSAGES */}
             {message.type === 'file' && message.media && message.media.length > 0 && (
               <div className="p-3 pb-4">
+                {message.isForwarded && (
+                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                    <ShareAltOutlined style={{ fontSize: '10px' }} />
+                    <span>Forwarded</span>
+                  </div>
+                )}
                 {message.media.map((m, i) => {
                   const fileName = m.fileName || getFileName(m.url);
                   const fileExt = fileName.split('.').pop()?.toUpperCase() || 'FILE';
@@ -828,7 +906,7 @@ export default function MessageBubble({
                   );
                 })}
                 {message.content && (
-                  <div className="mt-3 pt-3 border-t" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '70px', minWidth: '100px' }}>
+                  <div className="mt-3 pt-3 border-t" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '80px', minWidth: '120px' }}>
                     {message.content}
                   </div>
                 )}
@@ -909,7 +987,7 @@ export default function MessageBubble({
                   ))}
                 </div>
                 {message.content && (
-                  <div className="px-0" style={{ paddingRight: '70px', minWidth: '100px' }}>
+                  <div className="px-0" style={{ paddingRight: '80px', minWidth: '120px' }}>
                     {message.content}
                   </div>
                 )}
@@ -918,8 +996,16 @@ export default function MessageBubble({
 
             {/* ✅ PURE TEXT MESSAGES */}
             {message.type === 'text' && (!message.media || message.media.length === 0) && message.content && (
-              <div className="px-3 py-2 pb-2" style={{ paddingRight: '70px', minWidth: '100px' }}>
-                {message.content}
+              <div>
+                {message.isForwarded && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                    <ShareAltOutlined style={{ fontSize: '10px' }} />
+                    <span>Forwarded</span>
+                  </div>
+                )}
+                <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '22px', minWidth: '120px', paddingTop: message.isForwarded ? '0' : '8px' }}>
+                  {message.content}
+                </div>
               </div>
             )}
 
@@ -939,16 +1025,17 @@ export default function MessageBubble({
             )}
 
             {/* ✅ WhatsApp-style Overlay: Time, Status, Edited indicator */}
-            <div className={`absolute bottom-2 flex items-center gap-1.5 text-[11px] pointer-events-none z-10 ${isMine ? 'right-2.5' : 'right-2'}`}>
+            <div className={`absolute bottom-2 flex items-center gap-1 text-[11px] pointer-events-none z-10 ${isMine ? 'right-2.5' : 'right-2'}`}>
               {/* Edited indicator */}
               {message.isEdited && (
                 <span
-                  className={`text-[11px] italic mr-1 ${isMine ? 'text-white' : 'text-black/70'}`}
+                  className="text-[11px] italic"
                   style={{
-                    opacity: isMine ? 0.9 : 0.7,
-                    textShadow: isMine
-                      ? '0 1px 3px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.3)'
-                      : '0 1px 2px rgba(255,255,255,0.9)',
+                    color: isMine ? (theme?.timestampColor || '#FFFFFF') : (theme?.timestampColor || '#667781'),
+                    opacity: isMine ? 0.85 : 0.65,
+                    // textShadow: isMine
+                    //   ? '0 1px 3px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.3)'
+                    //   : '0 1px 2px rgba(255,255,255,0.9)',
                   }}
                 >
                   Edited
@@ -957,12 +1044,13 @@ export default function MessageBubble({
 
               {/* Time */}
               <span
-                className={`text-[11px] font-normal tracking-wide select-none whitespace-nowrap ${isMine ? 'text-white' : 'text-black/70'}`}
+                className="text-[11px] font-normal tracking-wide select-none whitespace-nowrap"
                 style={{
+                  color: isMine ? (theme?.timestampColor || '#FFFFFF') : (theme?.timestampColor || '#667781'),
                   opacity: isMine ? 0.9 : 0.7,
-                  textShadow: isMine
-                    ? '0 1px 3px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.3)'
-                    : '0 1px 2px rgba(255,255,255,0.9)',
+                  // textShadow: isMine
+                  //   ? '0 1px 3px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.3)'
+                  //   : '0 1px 2px rgba(255,255,255,0.9)',
                 }}
               >
                 {formatTime(message.createdAt)}
@@ -981,6 +1069,109 @@ export default function MessageBubble({
       </Dropdown>
 
       {/* Avatar removed for own messages - WhatsApp style */}
+
+      {/* ✅ Forward Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 pb-2" style={{ borderBottom: '1px solid #E9EDEF' }}>
+            <ShareAltOutlined style={{ color: theme.primaryColor, fontSize: '20px' }} />
+            <span style={{ fontSize: '18px', fontWeight: 500 }}>Forward message to...</span>
+          </div>
+        }
+        open={isForwardModalOpen}
+        onCancel={() => setIsForwardModalOpen(false)}
+        footer={null}
+        width={420}
+        centered
+        styles={{
+          header: { padding: '16px 24px 0', marginBottom: 0 },
+          body: { padding: '16px 0 0' }
+        }}
+      >
+        <div className="flex flex-col" style={{ height: '500px' }}>
+          {/* Search */}
+          <div className="px-6 pb-3">
+            <Input
+              placeholder="Search..."
+              prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
+              size="large"
+              style={{ borderRadius: '8px', backgroundColor: '#F0F2F5', border: 'none' }}
+            />
+          </div>
+
+          {/* Chat List */}
+          <div className="flex-1 overflow-y-auto" style={{ maxHeight: '360px' }}>
+            {(Array.isArray(rooms) ? rooms : []).map((room) => {
+              const otherParticipant = room.participants?.find(
+                p => p.userId?._id !== message.senderId
+              );
+              const displayName = room.type === 'DIRECT' || room.type === 'ADMIN_CHAT'
+                ? otherParticipant?.userId?.name || room.name
+                : room.name;
+              const isSelected = selectedRooms.includes(room._id);
+              
+              return (
+                <div
+                  key={room._id}
+                  onClick={() => {
+                    setSelectedRooms(prev =>
+                      prev.includes(room._id)
+                        ? prev.filter(id => id !== room._id)
+                        : [...prev, room._id]
+                    );
+                  }}
+                  className="flex items-center gap-3 px-6 py-3 cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: isSelected ? '#F0F2F5' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => !isSelected && (e.currentTarget.style.backgroundColor = '#F5F6F6')}
+                  onMouseLeave={(e) => !isSelected && (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <div className="relative">
+                    <Avatar size={48} name={displayName} style={{ backgroundColor: theme.primaryColor }} />
+                    {isSelected && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primaryColor }}>
+                        <CheckOutlined style={{ color: 'white', fontSize: '10px' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate" style={{ color: '#111B21' }}>{displayName}</div>
+                    <div className="text-xs truncate" style={{ color: '#667781' }}>
+                      {room.lastMessage?.content || 'Tap to forward here'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer with Send Button */}
+          <div className="px-6 py-3 flex items-center justify-between" style={{ borderTop: '1px solid #E9EDEF', backgroundColor: '#F0F2F5' }}>
+            <div className="text-sm" style={{ color: '#667781' }}>
+              {selectedRooms.length > 0 ? `${selectedRooms.length} selected` : 'Select chats'}
+            </div>
+            <Button
+              type="primary"
+              icon={<ShareAltOutlined />}
+              onClick={handleForwardSubmit}
+              loading={forwardLoading}
+              disabled={selectedRooms.length === 0}
+              size="large"
+              style={{
+                backgroundColor: selectedRooms.length > 0 ? theme.primaryColor : '#D1D7DB',
+                borderColor: selectedRooms.length > 0 ? theme.primaryColor : '#D1D7DB',
+                borderRadius: '24px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                fontWeight: 500
+              }}
+            >
+              Send
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ✅ Edit Modal */}
       <Modal

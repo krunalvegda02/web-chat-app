@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Form, Input, Button, Card, message, Divider } from 'antd';
+import { Form, Input, Button, Card, message, Divider, Typography } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { registerWithInvite } from '../../redux/slices/authSlice';
+import { useTheme } from '../../hooks/useTheme';
+
+const { Title, Text } = Typography;
 
 export default function SignupWithInviteForm({ token, tenantId, inviteInfo }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { theme } = useTheme();
   const { loading } = useSelector((s) => s.auth);
   const [form] = Form.useForm();
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -31,7 +35,8 @@ export default function SignupWithInviteForm({ token, tenantId, inviteInfo }) {
         tenantId,
         name: values.name,
         password: values.password,
-        confirmPassword: values.confirmPassword
+        confirmPassword: values.confirmPassword,
+        phone: inviteInfo?.invitedPhone
       })).unwrap();
       
       message.success('Welcome! 🎉 Redirecting to dashboard...');
@@ -46,21 +51,18 @@ export default function SignupWithInviteForm({ token, tenantId, inviteInfo }) {
   };
   
   return (
-    <Card className="w-full max-w-md !bg-white/20 !backdrop-blur-xl !border-white/40 !shadow-2xl rounded-2xl">
-      <div className="text-center mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-400 to-indigo-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
-          <UserOutlined className="text-white text-xl" />
-        </div>
-        
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">
+    <Card className="w-full shadow-lg" style={{ borderRadius: '12px', border: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}`, backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF' }}>
+      <div className="text-center mb-6">
+        <div className="text-4xl mb-2">✉️</div>
+        <Title level={3} style={{ color: theme?.primaryColor || '#008069', marginBottom: 8 }}>
           Join {inviteInfo?.tenantName}
-        </h1>
-        <p className="text-slate-600 text-sm">
+        </Title>
+        <Text style={{ color: theme?.timestampColor || '#667781', fontSize: '14px' }}>
           Complete your registration to get started
-        </p>
+        </Text>
       </div>
       
-      <Divider className="!my-6" />
+      <Divider style={{ margin: '20px 0' }} />
       
       <Form
         form={form}
@@ -71,77 +73,80 @@ export default function SignupWithInviteForm({ token, tenantId, inviteInfo }) {
         {/* Email - Read Only */}
         <Form.Item
           name="email"
-          label={<span className="font-medium text-slate-900">Email</span>}
+          label={<span style={{ color: theme?.sidebarTextColor || '#111B21', fontWeight: 500 }}>Email</span>}
           initialValue={inviteInfo?.invitedEmail}
         >
           <Input
-            prefix={<MailOutlined className="text-slate-400" />}
+            prefix={<MailOutlined style={{ color: theme?.timestampColor || '#667781' }} />}
             disabled
-            className="!bg-white/30 !border-white/60 !text-slate-900"
+            size="large"
+            style={{ backgroundColor: theme?.secondaryColor || '#F0F2F5', border: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}` }}
           />
         </Form.Item>
         
         {/* Name */}
         <Form.Item
           name="name"
-          label={<span className="font-medium text-slate-900">Full Name</span>}
+          label={<span style={{ color: theme?.sidebarTextColor || '#111B21', fontWeight: 500 }}>Full Name</span>}
           rules={[
             { required: true, message: 'Name is required' },
             { min: 2, message: 'Name must be at least 2 characters' }
           ]}
         >
           <Input
-            prefix={<UserOutlined className="text-slate-400" />}
+            prefix={<UserOutlined style={{ color: theme?.timestampColor || '#667781' }} />}
             placeholder="John Doe"
-            className="!bg-white/30 !border-white/60 !text-slate-900 placeholder:text-slate-500"
+            size="large"
           />
         </Form.Item>
         
         {/* Password */}
         <Form.Item
           name="password"
-          label={<span className="font-medium text-slate-900">Password</span>}
+          label={<span style={{ color: theme?.sidebarTextColor || '#111B21', fontWeight: 500 }}>Password</span>}
           rules={[
             { required: true, message: 'Password is required' },
             { min: 6, message: 'Password must be at least 6 characters' }
           ]}
         >
           <Input.Password
-            prefix={<LockOutlined className="text-slate-400" />}
+            prefix={<LockOutlined style={{ color: theme?.timestampColor || '#667781' }} />}
             placeholder="Min 6 characters"
             onChange={handlePasswordChange}
-            className="!bg-white/30 !border-white/60 !text-slate-900 placeholder:text-slate-500"
+            size="large"
           />
         </Form.Item>
         
         {/* Password Strength Indicator */}
         {passwordStrength > 0 && (
-          <div className="mb-4">
-            <div className="flex gap-1">
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className={`h-1 flex-1 rounded-full transition-colors ${
-                    i <= passwordStrength
-                      ? 'bg-green-400'
-                      : 'bg-gray-300'
-                  }`}
+                  style={{
+                    height: 4,
+                    flex: 1,
+                    borderRadius: 2,
+                    backgroundColor: i <= passwordStrength ? theme?.accentColor || '#25D366' : theme?.sidebarBorderColor || '#E9EDEF',
+                    transition: 'background-color 0.3s',
+                  }}
                 />
               ))}
             </div>
-            <p className="text-xs text-slate-600 mt-1">
+            <Text style={{ fontSize: 12, color: theme?.timestampColor || '#667781', marginTop: 4 }}>
               {passwordStrength < 2 && 'Weak'}
               {passwordStrength === 2 && 'Fair'}
               {passwordStrength === 3 && 'Good'}
               {passwordStrength === 4 && 'Strong'}
-            </p>
+            </Text>
           </div>
         )}
         
         {/* Confirm Password */}
         <Form.Item
           name="confirmPassword"
-          label={<span className="font-medium text-slate-900">Confirm Password</span>}
+          label={<span style={{ color: theme?.sidebarTextColor || '#111B21', fontWeight: 500 }}>Confirm Password</span>}
           dependencies={['password']}
           rules={[
             { required: true, message: 'Please confirm password' },
@@ -158,9 +163,9 @@ export default function SignupWithInviteForm({ token, tenantId, inviteInfo }) {
           ]}
         >
           <Input.Password
-            prefix={<LockOutlined className="text-slate-400" />}
+            prefix={<LockOutlined style={{ color: theme?.timestampColor || '#667781' }} />}
             placeholder="Confirm password"
-            className="!bg-white/30 !border-white/60 !text-slate-900 placeholder:text-slate-500"
+            size="large"
           />
         </Form.Item>
         
@@ -172,26 +177,30 @@ export default function SignupWithInviteForm({ token, tenantId, inviteInfo }) {
             block
             loading={loading}
             size="large"
-            className="!h-11 !text-base !bg-gradient-to-r !from-sky-400 !via-indigo-400 !to-purple-500 !border-none !shadow-lg hover:!shadow-xl hover:!scale-[1.02] transition-all duration-200"
+            style={{
+              backgroundColor: theme?.primaryColor || '#008069',
+              borderColor: theme?.primaryColor || '#008069',
+              height: 44,
+            }}
           >
             Accept Invite & Sign Up
           </Button>
         </Form.Item>
       </Form>
       
-      <Divider className="!my-6" />
+      <Divider style={{ margin: '20px 0' }} />
       
       {/* Footer Info */}
-      <div className="text-center text-xs text-slate-600 space-y-2">
-        <p>✅ Invite link expires in 7 days</p>
-        <p>Already have account? 
-          <button
+      <div style={{ textAlign: 'center' }}>
+        <Text style={{ fontSize: 12, color: theme?.timestampColor || '#667781' }}>
+          Already have account?{' '}
+          <a
             onClick={() => navigate('/login')}
-            className="text-indigo-500 hover:text-indigo-700 font-semibold ml-1"
+            style={{ color: theme?.primaryColor || '#008069', fontWeight: 500, cursor: 'pointer' }}
           >
             Log in
-          </button>
-        </p>
+          </a>
+        </Text>
       </div>
     </Card>
   );

@@ -1,28 +1,19 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
 import { _get, _delete } from '../../helper/apiClient';
+import { buildUrlWithParams } from '../../helper/helperFunction';
+// import { API } from '../../constants/endpoints';
 
-export const fetchCallLogs = createAsyncThunk(
+export const fetchCallLogs = createAsyncThunkHandler(
   'callLogs/fetchCallLogs',
-  async ({ page = 1, limit = 50 }, { rejectWithValue }) => {
-    try {
-      const response = await _get(`/call-logs/my-logs?page=${page}&limit=${limit}`);
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
-    }
-  }
+  _get,
+  (payload) => buildUrlWithParams('/call-logs/my-logs', payload || {})
 );
 
-export const deleteCallLog = createAsyncThunk(
+export const deleteCallLog = createAsyncThunkHandler(
   'callLogs/deleteCallLog',
-  async (callLogId, { rejectWithValue }) => {
-    try {
-      await _delete(`/call-logs/${callLogId}`);
-      return callLogId;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
-    }
-  }
+  _delete,
+  (callLogId) => `/call-logs/${callLogId}`
 );
 
 const callLogSlice = createSlice({
@@ -39,6 +30,12 @@ const callLogSlice = createSlice({
     addCallLog: (state, action) => {
       state.logs.unshift(action.payload);
       state.total += 1;
+    },
+    clearCallLogs: (state) => {
+      state.logs = [];
+      state.total = 0;
+      state.page = 1;
+      state.pages = 1;
     },
   },
   extraReducers: (builder) => {
@@ -65,5 +62,5 @@ const callLogSlice = createSlice({
   },
 });
 
-export const { addCallLog } = callLogSlice.actions;
+export const { addCallLog, clearCallLogs } = callLogSlice.actions;
 export default callLogSlice.reducer;

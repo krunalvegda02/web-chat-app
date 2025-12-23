@@ -1,14 +1,17 @@
 
 import { useSelector, useDispatch } from 'react-redux';
 import { useCallback } from 'react';
-import { logout } from '../redux/slices/authSlice';
+import { clearAuth } from '../redux/slices/authSlice';
 
 export function useAuth() {
   const { user, loading, error } = useSelector((s) => s.auth);
   const dispatch = useDispatch();
 
   const handleLogout = useCallback(() => {
-    dispatch(logout());
+    // Clear auth state and tokens locally
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    dispatch(clearAuth());
   }, [dispatch]);
 
   return {

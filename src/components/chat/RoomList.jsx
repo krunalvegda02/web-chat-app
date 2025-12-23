@@ -18,16 +18,38 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
 
   // ✅ Fetch rooms on mount
   useEffect(() => {
-    if (fetchRoomsAction) {
-      dispatch(fetchRoomsAction());
-    } else {
-      dispatch(fetchRooms());
-    }
+    const fetchRoomsData = async () => {
+      if (fetchRoomsAction) {
+        const result = await dispatch(fetchRoomsAction());
+        console.log('📥 [ROOMLIST] Fetched rooms result:', result?.payload?.data?.rooms?.map(r => ({
+          id: r._id,
+          name: r.name,
+          unreadCount: r.unreadCount
+        })));
+      } else {
+        const result = await dispatch(fetchRooms());
+        console.log('📥 [ROOMLIST] Fetched rooms result:', result?.payload?.data?.rooms?.map(r => ({
+          id: r._id,
+          name: r.name,
+          unreadCount: r.unreadCount
+        })));
+      }
+    };
+    fetchRoomsData();
   }, [dispatch, user?.role, fetchRoomsAction]);
 
   const roomsArray = Array.isArray(rooms)
     ? rooms
     : rooms?.data?.rooms || rooms?.rooms || rooms?.data || [];
+
+  // Log rooms from Redux state
+  useEffect(() => {
+    console.log('📦 [ROOMLIST] Rooms from Redux state:', roomsArray.map(r => ({
+      id: r._id,
+      name: r.name,
+      unreadCount: r.unreadCount
+    })));
+  }, [roomsArray]);
 
   // ✅ Filter rooms by search term
   const filteredRooms = roomsArray.filter((room) =>
@@ -65,21 +87,19 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
     return 'Chat';
   }, [user?._id]);
 
+  // ✅ Get participant avatar
+  const getParticipantAvatar = useCallback((room) => {
+    const participants = room.participants || [];
+    const otherParticipant = participants.find(p => {
+      const participantId = p.userId?._id || p._id;
+      return participantId !== user?._id;
+    });
+    return otherParticipant?.userId?.avatar || otherParticipant?.avatar || room.avatar;
+  }, [user?._id]);
+
   // ✅ Get last message text
   const getLastMessageText = useCallback((room) => {
-    // Show first unread message if there are unread messages
-    if (room.unreadCount > 0 && room.firstUnreadMessage) {
-      const msg = room.firstUnreadMessage;
-      if (msg.content) return msg.content.substring(0, 50);
-      if (msg.type === 'image') return '📷 Photo';
-      if (msg.type === 'video') return '🎥 Video';
-      if (msg.type === 'voice') return '🎤 Voice message';
-      if (msg.type === 'audio') return '🎵 Audio';
-      if (msg.type === 'file') return '📎 File';
-      return 'New message';
-    }
-    
-    // Otherwise show last message
+    // Always show last message, not first unread
     const lastMessage = room.lastMessage;
     if (!lastMessage) return 'No messages yet';
     
@@ -122,7 +142,9 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
 
   // ✅ Get unread count
   const getUnreadCount = useCallback((room) => {
-    return room.unreadCount || 0;
+    const count = room.unreadCount || 0;
+    console.log(`🔔 [ROOMLIST] Room ${room._id} unread count:`, count);
+    return count;
   }, []);
 
   // ✅ Show loading state
@@ -150,15 +172,16 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#FFFFFF',
-        borderRight: '1px solid #E5E7EB',
+        backgroundColor: theme?.
+          sidebarBackgroundColor || '#FFFFFF',
+        borderRight: `1px solid ${theme?.borderColor || '#E5E7EB'}`,
       }}
     >
       {/* ===== HEADER - WhatsApp Style ===== */}
       <div
         style={{
           padding: '13px',
-          background: '#008069',
+          background: theme?.sidebarHeaderColor || '#008069',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -170,7 +193,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
               margin: 0,
             }}
           >
-            Chats
+            {theme?.appName || 'Chats'}
           </h2>
           {onCreateRoom && (
             <Button
@@ -190,16 +213,16 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       </div>
 
       {/* Search Bar */}
-      <div style={{ padding: '12px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E9EDEF' }}>
+      <div style={{ padding: '12px', backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF', borderBottom: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}` }}>
         <Input
           placeholder="Search or start new chat"
-          prefix={<SearchOutlined style={{ color: '#667781' }} />}
+          prefix={<SearchOutlined style={{ color: theme?.headerText || '#667781' }} />}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           allowClear
           style={{
             borderRadius: '8px',
-            backgroundColor: '#F0F2F5',
+            backgroundColor: theme?.inputBackgroundColor || '#F0F2F5',
             border: 'none',
           }}
           size="large"
@@ -207,7 +230,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       </div>
 
       {/* ===== ROOM LIST - WhatsApp Style ===== */}
-      <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#FFFFFF' }}>
+      <div style={{ flex: 1, overflowY: 'auto', backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF' }}>
         {filteredRooms.length === 0 ? (
           <div
             style={{
@@ -225,20 +248,20 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                 width: '120px',
                 height: '120px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #008069 0%, #00A884 100%)',
+                background: theme?.primaryColor || '#008069',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(0, 128, 105, 0.25)',
+                boxShadow: `0 8px 24px ${theme?.primaryColor || 'rgba(0, 128, 105, 0.25)'}`,
               }}
             >
               <MessageOutlined style={{ fontSize: '50px', color: '#FFFFFF' }} />
             </div>
             <div style={{ textAlign: 'center', maxWidth: '300px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111B21', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: theme?.headerText || '#111B21', marginBottom: '8px' }}>
                 {searchTerm ? 'No chats found' : 'No conversations yet'}
               </h3>
-              <p style={{ fontSize: '13px', color: '#667781', lineHeight: '1.5', marginBottom: '16px' }}>
+              <p style={{ fontSize: '13px', color: theme?.headerText || '#667781', lineHeight: '1.5', marginBottom: '16px' }}>
                 {searchTerm ? 'Try searching with different keywords' : 'Start a new conversation by clicking the + button'}
               </p>
               {onCreateRoom && !searchTerm && (
@@ -247,8 +270,8 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                   icon={<MessageOutlined />}
                   onClick={onCreateRoom}
                   style={{
-                    backgroundColor: '#008069',
-                    borderColor: '#008069',
+                    backgroundColor: theme?.primaryColor || '#008069',
+                    borderColor: theme?.primaryColor || '#008069',
                     borderRadius: '8px',
                     height: '40px',
                     fontSize: '14px',
@@ -277,17 +300,17 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                     if (onRoomClick) onRoomClick(room._id);
                   }}
                   style={{
-                    backgroundColor: isActive ? '#F0F2F5' : '#FFFFFF',
-                    borderBottom: '1px solid #F0F2F5',
+                    backgroundColor: isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF'),
+                    borderBottom: `1px solid ${theme?.sidebarBorderColor || '#F0F2F5'}`,
                     padding: '12px 16px',
                     cursor: 'pointer',
                     transition: 'background-color 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = '#F5F6F6';
+                    if (!isActive) e.currentTarget.style.backgroundColor = theme?.sidebarHoverColor || '#F5F6F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isActive ? '#F0F2F5' : '#FFFFFF';
+                    e.currentTarget.style.backgroundColor = isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF');
                   }}
                 >
                   <List.Item.Meta
@@ -297,7 +320,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                           count={unreadCount}
                           offset={[-10, 10]}
                           style={{
-                            backgroundColor: '#25D366',
+                            backgroundColor: theme?.unreadBadgeColor || '#25D366',
                             fontSize: '10px',
                             minWidth: '20px',
                           }}
@@ -305,7 +328,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                           <Avatar
                             name={getRoomDisplayName(room)}
                             size={44}
-                            src={room.avatar}
+                            src={getParticipantAvatar(room)}
                           />
                         </Badge>
 
@@ -341,7 +364,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                         <span
                           style={{
                             fontWeight: '500',
-                            color: '#111B21',
+                            color: theme?.sidebarTextColor || '#111B21',
                             fontSize: '16px',
                           }}
                         >
@@ -350,7 +373,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                         <span
                           style={{
                             fontSize: '12px',
-                            color: '#667781',
+                            color: theme?.timestampColor || '#667781',
                           }}
                         >
                           {formatMessageTime(room.lastMessageTime)}

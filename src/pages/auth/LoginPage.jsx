@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
-import { Form, Input, Button, Card, Checkbox, Typography, Alert, Divider, Tabs, Tooltip } from 'antd';
-import { LockOutlined, MailOutlined, PhoneOutlined, HomeOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Checkbox, Typography, Alert, Divider } from 'antd';
+import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { login, clearError } from '../../redux/slices/authSlice.jsx';
+import { useTheme } from '../../hooks/useTheme';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -12,24 +13,24 @@ const { Title, Text, Paragraph } = Typography;
 export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const { loading, error } = useSelector((s) => s.auth);
   const [form] = Form.useForm();
-  const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone'
   const [rememberMe, setRememberMe] = useState(false);
   const [requiresPhoneVerification, setRequiresPhoneVerification] = useState(false);
   const [userId, setUserId] = useState(null);
   const [lastPhone, setLastPhone] = useState(null);
 
+  console.log(useSelector((state) => state.auth))
   // ✅ Load saved credentials if "Remember Me" was selected
   useEffect(() => {
     const saved = localStorage.getItem('loginCredentials');
     if (saved) {
       try {
-        const { email, rememberMe: wasRemembered } = JSON.parse(saved);
+        const { identifier, rememberMe: wasRemembered } = JSON.parse(saved);
         if (wasRemembered) {
-          form.setFieldsValue({ email });
+          form.setFieldsValue({ identifier });
           setRememberMe(true);
-          setLoginMethod('email');
         }
       } catch (e) {
         console.error('Failed to parse saved credentials:', e);
@@ -37,33 +38,22 @@ export default function LoginPage() {
     }
   }, [form]);
 
-  // ✅ Clear error when switching tabs
-  useEffect(() => {
-    dispatch(clearError());
-  }, [loginMethod, dispatch]);
-
-  // ✅ Handle login with email or phone
+  // ✅ Handle unified login (email or phone)
   const handleLogin = async (values) => {
     try {
-      const loginData = {};
-
-      if (loginMethod === 'email') {
-        loginData.email = values.email;
-      } else {
-        // ✅ Normalize phone number
-        loginData.phone = values.phone.replace(/\\D/g, '');
-      }
-
-      loginData.password = values.password;
+      const identifier = values.identifier.trim();
+      const isEmail = identifier.includes('@');
+      
+      const loginData = {
+        password: values.password,
+        ...(isEmail ? { email: identifier } : { phone: identifier.replace(/\D/g, '') })
+      };
 
       // ✅ Save credentials if Remember Me is checked
-      if (rememberMe && loginMethod === 'email') {
+      if (rememberMe) {
         localStorage.setItem(
           'loginCredentials',
-          JSON.stringify({
-            email: values.email,
-            rememberMe: true
-          })
+          JSON.stringify({ identifier, rememberMe: true })
         );
       } else {
         localStorage.removeItem('loginCredentials');
@@ -91,7 +81,7 @@ export default function LoginPage() {
         } else if (user.role === 'SUPER_ADMIN') {
           navigate('/super-admin');
         } else {
-          navigate('/user/chat');
+          navigate('/user/chats');
         }
       }
     } catch (err) {
@@ -99,142 +89,16 @@ export default function LoginPage() {
     }
   };
 
-  // ✅ Tabs configuration
-  const loginTabs = [
-    {
-      key: 'email',
-      label: (
-        <span>
-          <MailOutlined /> Email
-        </span>
-      ),
-      children: (
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleLogin}
-          autoComplete="off"
-        >
-          <Form.Item
-            name="email"
-            rules={[
-              { required: true, message: 'Email is required' },
-              { type: 'email', message: 'Invalid email format' }
-            ]}
-          >
-            <Input
-              size="large"
-              prefix={<MailOutlined />}
-              placeholder="your@email.com"
-              disabled={loading}
-            />
-          </Form.Item>
 
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: 'Password is required' }]}
-          >
-            <Input.Password
-              size="large"
-              prefix={<LockOutlined />}
-              placeholder="Enter password"
-              disabled={loading}
-            />
-          </Form.Item>
 
-          <Form.Item>
-            <Checkbox
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            >
-              Remember me
-            </Checkbox>
-          </Form.Item>
-
-          <Form.Item>
-            <Button
-              type="primary"
-              size="large"
-              htmlType="submit"
-              loading={loading}
-              block
-            >
-              Sign In
-            </Button>
-          </Form.Item>
-        </Form>
-      )
-    },
-    {
-      key: 'phone',
-      label: (
-        <Tooltip title="Login with registered phone number">
-          <span>
-            <PhoneOutlined /> Phone
-          </span>
-        </Tooltip>
-      ),
-      children: (
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleLogin}
-          autoComplete="off"
-        >
-          <Form.Item
-            name="phone"
-            rules={[
-              { required: true, message: 'Phone is required' },
-              {
-                pattern: /^[\\d\\s\\-\\+\\(\\)]{10,15}$/,
-                message: 'Invalid phone format'
-              }
-            ]}
-          >
-            <Input
-              size="large"
-              prefix={<PhoneOutlined />}
-              placeholder="+1 (555) 000-0000"
-              disabled={loading}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: 'Password is required' }]}
-          >
-            <Input.Password
-              size="large"
-              prefix={<LockOutlined />}
-              placeholder="Enter password"
-              disabled={loading}
-            />
-          </Form.Item>
-
-          <Form.Item>
-            <Button
-              type="primary"
-              size="large"
-              htmlType="submit"
-              loading={loading}
-              block
-            >
-              Sign In with Phone
-            </Button>
-          </Form.Item>
-        </Form>
-      )
-    }
-  ];
-
-  // ✅ Phone verification modal
   if (requiresPhoneVerification) {
     return (
-      <div className="login-page-container">
-        <Card className="login-card" style={{ maxWidth: 400 }}>
+      <div className="fixed inset-0 flex items-center justify-center overflow-auto" style={{ backgroundColor: theme?.sidebarBackgroundColor || '#F0F2F5' }}>
+        <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px', border: `1px solid ${theme?.borderColor || '#E9EDEF'}` }}>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <Title level={2}>
-              <PhoneOutlined /> Verify Phone
+            <div style={{ fontSize: 48, marginBottom: 8 }}>📱</div>
+            <Title level={2} style={{ color: theme?.primaryColor || '#008069', marginBottom: 8 }}>
+              Verify Phone
             </Title>
             <Text type="secondary">
               We sent a verification code to {lastPhone}
@@ -268,7 +132,7 @@ export default function LoginPage() {
             </Form.Item>
 
             <Form.Item>
-              <Button type="primary" size="large" htmlType="submit" block>
+              <Button type="primary" size="large" htmlType="submit" block style={{ backgroundColor: theme?.primaryColor || '#008069', borderColor: theme?.primaryColor || '#008069' }}>
                 Verify & Continue
               </Button>
             </Form.Item>
@@ -280,6 +144,7 @@ export default function LoginPage() {
                   setRequiresPhoneVerification(false);
                   form.resetFields();
                 }}
+                style={{ color: theme?.primaryColor || '#008069' }}
               >
                 Back to Login
               </Button>
@@ -291,12 +156,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page-container">
-      <Card className="login-card" style={{ maxWidth: 450 }}>
+    <div className="fixed inset-0 flex items-center justify-center overflow-auto" style={{ backgroundColor: theme?.sidebarBackgroundColor || '#F0F2F5' }}>
+      <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px', border: `1px solid ${theme?.borderColor || '#E9EDEF'}` }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
-          <Title level={2}>Sign In</Title>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>💬</div>
+          <Title level={2} style={{ color: theme?.primaryColor || '#008069', marginBottom: 8 }}>Sign In</Title>
           <Text type="secondary">
             Connect with contacts and start chatting
           </Text>
@@ -315,41 +180,81 @@ export default function LoginPage() {
           />
         )}
 
-        {/* Login Tabs */}
-        <Tabs
-          activeKey={loginMethod}
-          onChange={(key) => {
-            setLoginMethod(key);
-            form.resetFields();
-          }}
-          items={loginTabs}
-        />
+        {/* Login Form */}
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleLogin}
+          autoComplete="off"
+        >
+          <Form.Item
+            name="identifier"
+            rules={[
+              { required: true, message: 'Email or phone is required' }
+            ]}
+          >
+            <Input
+              size="large"
+              prefix={<UserOutlined />}
+              placeholder="Email or phone number"
+              disabled={loading}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: 'Password is required' }]}
+          >
+            <Input.Password
+              size="large"
+              prefix={<LockOutlined />}
+              placeholder="Enter password"
+              disabled={loading}
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Checkbox
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            >
+              Remember me
+            </Checkbox>
+          </Form.Item>
+
+          <Form.Item>
+            <Button
+              type="primary"
+              size="large"
+              htmlType="submit"
+              loading={loading}
+              block
+              style={{ backgroundColor: theme?.primaryColor || '#008069', borderColor: theme?.primaryColor || '#008069' }}
+            >
+              Sign In
+            </Button>
+          </Form.Item>
+        </Form>
 
         {/* Divider */}
         <Divider style={{ margin: '24px 0' }}>OR</Divider>
 
         {/* Additional Options */}
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        {/* <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <Text type="secondary">
             Don't have an account?{' '}
-            <Link to="/register" style={{ fontWeight: 500 }}>
+            <Link to="/register" style={{ fontWeight: 500, color: theme?.primaryColor || '#008069' }}>
               Create one
             </Link>
           </Text>
-        </div>
+        </div> */}
 
         <div style={{ textAlign: 'center', marginBottom: 0 }}>
-          <Link to="/auth/forgot-password" style={{ fontSize: 12 }}>
+          <Link to="/auth/forgot-password" style={{ fontSize: 12, color: theme?.primaryColor || '#008069' }}>
             Forgot password?
           </Link>
         </div>
 
-        {/* Demo Hint */}
-        <div style={{ marginTop: 24, padding: 12, background: '#fafafa', borderRadius: 8 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            💡 <strong>Demo:</strong> Use email or registered phone to login
-          </Text>
-        </div>
       </Card>
     </div>
   );

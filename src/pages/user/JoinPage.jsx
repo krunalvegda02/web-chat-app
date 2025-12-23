@@ -47,9 +47,9 @@ export default function JoinPage() {
     return (
       <div
         className="min-h-screen flex items-center justify-center p-4"
-        style={{ backgroundColor: theme.backgroundColor || '#FFFFFF' }}
+        style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}
       >
-        <Card className="w-full max-w-md border-0 shadow-lg">
+        <Card className="w-full max-w-md border-0 shadow-lg" style={{ border: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` }}>
           <Result
             status="warning"
             title="Invalid Invitation"
@@ -60,8 +60,8 @@ export default function JoinPage() {
                 size="large"
                 onClick={() => navigate('/login')}
                 style={{
-                  backgroundColor: theme.primaryColor || '#3B82F6',
-                  borderColor: theme.primaryColor || '#3B82F6',
+                  backgroundColor: theme.primaryColor || '#008069',
+                  borderColor: theme.primaryColor || '#008069',
                 }}
               >
                 Back to Login
@@ -77,7 +77,7 @@ export default function JoinPage() {
     return (
       <div
         className="min-h-screen flex items-center justify-center flex-col gap-4"
-        style={{ backgroundColor: theme.backgroundColor || '#FFFFFF' }}
+        style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}
       >
         <Spin size="large" tip="Verifying invitation..." />
       </div>
@@ -88,9 +88,9 @@ export default function JoinPage() {
     return (
       <div
         className="min-h-screen flex items-center justify-center p-4"
-        style={{ backgroundColor: theme.backgroundColor || '#FFFFFF' }}
+        style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}
       >
-        <Card className="w-full max-w-md border-0 shadow-lg">
+        <Card className="w-full max-w-md border-0 shadow-lg" style={{ border: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` }}>
           <Result
             status="error"
             title="Invitation Error"
@@ -101,8 +101,8 @@ export default function JoinPage() {
                 size="large"
                 onClick={() => navigate('/login')}
                 style={{
-                  backgroundColor: theme.primaryColor || '#3B82F6',
-                  borderColor: theme.primaryColor || '#3B82F6',
+                  backgroundColor: theme.primaryColor || '#008069',
+                  borderColor: theme.primaryColor || '#008069',
                 }}
               >
                 Back to Login
@@ -116,11 +116,11 @@ export default function JoinPage() {
 
   return (
     <div
-      className="min-h-screen py-8 px-4 sm:px-6 md:px-8"
-      style={{ backgroundColor: theme.backgroundColor || '#FFFFFF' }}
+      className="fixed inset-0 flex items-center justify-center overflow-auto"
+      style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}
     >
-      <div className="max-w-4xl mx-auto">
-        <Row gutter={[24, 24]} align="middle">
+      <div className="w-full max-w-5xl px-4 py-8">
+        <Row gutter={[32, 32]} align="middle">
           {/* Left Side - Welcome Info */}
           <Col xs={24} lg={12}>
             <div className="space-y-6">
@@ -128,24 +128,25 @@ export default function JoinPage() {
                 <div
                   className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4"
                   style={{
-                    backgroundColor: `${theme.primaryColor || '#3B82F6'}20`,
+                    backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF',
+                    border: `2px solid ${theme.primaryColor || '#008069'}`,
                   }}
                 >
                   <HomeOutlined
                     style={{
                       fontSize: '28px',
-                      color: theme.primaryColor || '#3B82F6',
+                      color: theme.primaryColor || '#008069',
                     }}
                   />
                 </div>
                 <Title
                   level={2}
-                  style={{ color: theme.headerText || '#1F2937' }}
+                  style={{ color: theme.sidebarTextColor || '#111B21', margin: 0 }}
                 >
                   You're Invited!
                 </Title>
                 <Paragraph
-                  style={{ color: '#6B7280', fontSize: '16px' }}
+                  style={{ color: theme.timestampColor || '#667781', fontSize: '15px', marginTop: '8px' }}
                 >
                   Join {inviteInfo?.tenantName || 'our workspace'} and start
                   collaborating with your team.
@@ -165,7 +166,7 @@ export default function JoinPage() {
                   >
                     <CheckCircleOutlined
                       style={{
-                        color: '#10B981',
+                        color: theme.accentColor || '#25D366',
                         fontSize: '18px',
                         marginTop: '2px',
                         flex: '0 0 auto',
@@ -173,7 +174,7 @@ export default function JoinPage() {
                     />
                     <Text
                       style={{
-                        color: '#6B7280',
+                        color: theme.timestampColor || '#667781',
                         fontSize: '14px',
                       }}
                     >
@@ -186,28 +187,31 @@ export default function JoinPage() {
               {/* Tenant Info */}
               {inviteInfo && (
                 <Card
-                  className="border-0"
+                  className="border-0 shadow-sm"
                   style={{
-                    backgroundColor: `${theme.primaryColor || '#3B82F6'}08`,
-                    border: `1px solid ${theme.borderColor || '#E5E7EB'}`,
+                    backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF',
+                    border: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}`,
+                    borderRadius: '8px',
                   }}
                 >
-                  <Space direction="vertical" style={{ width: '100%' }}>
+                  <Space direction="vertical" style={{ width: '100%' }} size="small">
                     <div className="flex items-center gap-2">
                       <MailOutlined
                         style={{
-                          color: theme.primaryColor || '#3B82F6',
+                          color: theme.primaryColor || '#008069',
+                          fontSize: '16px',
                         }}
                       />
                       <Text
-                        style={{ color: '#6B7280' }}
+                        style={{ color: theme.timestampColor || '#667781', fontSize: '14px' }}
+                        className="break-all"
                       >
                         {inviteInfo.inviterEmail}
                       </Text>
                     </div>
                     <Text
                       style={{
-                        color: theme.headerText || '#1F2937',
+                        color: theme.sidebarTextColor || '#111B21',
                         fontSize: '14px',
                       }}
                     >
@@ -219,11 +223,11 @@ export default function JoinPage() {
             </div>
           </Col>
 
-          <Divider type="vertical" style={{ height: 'auto', display: 'none' }} className="hidden lg:block" />
-
           {/* Right Side - Form */}
           <Col xs={24} lg={12}>
             <SignupWithInviteForm
+              token={token}
+              tenantId={tenantId}
               inviteInfo={inviteInfo}
               onSuccess={() => navigate('/chat')}
             />
