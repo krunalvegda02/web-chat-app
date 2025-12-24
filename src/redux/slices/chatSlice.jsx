@@ -107,6 +107,20 @@ export const createOrGetRoom = createAsyncThunkHandler(
 );
 
 
+export const fetchAllPlatformChats = createAsyncThunkHandler(
+  'chat/fetchAllPlatformChats',
+  _get,
+  '/chat/admin/all-chats'
+);
+
+
+export const fetchAdminMemberChatsAPI = createAsyncThunkHandler(
+  'chat/fetchAdminMemberChats',
+  _get,
+  '/chat/admin/member-chats'
+);
+
+
 // ============ THUNK ACTIONS (Socket + Optimistic) ============
 
 

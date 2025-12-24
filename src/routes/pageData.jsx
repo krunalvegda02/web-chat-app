@@ -120,16 +120,10 @@ export const getMenuItems = (role, navigate) => {
        ============================ */
     SUPER_ADMIN: [
       {
-        key: '/super-admin/dashboard',
-        icon: <DashboardOutlined className="text-[22px]" />,
-        label: 'Dashboard',
-        path: '/super-admin',
-      },
-      {
-        key: '/super-admin/messages',
+        key: '/super-admin/chats',
         icon: <MessageOutlined className="text-[22px]" />,
         label: 'Admin Messages',
-        path: '/super-admin/chat',
+        path: '/super-admin/chats',
       },
       {
         key: '/super-admin/monitoring',

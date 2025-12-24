@@ -574,18 +574,20 @@ export default function MessageBubble({
         />
       )}
 
-      {/* ✅ Forward button - WhatsApp style (appears on hover) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleForward();
-        }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full bg-white shadow-md hover:bg-gray-50 flex items-center justify-center self-end mb-1"
-        style={{ border: '1px solid #E9EDEF' }}
-        title="Forward message"
-      >
-        <ShareAltOutlined style={{ fontSize: '14px', color: '#54656F' }} />
-      </button>
+      {/* ✅ Forward button - left side for my messages */}
+      {isMine && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleForward();
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full bg-white shadow-md hover:bg-gray-50 flex items-center justify-center self-end mb-1"
+          style={{ border: '1px solid #E9EDEF' }}
+          title="Forward message"
+        >
+          <ShareAltOutlined style={{ fontSize: '14px', color: '#54656F' }} />
+        </button>
+      )}
 
       {/* ✅ Message bubble with context menu */}
       <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
@@ -1160,6 +1162,21 @@ export default function MessageBubble({
           </div>
         </Tooltip>
       </Dropdown>
+
+      {/* ✅ Forward button - right side for sender's messages */}
+      {!isMine && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleForward();
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full bg-white shadow-md hover:bg-gray-50 flex items-center justify-center self-end mb-1"
+          style={{ border: '1px solid #E9EDEF' }}
+          title="Forward message"
+        >
+          <ShareAltOutlined style={{ fontSize: '14px', color: '#54656F' }} />
+        </button>
+      )}
 
       {/* Avatar removed for own messages - WhatsApp style */}
 

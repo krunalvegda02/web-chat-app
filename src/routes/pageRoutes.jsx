@@ -66,9 +66,9 @@ export const pageRoutes = [
         layout: SuperAdminLayout,
         requiredRoles: ["SUPER_ADMIN"],
         routes: [
-            { path: "/super-admin", element: SuperAdminDashboard },
+            // { path: "/super-admin", element: SuperAdminDashboard },
             { path: "/super-admin/admins", element: SuperAdminAdminsList },
-            { path: "/super-admin/chat", element: SuperAdminChat },
+            { path: "/super-admin/chats", element: SuperAdminChat },
             { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
         ],
     },

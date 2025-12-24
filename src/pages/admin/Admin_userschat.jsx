@@ -4,17 +4,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useTheme } from '../../hooks/useTheme';
 import {
   MessageOutlined,
-  UserOutlined,
   SearchOutlined,
-  ArrowLeftOutlined,
 } from '@ant-design/icons';
-import {
-  fetchAdminMemberChats,
-  fetchSpecificMemberChats,
-  fetchMemberChatHistory,
-  clearMessages,
-} from '../../redux/slices/adminChatSlice';
-import { Input, Avatar, Badge, Empty, Spin, Select } from 'antd';
+import { fetchAdminMemberChatsAPI } from '../../redux/slices/chatSlice';
+import { Avatar, Badge, Empty, Spin, Select } from 'antd';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { setActiveRoom } from '../../redux/slices/chatSlice';
 
@@ -22,33 +15,40 @@ export default function AdminUsersChat() {
   const { theme } = useTheme();
   const { user } = useAuthGuard(['ADMIN', 'TENANT_ADMIN']);
   const dispatch = useDispatch();
-  const { members, memberChats, messages, loading, chatsLoading, messagesLoading } = useSelector(
-    (state) => state.adminChat
-  );
   const { activeRoomId } = useSelector((s) => s.chat);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [members, setMembers] = useState([]);
   const [selectedMemberId, setSelectedMemberId] = useState(null);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [chatOpened, setChatOpened] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchAdminMemberChats());
+    const loadMemberChats = async () => {
+      setLoading(true);
+      try {
+        const result = await dispatch(fetchAdminMemberChatsAPI()).unwrap();
+        if (result?.data?.memberChats) {
+          setMembers(result.data.memberChats);
+        }
+      } catch (error) {
+        console.error('Failed to fetch member chats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMemberChats();
   }, [dispatch]);
 
-  const handleRoomClick = async (chat) => {
-    const member = members.find(m => m.memberId === chat.memberId);
-    setSelectedMember(member);
+  const handleRoomClick = (chat) => {
     dispatch(setActiveRoom(chat.roomId));
-    await dispatch(fetchMemberChatHistory({ memberId: chat.memberId, roomId: chat.roomId }));
     setChatOpened(true);
   };
 
   if (!user) return null;
 
-  // Combine members with their top 10 chats
+  // Combine members with their chats
   const combinedList = members.flatMap(member => 
-    (member.recentChats || []).slice(0, 10).map(chat => ({
+    (member.recentChats || []).map(chat => ({
       ...chat,
       memberId: member.memberId,
       memberName: member.memberName,
@@ -58,16 +58,11 @@ export default function AdminUsersChat() {
   );
 
   const filteredList = selectedMemberId
-    ? combinedList.filter(item => 
-        item.memberId === selectedMemberId || 
-        item.otherParticipants?.some(p => p.userId === selectedMemberId)
-      )
+    ? combinedList.filter(item => item.memberId === selectedMemberId)
     : combinedList;
 
-  // Extract unique participants from all chats (both members and other participants)
+  // Extract unique participants
   const allParticipants = new Map();
-  
-  // Add members
   members.forEach(member => {
     allParticipants.set(member.memberId, {
       value: member.memberId,
@@ -76,25 +71,8 @@ export default function AdminUsersChat() {
       type: 'USER'
     });
   });
-  
-  // Add other participants from chats
-  combinedList.forEach(chat => {
-    if (chat.otherParticipants && Array.isArray(chat.otherParticipants)) {
-      chat.otherParticipants.forEach(participant => {
-        if (participant && participant.userId) {
-          allParticipants.set(participant.userId, {
-            value: participant.userId,
-            label: participant.name,
-            email: participant.email || '',
-            type: participant.role || 'USER'
-          });
-        }
-      });
-    }
-  });
 
   const memberOptions = Array.from(allParticipants.values());
-
   const primaryColor = '#008069';
 
   // Mobile view

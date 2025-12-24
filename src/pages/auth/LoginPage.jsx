@@ -79,7 +79,7 @@ export default function LoginPage() {
         if (user.role === 'ADMIN' || user.role === 'TENANT_ADMIN') {
           navigate('/admin');
         } else if (user.role === 'SUPER_ADMIN') {
-          navigate('/super-admin');
+          navigate('/super-admin/chats');
         } else {
           navigate('/user/chats');
         }

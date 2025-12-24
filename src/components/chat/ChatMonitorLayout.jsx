@@ -1,29 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Select,
   Spin,
   Empty,
   Avatar,
-  Input,
-  Button,
   Badge,
   Typography,
-  Tooltip,
-  Space,
+  Button,
 } from 'antd';
 import {
-  UserOutlined,
   MessageOutlined,
   SearchOutlined,
-  PhoneOutlined,
-  MoreOutlined,
-  ClockCircleOutlined,
-  ArrowLeftOutlined,
-  TeamOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../hooks/useTheme';
+import { _get } from '../../helper/apiClient';
+import MessageBubble from './MessageBubble';
 
-const { Option } = Select;
 const { Text } = Typography;
 
 export default function ChatMonitorLayout({
@@ -31,396 +24,403 @@ export default function ChatMonitorLayout({
   usersLoading = false,
   chats = [],
   chatsLoading = false,
-  messages = [],
-  messagesLoading = false,
   onUserSelect = () => {},
-  onChatSelect = () => {},
-  getUserLabel = {},
-  getChatLabel = {},
-  getMessageAlignment = () => 'justify-start',
+  title = 'Monitor Chats',
 }) {
+  console.log("chats",chats)
   const { theme } = useTheme();
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [searchChatTerm, setSearchChatTerm] = useState('');
-  const [mobileView, setMobileView] = useState('select'); // 'select', 'rooms', 'chat'
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [chatOpened, setChatOpened] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  const primaryColor = theme?.primaryColor || '#10B981';
-  const accentColor = '#059669';
-  const lightGreen = '#D1FAE5';
+  const primaryColor = '#008069';
   const veryLightGreen = '#F0FDF4';
-  const borderColor = '#E5E7EB';
   const textColor = '#1F2937';
 
-  const filteredChats = useMemo(() => {
-    if (!selectedUser) return [];
-    return chats.filter(
-      (c) =>
-        c.name?.toLowerCase().includes(searchChatTerm.toLowerCase()) ||
-        c.participantName?.toLowerCase().includes(searchChatTerm.toLowerCase())
-    );
-  }, [chats, searchChatTerm, selectedUser]);
+  console.log('📊 ChatMonitorLayout rendered:', { users: users.length, chats: chats.length, loading: chatsLoading });
 
-  const handleUserSelect = (userId) => {
-    const user = users.find((u) => u.id === userId);
-    setSelectedUser(user);
-    setSelectedChat(null);
-    setSearchChatTerm('');
-    onUserSelect(userId, user);
-    setMobileView('rooms');
+  const formatDateLabel = (date) => {
+    const msgDate = new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    msgDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    if (msgDate.getTime() === today.getTime()) return 'Today';
+    if (msgDate.getTime() === yesterday.getTime()) return 'Yesterday';
+    return msgDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  const shouldShowDateSeparator = (currentMsg, prevMsg) => {
+    if (!prevMsg) return true;
+    const currentDate = new Date(currentMsg.createdAt).toDateString();
+    const prevDate = new Date(prevMsg.createdAt).toDateString();
+    return currentDate !== prevDate;
+  };
+
+  const fetchMessages = useCallback(async (roomId, pageNum = 1) => {
+    if (!roomId) return;
+    
+    setMessagesLoading(true);
+    try {
+      const response = await _get(`/chat/rooms/${roomId}/messages?page=${pageNum}&limit=50&readOnly=true`);
+      const newMessages = response.data?.data?.messages || [];
+      
+      if (pageNum === 1) {
+        setMessages(newMessages.reverse());
+        setTimeout(() => messagesEndRef.current?.scrollIntoView(), 100);
+      } else {
+        setMessages(prev => [...newMessages.reverse(), ...prev]);
+      }
+      
+      setHasMore(response.data?.data?.pagination?.hasMore || false);
+      setPage(pageNum);
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!messagesContainerRef.current || messagesLoading || !hasMore) return;
+    
+    if (messagesContainerRef.current.scrollTop === 0) {
+      fetchMessages(selectedChat?.roomId, page + 1);
+    }
+  }, [messagesLoading, hasMore, selectedChat, page, fetchMessages]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
 
   const handleChatSelect = (chat) => {
+    const user = users.find(u => u.id === selectedUserId) || users.find(u => u.id === chat.participantId);
+    setSelectedUser(user || { _id: chat.participantId, name: chat.participantName });
     setSelectedChat(chat);
-    onChatSelect(chat, selectedUser);
-    setMobileView('chat');
+    setMessages([]);
+    setPage(1);
+    fetchMessages(chat.roomId, 1);
+    setChatOpened(true);
   };
 
-  // Mobile: User Selection Screen
-  if (mobileView === 'select' && window.innerWidth < 768) {
-    return (
-      <div className="h-screen flex flex-col bg-white">
-        <div
-          className="px-4 py-4 border-b"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <TeamOutlined style={{ color: '#FFFFFF', fontSize: '20px' }} />
-            <Text strong style={{ color: '#FFFFFF', fontSize: '18px' }}>
-              Monitor Admin Chats
-            </Text>
-          </div>
-          <Select
-            placeholder="Select admin to monitor..."
-            value={selectedUser?.id}
-            onChange={handleUserSelect}
-            loading={usersLoading}
-            size="large"
-            className="w-full"
-            style={{ borderRadius: '8px' }}
-          >
-            {users.map((user) => (
-              <Option key={user.id} value={user.id}>
-                <div className="flex items-center gap-2">
-                  <Avatar size={24} style={{ backgroundColor: primaryColor }}>
-                    {user.name?.charAt(0)?.toUpperCase()}
-                  </Avatar>
-                  <span>{user.name}</span>
-                </div>
-              </Option>
-            ))}
-          </Select>
-        </div>
+  const combinedList = chats;
+  const filteredList = selectedUserId
+    ? combinedList.filter(item => 
+        item.participantId === selectedUserId
+      )
+    : combinedList;
 
-        <div className="flex-1 flex items-center justify-center">
-          <Empty
-            image={<UserOutlined style={{ fontSize: '64px', color: `${primaryColor}40` }} />}
-            description={
-              <Text style={{ color: '#9CA3AF' }}>
-                Select an admin to view their conversations
-              </Text>
-            }
-          />
-        </div>
-      </div>
-    );
-  }
+  console.log('🔍 Debug:', {
+    chatsLength: chats.length,
+    filteredListLength: filteredList.length,
+    messagesLength: messages.length
+  });
 
-  // Mobile: Room List Screen
-  if (mobileView === 'rooms' && selectedUser && window.innerWidth < 768) {
-    return (
-      <div className="h-screen flex flex-col bg-white">
-        <div
-          className="px-4 py-3 border-b"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <Button
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => setMobileView('select')}
-              style={{ color: '#FFFFFF' }}
-            />
-            <div className="flex-1">
-              <Text strong style={{ color: '#FFFFFF', fontSize: '16px', display: 'block' }}>
-                {selectedUser.name}
-              </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>
-                {filteredChats.length} conversation{filteredChats.length !== 1 ? 's' : ''}
-              </Text>
+  const allParticipants = new Map();
+  users.forEach(user => {
+    allParticipants.set(user.id, {
+      value: user.id,
+      label: user.name,
+      email: user.email,
+      type: user.role || 'ADMIN'
+    });
+  });
+  
+  chats.forEach(chat => {
+    if (chat.participantId) {
+      allParticipants.set(chat.participantId, {
+        value: chat.participantId,
+        label: chat.participantName,
+        email: chat.participantEmail || '',
+        type: 'USER'
+      });
+    }
+  });
+
+  const userOptions = Array.from(allParticipants.values());
+
+  // Mobile view
+  if (window.innerWidth < 768) {
+    if (!chatOpened) {
+      return (
+        <>
+          <style>{`body { overflow: hidden !important; }`}</style>
+          <div className="fixed top-0 left-0 right-0 bottom-14 flex flex-col bg-[#F0F2F5] z-10">
+            <div className="bg-[#008069] px-4 py-5 flex items-center gap-3">
+              <h1 className="text-white text-xl font-medium flex-1">{title}</h1>
+              <SearchOutlined className="text-white text-xl" />
             </div>
-          </div>
-          <Input
-            placeholder="Search conversations..."
-            prefix={<SearchOutlined style={{ color: primaryColor }} />}
-            value={searchChatTerm}
-            onChange={(e) => setSearchChatTerm(e.target.value)}
-            size="large"
-            style={{ borderRadius: '8px' }}
-          />
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
-          {chatsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Spin />
-            </div>
-          ) : filteredChats.length > 0 ? (
-            filteredChats.map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => handleChatSelect(chat)}
-                className="p-4 rounded-xl bg-white cursor-pointer active:scale-98 transition-all"
-                style={{ border: '1px solid #E5E7EB', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar size={48} style={{ backgroundColor: primaryColor, fontWeight: 600 }}>
-                    {chat.participantName?.charAt(0)?.toUpperCase()}
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <Text strong style={{ fontSize: '14px', display: 'block' }}>
-                      {chat.participantName}
-                    </Text>
-                    <Text style={{ color: '#9CA3AF', fontSize: '12px', display: 'block' }} className="truncate">
-                      {chat.lastMessage || 'No messages'}
-                    </Text>
-                  </div>
-                  {chat.messageCount > 0 && (
-                    <Badge count={chat.messageCount} style={{ backgroundColor: primaryColor }} />
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <Empty description="No conversations" />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Mobile: Chat Screen
-  if (mobileView === 'chat' && selectedChat && selectedUser && window.innerWidth < 768) {
-    return (
-      <div className="h-screen flex flex-col" style={{ backgroundColor: veryLightGreen }}>
-        <div
-          className="px-4 py-3 border-b flex items-center gap-3"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => setMobileView('rooms')}
-            style={{ color: '#FFFFFF' }}
-          />
-          <Avatar size={36} style={{ backgroundColor: accentColor }}>
-            {selectedChat.participantName?.charAt(0)?.toUpperCase()}
-          </Avatar>
-          <div className="flex-1">
-            <Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>
-              {selectedChat.participantName}
-            </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>
-              with {selectedUser.name}
-            </Text>
-          </div>
-          <Space>
-            <Button
-              type="text"
-              icon={<PhoneOutlined />}
-              size="small"
-              style={{ color: '#FFFFFF' }}
-            />
-            <Button
-              type="text"
-              icon={<MoreOutlined />}
-              size="small"
-              style={{ color: '#FFFFFF' }}
-            />
-          </Space>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messagesLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <Spin />
-            </div>
-          ) : messages.length > 0 ? (
-            messages.map((msg, idx) => {
-              const alignment = getMessageAlignment(msg, selectedUser);
-              const isOwn = alignment === 'justify-end';
-
-              return (
-                <div key={msg.id || idx} className={`flex ${alignment} gap-2`}>
-                  {!isOwn && (
-                    <Avatar size={32} style={{ backgroundColor: primaryColor }}>
-                      {msg.senderName?.charAt(0)?.toUpperCase()}
-                    </Avatar>
-                  )}
-                  <div
-                    className={`max-w-xs px-4 py-2 ${isOwn ? 'rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' : 'rounded-tl-2xl rounded-tr-2xl rounded-br-2xl'}`}
-                    style={{
-                      backgroundColor: isOwn ? primaryColor : '#FFFFFF',
-                      color: isOwn ? '#FFFFFF' : textColor,
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                    }}
-                  >
-                    {!isOwn && (
-                      <Text strong style={{ fontSize: '12px', color: primaryColor, display: 'block', marginBottom: '4px' }}>
-                        {msg.senderName}
-                      </Text>
-                    )}
-                    <Text style={{ fontSize: '14px', display: 'block', wordBreak: 'break-word' }}>
-                      {msg.content}
-                    </Text>
-                    <Text style={{ fontSize: '11px', marginTop: '4px', color: isOwn ? 'rgba(255,255,255,0.7)' : '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </div>
-                  {isOwn && (
-                    <Avatar size={32} style={{ backgroundColor: primaryColor }}>
-                      {selectedUser.name?.charAt(0)?.toUpperCase()}
-                    </Avatar>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <Empty description="No messages" />
-          )}
-        </div>
-
-        <div
-          className="p-3 text-center text-xs"
-          style={{ backgroundColor: lightGreen, color: accentColor, borderTop: `1px solid ${borderColor}` }}
-        >
-          <ClockCircleOutlined className="mr-2" />
-          Messages are encrypted and secure
-        </div>
-      </div>
-    );
-  }
-
-  // Desktop: Split View
-  return (
-    <div className="h-[calc(100vh-64px)] flex bg-white">
-      {/* Left: User Selector + Room List */}
-      <div className="w-96 flex flex-col border-r" style={{ borderColor }}>
-        <div
-          className="px-4 py-4 border-b"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <TeamOutlined style={{ color: '#FFFFFF', fontSize: '18px' }} />
-            <Text strong style={{ color: '#FFFFFF', fontSize: '16px' }}>
-              Monitor Admin Chats
-            </Text>
-          </div>
-          <Select
-            placeholder="Select admin..."
-            value={selectedUser?.id}
-            onChange={handleUserSelect}
-            loading={usersLoading}
-            size="large"
-            className="w-full"
-            style={{ borderRadius: '8px' }}
-          >
-            {users.map((user) => (
-              <Option key={user.id} value={user.id}>
-                <div className="flex items-center gap-2">
-                  <Avatar size={24} style={{ backgroundColor: primaryColor }}>
-                    {user.name?.charAt(0)?.toUpperCase()}
-                  </Avatar>
-                  <span>{user.name}</span>
-                </div>
-              </Option>
-            ))}
-          </Select>
-        </div>
-
-        {selectedUser ? (
-          <>
-            <div className="px-4 py-3 border-b" style={{ borderColor }}>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <Text strong style={{ fontSize: '14px', display: 'block' }}>
-                    {selectedUser.name}
-                  </Text>
-                  <Text style={{ color: '#9CA3AF', fontSize: '12px' }}>
-                    {filteredChats.length} conversation{filteredChats.length !== 1 ? 's' : ''}
-                  </Text>
-                </div>
-                <Badge count={filteredChats.length} style={{ backgroundColor: primaryColor }} />
-              </div>
-              <Input
-                placeholder="Search conversations..."
-                prefix={<SearchOutlined style={{ color: primaryColor }} />}
-                value={searchChatTerm}
-                onChange={(e) => setSearchChatTerm(e.target.value)}
+            <div className="bg-white px-3 py-2 border-b">
+              <Select
+                showSearch
+                placeholder="Select user to view chats..."
+                optionFilterProp="children"
+                value={selectedUserId}
+                onChange={(value) => {
+                  setSelectedUserId(value);
+                  const user = users.find(u => u.id === value);
+                  if (user) onUserSelect(value, user);
+                }}
+                allowClear
+                style={{ width: '100%' }}
                 size="large"
-                style={{ borderRadius: '8px', backgroundColor: veryLightGreen }}
+                virtual
+                listHeight={400}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+                  (option?.email ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={userOptions}
+                optionRender={(option) => (
+                  <div className="flex flex-col">
+                    <span className="font-medium">{option.data.label}</span>
+                    <span className="text-xs text-gray-500">{option.data.email}</span>
+                  </div>
+                )}
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-gray-50">
+            <div className="flex-1 overflow-y-auto bg-white">
               {chatsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Spin />
+                <div className="flex justify-center items-center h-full">
+                  <Spin size="large" />
                 </div>
-              ) : filteredChats.length > 0 ? (
-                filteredChats.map((chat) => (
+              ) : filteredList.length > 0 ? (
+                filteredList.map((item, idx) => (
                   <div
-                    key={chat.id}
-                    onClick={() => handleChatSelect(chat)}
-                    className="p-3 rounded-xl cursor-pointer transition-all"
-                    style={{
-                      backgroundColor: selectedChat?.id === chat.id ? lightGreen : '#FFFFFF',
-                      border: selectedChat?.id === chat.id ? `2px solid ${primaryColor}` : '1px solid #E5E7EB',
-                    }}
+                    key={`${item.roomId}-${idx}`}
+                    onClick={() => handleChatSelect(item)}
+                    className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] cursor-pointer active:bg-[#E9EDEF] transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <Avatar size={40} style={{ backgroundColor: primaryColor, fontWeight: 600 }}>
-                        {chat.participantName?.charAt(0)?.toUpperCase()}
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <Text strong style={{ fontSize: '14px', display: 'block' }}>
-                          {chat.participantName}
-                        </Text>
-                        <Text style={{ color: '#9CA3AF', fontSize: '12px', display: 'block' }} className="truncate">
-                          {chat.lastMessage || 'No messages'}
-                        </Text>
-                        {chat.messageCount > 0 && (
-                          <Badge count={chat.messageCount} style={{ backgroundColor: primaryColor, marginTop: '4px' }} />
+                    <Avatar
+                      size={50}
+                      style={{ backgroundColor: primaryColor, flexShrink: 0 }}
+                    >
+                      {item.participantName?.charAt(0)?.toUpperCase()}
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-[#111B21] text-[16px] truncate">
+                          {item.participantName}
+                        </p>
+                        <span className="text-xs text-[#667781]">
+                          {new Date(item.lastMessageTime).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-[#667781] truncate">
+                          {item.lastMessage || 'No messages'}
+                        </p>
+                        {item.messageCount > 0 && (
+                          <Badge
+                            count={item.messageCount}
+                            style={{ backgroundColor: '#25D366' }}
+                          />
                         )}
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <Empty description="No conversations" />
+                <Empty description="No chats found" className="mt-20" />
               )}
             </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <Empty
-              image={<UserOutlined style={{ fontSize: '48px', color: `${primaryColor}40` }} />}
-              description="Select an admin to view conversations"
+          </div>
+        </>
+      );
+    } else if (selectedChat) {
+      return (
+        <>
+          <style>{`
+            body { overflow: hidden !important; }
+            nav[class*="bottom-0"] { display: none !important; }
+          `}</style>
+          <div className="fixed inset-0 flex flex-col bg-white z-[150]">
+            <div className="bg-[#008069] px-4 py-3 flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setChatOpened(false);
+                  setSelectedChat(null);
+                }}
+                className="text-white"
+              >
+                ←
+              </button>
+              <Avatar size={36} style={{ backgroundColor: primaryColor }}>
+                {selectedChat.participantName?.charAt(0)?.toUpperCase()}
+              </Avatar>
+              <div className="flex-1">
+                <Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>
+                  {selectedChat.participantName}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>
+                  {selectedUser?.name}
+                </Text>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: veryLightGreen }} ref={messagesContainerRef}>
+              {messagesLoading && page === 1 ? (
+                <div className="flex items-center justify-center h-full">
+                  <Spin />
+                </div>
+              ) : messages.length > 0 ? (
+                <>
+                  {hasMore && (
+                    <div className="text-center py-2">
+                      <Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>
+                        Load older messages
+                      </Button>
+                    </div>
+                  )}
+                  {messages.map((msg, idx) => {
+                    const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
+                    const sender = msg.sender || msg.senderId;
+                    const currentUserId = sender?.role === 'ADMIN' || sender?.role === 'TENANT_ADMIN' ? sender?._id : null;
+                    
+                    return (
+                      <div key={msg._id}>
+                        {showDate && (
+                          <div className="flex justify-center my-3">
+                            <div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>
+                              {formatDateLabel(msg.createdAt)}
+                            </div>
+                          </div>
+                        )}
+                        <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} />
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </>
+              ) : (
+                <Empty description="No messages" />
+              )}
+            </div>
+
+            <div className="p-3 text-center text-xs" style={{ backgroundColor: '#F0F2F5', color: '#667781', borderTop: '1px solid #E5E7EB' }}>
+              Read-only view • No live updates
+            </div>
+          </div>
+        </>
+      );
+    }
+    return null;
+  }
+
+  // Desktop view
+  return (
+    <>
+      <style>{`body { overflow: hidden !important; }`}</style>
+      <div className="fixed top-0 right-0 bottom-0 sm:left-20 left-0 flex bg-white">
+        <div className="w-96 flex flex-col border-r border-[#E9EDEF] bg-white">
+          <div className="bg-[#008069] px-4 py-4 flex items-center justify-between">
+            <h1 className="text-white text-xl font-medium">{title}</h1>
+            <SearchOutlined className="text-white text-xl cursor-pointer" />
+          </div>
+
+          <div className="px-3 py-2 bg-white border-b border-[#E9EDEF]">
+            <Select
+              showSearch
+              placeholder="Select user to view chats..."
+              optionFilterProp="children"
+              value={selectedUserId}
+              onChange={(value) => {
+                setSelectedUserId(value);
+                const user = users.find(u => u.id === value);
+                if (user) onUserSelect(value, user);
+              }}
+              allowClear
+              style={{ width: '100%' }}
+              size="large"
+              virtual
+              listHeight={400}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+                (option?.email ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={userOptions}
+              optionRender={(option) => (
+                <div className="flex flex-col">
+                  <span className="font-medium">{option.data.label}</span>
+                  <span className="text-xs text-gray-500">{option.data.email}</span>
+                </div>
+              )}
             />
           </div>
-        )}
-      </div>
 
-      {/* Right: Chat Window */}
-      <div className="flex-1 flex flex-col" style={{ backgroundColor: veryLightGreen }}>
-        {selectedChat && selectedUser ? (
-          <>
-            <div
-              className="px-4 py-3 border-b flex items-center justify-between"
-              style={{ backgroundColor: primaryColor }}
-            >
-              <div className="flex items-center gap-3">
-                <Avatar size={40} style={{ backgroundColor: accentColor }}>
+          <div className="flex-1 overflow-y-auto bg-white">
+            {chatsLoading ? (
+              <div className="flex justify-center items-center h-full">
+                <Spin size="large" />
+              </div>
+            ) : filteredList.length > 0 ? (
+              filteredList.map((item, idx) => (
+                <div
+                  key={`${item.roomId}-${idx}`}
+                  onClick={() => handleChatSelect(item)}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: selectedChat?.roomId === item.roomId ? '#F0F2F5' : 'transparent'
+                  }}
+                >
+                  <Avatar
+                    size={50}
+                    style={{ backgroundColor: primaryColor, flexShrink: 0 }}
+                  >
+                    {item.participantName?.charAt(0)?.toUpperCase()}
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-medium text-[#111B21] text-[16px] truncate">
+                        {item.participantName}
+                      </p>
+                      <span className="text-xs text-[#667781]">
+                        {new Date(item.lastMessageTime).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-[#667781] truncate">
+                        {item.lastMessage || 'No messages'}
+                      </p>
+                      {item.messageCount > 0 && (
+                        <Badge
+                          count={item.messageCount}
+                          style={{ backgroundColor: '#25D366' }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <Empty description="No chats found" className="mt-20" />
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col">
+          {selectedChat ? (
+            <>
+              <div className="bg-[#008069] px-4 py-3 flex items-center gap-3">
+                <Avatar size={40} style={{ backgroundColor: primaryColor }}>
                   {selectedChat.participantName?.charAt(0)?.toUpperCase()}
                 </Avatar>
                 <div>
@@ -428,97 +428,68 @@ export default function ChatMonitorLayout({
                     {selectedChat.participantName}
                   </Text>
                   <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>
-                    {selectedUser.name}
+                    {selectedUser?.name}
                   </Text>
                 </div>
               </div>
-              <Space>
-                <Tooltip title="Call">
-                  <Button
-                    type="text"
-                    icon={<PhoneOutlined />}
-                    size="small"
-                    style={{ color: '#FFFFFF' }}
-                  />
-                </Tooltip>
-                <Tooltip title="More">
-                  <Button
-                    type="text"
-                    icon={<MoreOutlined />}
-                    size="small"
-                    style={{ color: '#FFFFFF' }}
-                  />
-                </Tooltip>
-              </Space>
-            </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messagesLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Spin />
-                </div>
-              ) : messages.length > 0 ? (
-                messages.map((msg, idx) => {
-                  const alignment = getMessageAlignment(msg, selectedUser);
-                  const isOwn = alignment === 'justify-end';
-
-                  return (
-                    <div key={msg.id || idx} className={`flex ${alignment} gap-2`}>
-                      {!isOwn && (
-                        <Avatar size={32} style={{ backgroundColor: primaryColor }}>
-                          {msg.senderName?.charAt(0)?.toUpperCase()}
-                        </Avatar>
-                      )}
-                      <div
-                        className={`max-w-md px-4 py-2 ${isOwn ? 'rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' : 'rounded-tl-2xl rounded-tr-2xl rounded-br-2xl'}`}
-                        style={{
-                          backgroundColor: isOwn ? primaryColor : '#FFFFFF',
-                          color: isOwn ? '#FFFFFF' : textColor,
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                        }}
-                      >
-                        {!isOwn && (
-                          <Text strong style={{ fontSize: '12px', color: primaryColor, display: 'block', marginBottom: '4px' }}>
-                            {msg.senderName}
-                          </Text>
-                        )}
-                        <Text style={{ fontSize: '14px', display: 'block', wordBreak: 'break-word' }}>
-                          {msg.content}
-                        </Text>
-                        <Text style={{ fontSize: '11px', marginTop: '4px', color: isOwn ? 'rgba(255,255,255,0.7)' : '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: veryLightGreen }} ref={messagesContainerRef}>
+                {messagesLoading && page === 1 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Spin />
+                  </div>
+                ) : messages.length > 0 ? (
+                  <>
+                    {hasMore && (
+                      <div className="text-center py-2">
+                        <Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>
+                          Load older messages
+                        </Button>
                       </div>
-                      {isOwn && (
-                        <Avatar size={32} style={{ backgroundColor: primaryColor }}>
-                          {selectedUser.name?.charAt(0)?.toUpperCase()}
-                        </Avatar>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <Empty description="No messages" />
-              )}
-            </div>
+                    )}
+                    {messages.map((msg, idx) => {
+                      const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
+                      const sender = msg.sender || msg.senderId;
+                      const currentUserId = sender?.role === 'ADMIN' || sender?.role === 'TENANT_ADMIN' ? sender?._id : null;
+                      
+                      return (
+                        <div key={msg._id}>
+                          {showDate && (
+                            <div className="flex justify-center my-3">
+                              <div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>
+                                {formatDateLabel(msg.createdAt)}
+                              </div>
+                            </div>
+                          )}
+                          <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} />
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </>
+                ) : (
+                  <Empty description="No messages" />
+                )}
+              </div>
 
-            <div
-              className="p-3 text-center text-xs"
-              style={{ backgroundColor: lightGreen, color: accentColor, borderTop: `1px solid ${borderColor}` }}
-            >
-              <ClockCircleOutlined className="mr-2" />
-              Messages are encrypted and secure
+              <div className="p-3 text-center text-xs" style={{ backgroundColor: '#F0F2F5', color: '#667781', borderTop: '1px solid #E5E7EB' }}>
+                Read-only view • No live updates
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-[#F0F2F5]">
+              <Empty
+                image={<MessageOutlined style={{ fontSize: '64px', color: '#8696A0' }} />}
+                description={
+                  <span className="text-[#667781] text-sm">
+                    Select a chat to view conversation
+                  </span>
+                }
+              />
             </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <Empty
-              image={<MessageOutlined style={{ fontSize: '64px', color: `${primaryColor}40` }} />}
-              description="Select a conversation to view messages"
-            />
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
