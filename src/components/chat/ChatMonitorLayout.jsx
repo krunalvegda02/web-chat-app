@@ -12,6 +12,9 @@ import {
   MessageOutlined,
   SearchOutlined,
   CheckOutlined,
+  UpOutlined,
+  DownOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../hooks/useTheme';
 import { _get } from '../../helper/apiClient';
@@ -27,7 +30,6 @@ export default function ChatMonitorLayout({
   onUserSelect = () => {},
   title = 'Monitor Chats',
 }) {
-  console.log("chats",chats)
   const { theme } = useTheme();
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
@@ -37,14 +39,15 @@ export default function ChatMonitorLayout({
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [messageSearchResults, setMessageSearchResults] = useState([]);
+  const [currentMessageSearchIndex, setCurrentMessageSearchIndex] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
   const primaryColor = '#008069';
   const veryLightGreen = '#F0FDF4';
-  const textColor = '#1F2937';
-
-  console.log('📊 ChatMonitorLayout rendered:', { users: users.length, chats: chats.length, loading: chatsLoading });
 
   const formatDateLabel = (date) => {
     const msgDate = new Date(date);
@@ -121,16 +124,28 @@ export default function ChatMonitorLayout({
 
   const combinedList = chats;
   const filteredList = selectedUserId
-    ? combinedList.filter(item => 
-        item.participantId === selectedUserId
-      )
+    ? combinedList.filter(item => item.participantId === selectedUserId)
     : combinedList;
 
-  console.log('🔍 Debug:', {
-    chatsLength: chats.length,
-    filteredListLength: filteredList.length,
-    messagesLength: messages.length
-  });
+  // Message search
+  useEffect(() => {
+    if (!messageSearchQuery.trim()) {
+      setMessageSearchResults([]);
+      setCurrentMessageSearchIndex(0);
+      return;
+    }
+    const query = messageSearchQuery.toLowerCase();
+    const results = messages.map((msg, idx) => ({ msg, idx })).filter(({ msg }) => (msg.content || msg.text || '').toLowerCase().includes(query)).reverse();
+    setMessageSearchResults(results);
+    setCurrentMessageSearchIndex(results.length > 0 ? 0 : -1);
+  }, [messageSearchQuery, messages]);
+
+  useEffect(() => {
+    if (messageSearchResults.length > 0 && currentMessageSearchIndex >= 0) {
+      const element = document.getElementById(`msg-${messageSearchResults[currentMessageSearchIndex].msg._id}`);
+      if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [currentMessageSearchIndex, messageSearchResults]);
 
   const allParticipants = new Map();
   users.forEach(user => {
@@ -164,7 +179,6 @@ export default function ChatMonitorLayout({
           <div className="fixed top-0 left-0 right-0 bottom-14 flex flex-col bg-[#F0F2F5] z-10">
             <div className="bg-[#008069] px-4 py-5 flex items-center gap-3">
               <h1 className="text-white text-xl font-medium flex-1">{title}</h1>
-              <SearchOutlined className="text-white text-xl" />
             </div>
 
             <div className="bg-white px-3 py-2 border-b">
@@ -209,31 +223,17 @@ export default function ChatMonitorLayout({
                     onClick={() => handleChatSelect(item)}
                     className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] cursor-pointer active:bg-[#E9EDEF] transition-colors"
                   >
-                    <Avatar
-                      size={50}
-                      style={{ backgroundColor: primaryColor, flexShrink: 0 }}
-                    >
+                    <Avatar size={50} style={{ backgroundColor: primaryColor, flexShrink: 0 }}>
                       {item.participantName?.charAt(0)?.toUpperCase()}
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-[#111B21] text-[16px] truncate">
-                          {item.participantName}
-                        </p>
-                        <span className="text-xs text-[#667781]">
-                          {new Date(item.lastMessageTime).toLocaleDateString()}
-                        </span>
+                        <p className="font-medium text-[#111B21] text-[16px] truncate">{item.participantName}</p>
+                        <span className="text-xs text-[#667781]">{new Date(item.lastMessageTime).toLocaleDateString()}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-[#667781] truncate">
-                          {item.lastMessage || 'No messages'}
-                        </p>
-                        {item.messageCount > 0 && (
-                          <Badge
-                            count={item.messageCount}
-                            style={{ backgroundColor: '#25D366' }}
-                          />
-                        )}
+                        <p className="text-sm text-[#667781] truncate">{item.lastMessage || 'No messages'}</p>
+                        {item.messageCount > 0 && <Badge count={item.messageCount} style={{ backgroundColor: '#25D366' }} />}
                       </div>
                     </div>
                   </div>
@@ -248,63 +248,39 @@ export default function ChatMonitorLayout({
     } else if (selectedChat) {
       return (
         <>
-          <style>{`
-            body { overflow: hidden !important; }
-            nav[class*="bottom-0"] { display: none !important; }
-          `}</style>
+          <style>{`body { overflow: hidden !important; } nav[class*="bottom-0"] { display: none !important; }`}</style>
           <div className="fixed inset-0 flex flex-col bg-white z-[150]">
             <div className="bg-[#008069] px-4 py-3 flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setChatOpened(false);
-                  setSelectedChat(null);
-                }}
-                className="text-white"
-              >
-                ←
-              </button>
-              <Avatar size={36} style={{ backgroundColor: primaryColor }}>
-                {selectedChat.participantName?.charAt(0)?.toUpperCase()}
-              </Avatar>
-              <div className="flex-1">
-                <Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>
-                  {selectedChat.participantName}
-                </Text>
-                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>
-                  {selectedUser?.name}
-                </Text>
-              </div>
+              <button onClick={() => { setChatOpened(false); setSelectedChat(null); setSearchOpen(false); setMessageSearchQuery(''); }} className="text-white">←</button>
+              <Avatar size={36} style={{ backgroundColor: '#FFFFFF', color: primaryColor, border: '2px solid rgba(255,255,255,0.3)' }}>{selectedChat.participantName?.charAt(0)?.toUpperCase()}</Avatar>
+              <div className="flex-1"><Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>{selectedChat.participantName}</Text></div>
+              <Button type="text" icon={<SearchOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />} onClick={() => setSearchOpen(!searchOpen)} />
             </div>
+            {searchOpen && (
+              <div className="bg-[#008069] px-4 py-2 flex items-center gap-2">
+                <input type="text" placeholder="Search messages..." value={messageSearchQuery} onChange={(e) => setMessageSearchQuery(e.target.value)} autoFocus className="flex-1 px-3 py-1.5 rounded text-sm" />
+                {messageSearchResults.length > 0 && <span className="text-white text-xs">{currentMessageSearchIndex + 1} of {messageSearchResults.length}</span>}
+                <Button type="text" size="small" icon={<UpOutlined style={{ color: '#FFFFFF' }} />} onClick={() => setCurrentMessageSearchIndex((prev) => (prev - 1 + messageSearchResults.length) % messageSearchResults.length)} disabled={messageSearchResults.length === 0} />
+                <Button type="text" size="small" icon={<DownOutlined style={{ color: '#FFFFFF' }} />} onClick={() => setCurrentMessageSearchIndex((prev) => (prev + 1) % messageSearchResults.length)} disabled={messageSearchResults.length === 0} />
+                <Button type="text" size="small" icon={<CloseOutlined style={{ color: '#FFFFFF' }} />} onClick={() => { setSearchOpen(false); setMessageSearchQuery(''); }} />
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: veryLightGreen }} ref={messagesContainerRef}>
               {messagesLoading && page === 1 ? (
-                <div className="flex items-center justify-center h-full">
-                  <Spin />
-                </div>
+                <div className="flex items-center justify-center h-full"><Spin /></div>
               ) : messages.length > 0 ? (
                 <>
-                  {hasMore && (
-                    <div className="text-center py-2">
-                      <Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>
-                        Load older messages
-                      </Button>
-                    </div>
-                  )}
+                  {hasMore && <div className="text-center py-2"><Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>Load older messages</Button></div>}
                   {messages.map((msg, idx) => {
                     const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
                     const sender = msg.sender || msg.senderId;
                     const currentUserId = sender?.role === 'ADMIN' || sender?.role === 'TENANT_ADMIN' ? sender?._id : null;
                     
                     return (
-                      <div key={msg._id}>
-                        {showDate && (
-                          <div className="flex justify-center my-3">
-                            <div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>
-                              {formatDateLabel(msg.createdAt)}
-                            </div>
-                          </div>
-                        )}
-                        <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} />
+                      <div key={msg._id} id={`msg-${msg._id}`} style={{ backgroundColor: messageSearchResults[currentMessageSearchIndex]?.msg._id === msg._id ? 'rgba(255, 235, 59, 0.5)' : messageSearchResults.some(r => r.msg._id === msg._id) ? 'rgba(255, 235, 59, 0.2)' : 'transparent', borderRadius: '8px', padding: messageSearchResults.some(r => r.msg._id === msg._id) ? '4px' : '0', transition: 'background-color 0.3s ease' }}>
+                        {showDate && <div className="flex justify-center my-3"><div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>{formatDateLabel(msg.createdAt)}</div></div>}
+                        <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} searchQuery={messageSearchQuery} />
                       </div>
                     );
                   })}
@@ -315,9 +291,7 @@ export default function ChatMonitorLayout({
               )}
             </div>
 
-            <div className="p-3 text-center text-xs" style={{ backgroundColor: '#F0F2F5', color: '#667781', borderTop: '1px solid #E5E7EB' }}>
-              Read-only view • No live updates
-            </div>
+            <div className="p-2 text-center text-xs" style={{ backgroundColor: '#F0F2F5', color: '#667781', borderTop: '1px solid #E5E7EB' }}>Read-only view</div>
           </div>
         </>
       );
@@ -333,7 +307,6 @@ export default function ChatMonitorLayout({
         <div className="w-96 flex flex-col border-r border-[#E9EDEF] bg-white">
           <div className="bg-[#008069] px-4 py-4 flex items-center justify-between">
             <h1 className="text-white text-xl font-medium">{title}</h1>
-            <SearchOutlined className="text-white text-xl cursor-pointer" />
           </div>
 
           <div className="px-3 py-2 bg-white border-b border-[#E9EDEF]">
@@ -368,44 +341,24 @@ export default function ChatMonitorLayout({
 
           <div className="flex-1 overflow-y-auto bg-white">
             {chatsLoading ? (
-              <div className="flex justify-center items-center h-full">
-                <Spin size="large" />
-              </div>
+              <div className="flex justify-center items-center h-full"><Spin size="large" /></div>
             ) : filteredList.length > 0 ? (
               filteredList.map((item, idx) => (
                 <div
                   key={`${item.roomId}-${idx}`}
                   onClick={() => handleChatSelect(item)}
                   className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] cursor-pointer transition-colors"
-                  style={{
-                    backgroundColor: selectedChat?.roomId === item.roomId ? '#F0F2F5' : 'transparent'
-                  }}
+                  style={{ backgroundColor: selectedChat?.roomId === item.roomId ? '#F0F2F5' : 'transparent' }}
                 >
-                  <Avatar
-                    size={50}
-                    style={{ backgroundColor: primaryColor, flexShrink: 0 }}
-                  >
-                    {item.participantName?.charAt(0)?.toUpperCase()}
-                  </Avatar>
+                  <Avatar size={50} style={{ backgroundColor: primaryColor, flexShrink: 0 }}>{item.participantName?.charAt(0)?.toUpperCase()}</Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="font-medium text-[#111B21] text-[16px] truncate">
-                        {item.participantName}
-                      </p>
-                      <span className="text-xs text-[#667781]">
-                        {new Date(item.lastMessageTime).toLocaleDateString()}
-                      </span>
+                      <p className="font-medium text-[#111B21] text-[16px] truncate">{item.participantName}</p>
+                      <span className="text-xs text-[#667781]">{new Date(item.lastMessageTime).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-[#667781] truncate">
-                        {item.lastMessage || 'No messages'}
-                      </p>
-                      {item.messageCount > 0 && (
-                        <Badge
-                          count={item.messageCount}
-                          style={{ backgroundColor: '#25D366' }}
-                        />
-                      )}
+                      <p className="text-sm text-[#667781] truncate">{item.lastMessage || 'No messages'}</p>
+                      {item.messageCount > 0 && <Badge count={item.messageCount} style={{ backgroundColor: '#25D366' }} />}
                     </div>
                   </div>
                 </div>
@@ -419,49 +372,36 @@ export default function ChatMonitorLayout({
         <div className="flex-1 flex flex-col">
           {selectedChat ? (
             <>
-              <div className="bg-[#008069] px-4 py-3 flex items-center gap-3">
-                <Avatar size={40} style={{ backgroundColor: primaryColor }}>
-                  {selectedChat.participantName?.charAt(0)?.toUpperCase()}
-                </Avatar>
-                <div>
-                  <Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>
-                    {selectedChat.participantName}
-                  </Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>
-                    {selectedUser?.name}
-                  </Text>
-                </div>
+              <div className="bg-[#008069] px-2.5 py-2.5 flex items-center gap-3">
+                <Avatar size={40} style={{ backgroundColor: '#FFFFFF', color: primaryColor, border: '2px solid rgba(255,255,255,0.3)' }}>{selectedChat.participantName?.charAt(0)?.toUpperCase()}</Avatar>
+                <div className="flex-1"><Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>{selectedChat.participantName}</Text></div>
+                <Button type="text" icon={<SearchOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />} onClick={() => setSearchOpen(!searchOpen)} />
               </div>
+              {searchOpen && (
+                <div className="bg-[#008069] px-4 py-2 flex items-center gap-2">
+                  <input type="text" placeholder="Search messages..." value={messageSearchQuery} onChange={(e) => setMessageSearchQuery(e.target.value)} autoFocus className="flex-1 px-3 py-1.5 rounded text-sm" />
+                  {messageSearchResults.length > 0 && <span className="text-white text-xs">{currentMessageSearchIndex + 1} of {messageSearchResults.length}</span>}
+                  <Button type="text" size="small" icon={<UpOutlined style={{ color: '#FFFFFF' }} />} onClick={() => setCurrentMessageSearchIndex((prev) => (prev - 1 + messageSearchResults.length) % messageSearchResults.length)} disabled={messageSearchResults.length === 0} />
+                  <Button type="text" size="small" icon={<DownOutlined style={{ color: '#FFFFFF' }} />} onClick={() => setCurrentMessageSearchIndex((prev) => (prev + 1) % messageSearchResults.length)} disabled={messageSearchResults.length === 0} />
+                  <Button type="text" size="small" icon={<CloseOutlined style={{ color: '#FFFFFF' }} />} onClick={() => { setSearchOpen(false); setMessageSearchQuery(''); }} />
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: veryLightGreen }} ref={messagesContainerRef}>
                 {messagesLoading && page === 1 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Spin />
-                  </div>
+                  <div className="flex items-center justify-center h-full"><Spin /></div>
                 ) : messages.length > 0 ? (
                   <>
-                    {hasMore && (
-                      <div className="text-center py-2">
-                        <Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>
-                          Load older messages
-                        </Button>
-                      </div>
-                    )}
+                    {hasMore && <div className="text-center py-2"><Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>Load older messages</Button></div>}
                     {messages.map((msg, idx) => {
                       const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
                       const sender = msg.sender || msg.senderId;
                       const currentUserId = sender?.role === 'ADMIN' || sender?.role === 'TENANT_ADMIN' ? sender?._id : null;
                       
                       return (
-                        <div key={msg._id}>
-                          {showDate && (
-                            <div className="flex justify-center my-3">
-                              <div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>
-                                {formatDateLabel(msg.createdAt)}
-                              </div>
-                            </div>
-                          )}
-                          <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} />
+                        <div key={msg._id} id={`msg-${msg._id}`} style={{ backgroundColor: messageSearchResults[currentMessageSearchIndex]?.msg._id === msg._id ? 'rgba(255, 235, 59, 0.5)' : messageSearchResults.some(r => r.msg._id === msg._id) ? 'rgba(255, 235, 59, 0.2)' : 'transparent', borderRadius: '8px', padding: messageSearchResults.some(r => r.msg._id === msg._id) ? '4px' : '0', transition: 'background-color 0.3s ease' }}>
+                          {showDate && <div className="flex justify-center my-3"><div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>{formatDateLabel(msg.createdAt)}</div></div>}
+                          <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} searchQuery={messageSearchQuery} />
                         </div>
                       );
                     })}
@@ -472,20 +412,11 @@ export default function ChatMonitorLayout({
                 )}
               </div>
 
-              <div className="p-3 text-center text-xs" style={{ backgroundColor: '#F0F2F5', color: '#667781', borderTop: '1px solid #E5E7EB' }}>
-                Read-only view • No live updates
-              </div>
+              <div className="p-2 text-center text-xs" style={{ backgroundColor: '#F0F2F5', color: '#667781', borderTop: '1px solid #E5E7EB' }}>Read-only view</div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-[#F0F2F5]">
-              <Empty
-                image={<MessageOutlined style={{ fontSize: '64px', color: '#8696A0' }} />}
-                description={
-                  <span className="text-[#667781] text-sm">
-                    Select a chat to view conversation
-                  </span>
-                }
-              />
+              <Empty image={<MessageOutlined style={{ fontSize: '64px', color: '#8696A0' }} />} description={<span className="text-[#667781] text-sm">Select a chat to view conversation</span>} />
             </div>
           )}
         </div>

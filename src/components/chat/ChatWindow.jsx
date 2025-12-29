@@ -278,13 +278,17 @@ import {
 } from '../../redux/slices/chatSlice';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import { Spin, Empty, Button, Space, Tooltip, message } from 'antd';
+import { Spin, Empty, Button, Space, Tooltip, message, Input } from 'antd';
 import {
   PhoneOutlined,
   VideoCameraOutlined,
   MoreOutlined,
   ArrowLeftOutlined,
   MessageOutlined,
+  SearchOutlined,
+  CloseOutlined,
+  UpOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import OnlineStatus from './OnlineStatus';
 import TypingIndicator from './TypingIndicator';
@@ -313,6 +317,11 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   const [roomDetails, setRoomDetails] = useState(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const hasJoinedRoom = useRef(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const messagesContainerRef = useRef(null);
 
   // ✅ Get room details from rooms (memoized)
   const currentRoom = useMemo(() => {
@@ -325,6 +334,57 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
   // ✅ Memoize messages to prevent re-renders
   const messages = useMemo(() => messagesByRoom[activeRoomId] || [], [messagesByRoom, activeRoomId]);
+
+  // Search functionality
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(0);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const results = messages
+      .map((msg, idx) => ({ msg, idx }))
+      .filter(({ msg }) => {
+        const text = msg.text || msg.content || '';
+        return text.toLowerCase().includes(query);
+      })
+      .reverse(); // Reverse to show newest first
+
+    setSearchResults(results);
+    setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+  }, [searchQuery, messages]);
+
+  // Scroll to current search result
+  useEffect(() => {
+    if (searchResults.length > 0 && currentSearchIndex >= 0) {
+      const result = searchResults[currentSearchIndex];
+      const element = document.getElementById(`msg-${result.msg._id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [currentSearchIndex, searchResults]);
+
+  const handleSearchNext = () => {
+    if (searchResults.length > 0) {
+      setCurrentSearchIndex((prev) => (prev + 1) % searchResults.length);
+    }
+  };
+
+  const handleSearchPrev = () => {
+    if (searchResults.length > 0) {
+      setCurrentSearchIndex((prev) => (prev - 1 + searchResults.length) % searchResults.length);
+    }
+  };
+
+  const handleCloseSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
+  };
 
   // ✅ Get other participant or all participants for display
   const otherParticipant = useMemo(() => {
@@ -641,6 +701,14 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
         </div>
 
         <Space size="small">
+          <Tooltip title="Search">
+            <Button
+              type="text"
+              icon={<SearchOutlined style={{ fontSize: '18px' }} />}
+              onClick={() => setSearchOpen(!searchOpen)}
+              style={{ color: theme?.headerIconColor || '#FFFFFF' }}
+            />
+          </Tooltip>
           <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
             <Button
               type="text"
@@ -660,8 +728,62 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
         </Space>
       </div>
 
+      {/* Search Bar */}
+      {searchOpen && (
+        <div
+          style={{
+            padding: '8px 16px',
+            background: theme?.headerBackgroundColor || '#008069',
+            borderBottom: `1px solid ${theme?.sidebarBorderColor || '#e0e0e0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexShrink: 0,
+          }}
+        >
+          <Input
+            placeholder="Search messages..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoFocus
+            style={{ flex: 1 }}
+            suffix={
+              searchResults.length > 0 && (
+                <span style={{ fontSize: '12px', color: '#667781', marginRight: '8px' }}>
+                  {currentSearchIndex + 1} of {searchResults.length}
+                </span>
+              )
+            }
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<UpOutlined />}
+            onClick={handleSearchPrev}
+            disabled={searchResults.length === 0}
+            style={{ color: '#FFFFFF' }}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<DownOutlined />}
+            onClick={handleSearchNext}
+            disabled={searchResults.length === 0}
+            style={{ color: '#FFFFFF' }}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            onClick={handleCloseSearch}
+            style={{ color: '#FFFFFF' }}
+          />
+        </div>
+      )}
+
       {/* Messages - WhatsApp Background - Scrollable */}
       <div
+        ref={messagesContainerRef}
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -675,7 +797,13 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           backgroundPosition: 'center',
         }}
       >
-        <MessageList messages={messages} roomId={activeRoomId} />
+        <MessageList 
+          messages={messages} 
+          roomId={activeRoomId}
+          searchQuery={searchQuery}
+          searchResults={searchResults}
+          currentSearchIndex={currentSearchIndex}
+        />
       </div>
 
       {/* Typing Indicator - Fixed */}

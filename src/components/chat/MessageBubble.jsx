@@ -39,6 +39,7 @@ export default function MessageBubble({
   showAvatar, // eslint-disable-line no-unused-vars
   onEdit,
   onDelete,
+  searchQuery = '',
 }) {
   const { theme } = useTheme();
   const dispatch = useDispatch();
@@ -52,6 +53,20 @@ export default function MessageBubble({
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const [audioStates, setAudioStates] = useState({});
   const audioRefs = useRef({});
+
+  // Highlight search text
+  const highlightText = (text) => {
+    if (!searchQuery || !text) return text;
+    
+    const parts = text.split(new RegExp(`(${searchQuery})`, 'gi'));
+    return parts.map((part, i) => 
+      part.toLowerCase() === searchQuery.toLowerCase() ? (
+        <mark key={i} style={{ backgroundColor: '#FFEB3B', padding: '2px 0', borderRadius: '2px' }}>
+          {part}
+        </mark>
+      ) : part
+    );
+  };
 
   // ✅ Determine if message is from current user
   const messageSenderId = typeof message.senderId === 'object' && message.senderId?._id
@@ -755,7 +770,7 @@ export default function MessageBubble({
                 )}
                 {message.content && (
                   <div className="px-3 pb-2 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
-                    {message.content}
+                    {highlightText(message.content)}
                   </div>
                 )}
               </div>
@@ -804,7 +819,7 @@ export default function MessageBubble({
                 ))}
                 {message.content && (
                   <div className="px-3 pb-2 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
-                    {message.content}
+                    {highlightText(message.content)}
                   </div>
                 )}
               </div>
@@ -947,7 +962,7 @@ export default function MessageBubble({
                 })}
                 {message.content && (
                   <div className="mt-2 pt-2 border-t pb-2" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '80px', minWidth: '120px' }}>
-                    {message.content}
+                    {highlightText(message.content)}
                   </div>
                 )}
               </div>
@@ -1002,7 +1017,7 @@ export default function MessageBubble({
                 })}
                 {message.content && (
                   <div className="mt-3 pt-3 border-t" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '80px', minWidth: '120px' }}>
-                    {message.content}
+                    {highlightText(message.content)}
                   </div>
                 )}
               </div>
@@ -1083,7 +1098,7 @@ export default function MessageBubble({
                 </div>
                 {message.content && (
                   <div className="px-0" style={{ paddingRight: '80px', minWidth: '120px' }}>
-                    {message.content}
+                    {highlightText(message.content)}
                   </div>
                 )}
               </div>
@@ -1099,7 +1114,7 @@ export default function MessageBubble({
                   </div>
                 )}
                 <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '22px', minWidth: '120px', paddingTop: message.isForwarded ? '0' : '8px' }}>
-                  {message.content}
+                  {highlightText(message.content)}
                 </div>
               </div>
             )}

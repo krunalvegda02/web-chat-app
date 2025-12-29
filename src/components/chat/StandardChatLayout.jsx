@@ -1288,12 +1288,10 @@ export default function StandardChatLayout() {
         <>
           <style>{`
             body { overflow: hidden !important; }
-            nav[class*="bottom-0"] { display: none !important; }
           `}</style>
           <div className="fixed inset-0 flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
             <ChatWindow 
               showMobileHeader={true}
-              readOnly={false}
               onBack={() => {
                 dispatch(setActiveRoom(''));
                 setTimeout(() => setChatOpened(false), 0);
@@ -1467,7 +1465,7 @@ export default function StandardChatLayout() {
   return (
     <>
       <style>{`body { overflow: hidden !important; }`}</style>
-      <div className="fixed top-0 right-0 bottom-0 sm:left-20 left-0 flex" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
+      <div className="fixed top-0 right-0 bottom-0 left-0 md:left-20 flex" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
         {/* Left: Room List */}
         <div className="hidden md:flex w-96 flex-col" style={{ borderRight: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}` }}>
           <RoomList onCreateRoom={handlePlusClick} />
@@ -1478,7 +1476,6 @@ export default function StandardChatLayout() {
           {activeRoomId ? (
             <ChatWindow 
               showMobileHeader={false}
-              readOnly={false}
               onBack={() => dispatch(setActiveRoom(''))}
             />
           ) : (

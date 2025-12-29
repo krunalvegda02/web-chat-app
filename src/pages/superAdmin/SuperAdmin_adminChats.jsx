@@ -85,7 +85,7 @@ export default function SuperAdminAdminChats() {
       chats={chats}
       chatsLoading={loading}
       onUserSelect={() => {}} // No filtering needed, showing all
-      title="Monitor All Chats"
+      title="Monitor  Chats"
     />
   );
 }

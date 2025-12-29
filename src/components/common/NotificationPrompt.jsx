@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { Button, message } from 'antd';
-import { BellOutlined } from '@ant-design/icons';
+import { BellOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNotifications } from '../../hooks/useNotifications';
 
 export default function NotificationPrompt() {
   const { permission, requestPermission } = useNotifications();
+  const [dismissed, setDismissed] = useState(false);
 
   const handleEnable = async () => {
     const granted = await requestPermission();
@@ -15,7 +16,7 @@ export default function NotificationPrompt() {
     }
   };
 
-  if (permission === 'granted') return null;
+  if (permission === 'granted' || dismissed) return null;
 
   return (
     <div style={{
@@ -29,6 +30,18 @@ export default function NotificationPrompt() {
       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
       maxWidth: '300px'
     }}>
+      <CloseOutlined
+        onClick={() => setDismissed(true)}
+        style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          fontSize: '12px',
+          color: '#667781',
+          cursor: 'pointer',
+          padding: '4px'
+        }}
+      />
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
         <BellOutlined style={{ fontSize: '24px', color: '#008069' }} />
         <div>

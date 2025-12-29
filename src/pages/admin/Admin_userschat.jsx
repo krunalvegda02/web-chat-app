@@ -1,26 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
-import { useDispatch, useSelector } from 'react-redux';
-import { useTheme } from '../../hooks/useTheme';
-import {
-  MessageOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
+import { useDispatch } from 'react-redux';
 import { fetchAdminMemberChatsAPI } from '../../redux/slices/chatSlice';
-import { Avatar, Badge, Empty, Spin, Select } from 'antd';
-import ChatWindow from '../../components/chat/ChatWindow';
-import { setActiveRoom } from '../../redux/slices/chatSlice';
+import ChatMonitorLayout from '../../components/chat/ChatMonitorLayout';
 
 export default function AdminUsersChat() {
-  const { theme } = useTheme();
   const { user } = useAuthGuard(['ADMIN', 'TENANT_ADMIN']);
   const dispatch = useDispatch();
-  const { activeRoomId } = useSelector((s) => s.chat);
-
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
-  const [selectedMemberId, setSelectedMemberId] = useState(null);
-  const [chatOpened, setChatOpened] = useState(false);
 
   useEffect(() => {
     const loadMemberChats = async () => {
@@ -39,269 +27,44 @@ export default function AdminUsersChat() {
     loadMemberChats();
   }, [dispatch]);
 
-  const handleRoomClick = (chat) => {
-    dispatch(setActiveRoom(chat.roomId));
-    setChatOpened(true);
-  };
+  const users = useMemo(() => 
+    members.map(member => ({
+      id: member.memberId,
+      name: member.memberName,
+      email: member.memberEmail,
+      avatar: member.memberAvatar,
+      role: 'USER'
+    })),
+    [members]
+  );
+
+  const chats = useMemo(() => 
+    members.flatMap(member => 
+      (member.recentChats || []).map(chat => ({
+        roomId: chat.roomId,
+        participantId: member.memberId,
+        participantName: member.memberName,
+        participantEmail: member.memberEmail,
+        participantAvatar: member.memberAvatar,
+        lastMessage: chat.lastMessage,
+        lastMessageTime: chat.lastMessageTime,
+        messageCount: chat.messageCount,
+        roomType: chat.roomType,
+        roomName: chat.roomName
+      }))
+    ),
+    [members]
+  );
 
   if (!user) return null;
 
-  // Combine members with their chats
-  const combinedList = members.flatMap(member => 
-    (member.recentChats || []).map(chat => ({
-      ...chat,
-      memberId: member.memberId,
-      memberName: member.memberName,
-      memberEmail: member.memberEmail,
-      memberAvatar: member.memberAvatar,
-    }))
-  );
-
-  const filteredList = selectedMemberId
-    ? combinedList.filter(item => item.memberId === selectedMemberId)
-    : combinedList;
-
-  // Extract unique participants
-  const allParticipants = new Map();
-  members.forEach(member => {
-    allParticipants.set(member.memberId, {
-      value: member.memberId,
-      label: member.memberName,
-      email: member.memberEmail,
-      type: 'USER'
-    });
-  });
-
-  const memberOptions = Array.from(allParticipants.values());
-  const primaryColor = '#008069';
-
-  // Mobile view
-  if (window.innerWidth < 768) {
-    if (!chatOpened) {
-      return (
-        <>
-          <style>{`body { overflow: hidden !important; }`}</style>
-          <div className="fixed top-0 left-0 right-0 bottom-14 flex flex-col bg-[#F0F2F5] z-10">
-            {/* WhatsApp Header */}
-            <div className="bg-[#008069] px-4 py-5 flex items-center gap-3">
-              <h1 className="text-white text-xl font-medium flex-1">Member Chats</h1>
-              <SearchOutlined className="text-white text-xl" />
-            </div>
-
-            {/* Search Bar */}
-            <div className="bg-white px-3 py-2 border-b">
-              <Select
-                showSearch
-                placeholder="Select member to view chats..."
-                optionFilterProp="children"
-                value={selectedMemberId}
-                onChange={(value) => setSelectedMemberId(value)}
-                allowClear
-                style={{ width: '100%' }}
-                size="large"
-                virtual
-                listHeight={400}
-                filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
-                  (option?.email ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-                options={memberOptions}
-                optionRender={(option) => (
-                  <div className="flex flex-col">
-                    <span className="font-medium">{option.data.label}</span>
-                    <span className="text-xs text-gray-500">{option.data.email}</span>
-                  </div>
-                )}
-              />
-            </div>
-
-            {/* Chat List */}
-            <div className="flex-1 overflow-y-auto bg-white">
-              {loading ? (
-                <div className="flex justify-center items-center h-full">
-                  <Spin size="large" />
-                </div>
-              ) : filteredList.length > 0 ? (
-                filteredList.map((item, idx) => (
-                  <div
-                    key={`${item.roomId}-${idx}`}
-                    onClick={() => handleRoomClick(item)}
-                    className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] cursor-pointer active:bg-[#E9EDEF] transition-colors"
-                  >
-                    <Avatar
-                      size={50}
-                      src={item.memberAvatar}
-                      style={{ backgroundColor: primaryColor, flexShrink: 0 }}
-                    >
-                      {item.memberName?.charAt(0)?.toUpperCase()}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-[#111B21] text-[16px] truncate">
-                          {item.memberName}
-                        </p>
-                        <span className="text-xs text-[#667781]">
-                          {new Date(item.lastMessageTime).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-[#667781] truncate">
-                          {item.roomType === 'GROUP' ? `📁 ${item.roomName}` : item.lastMessage || 'No messages'}
-                        </p>
-                        {item.messageCount > 0 && (
-                          <Badge
-                            count={item.messageCount}
-                            style={{ backgroundColor: '#25D366' }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <Empty description="No chats found" className="mt-20" />
-              )}
-            </div>
-          </div>
-        </>
-      );
-    } else if (activeRoomId) {
-      return (
-        <>
-          <style>{`
-            body { overflow: hidden !important; }
-            nav[class*="bottom-0"] { display: none !important; }
-          `}</style>
-          <div className="fixed inset-0 flex flex-col bg-white z-[150]">
-            <ChatWindow
-              showMobileHeader={true}
-              readOnly={true}
-              onBack={() => {
-                setChatOpened(false);
-                dispatch(setActiveRoom(''));
-              }}
-            />
-          </div>
-        </>
-      );
-    }
-    return null;
-  }
-
-  // Desktop view
   return (
-    <>
-      <style>{`body { overflow: hidden !important; }`}</style>
-      <div className="fixed top-0 right-0 bottom-0 sm:left-20 left-0 flex bg-white">
-        {/* Left: Combined List */}
-        <div className="w-96 flex flex-col border-r border-[#E9EDEF] bg-white">
-          {/* WhatsApp Header */}
-          <div className="bg-[#008069] px-4 py-4 flex items-center justify-between">
-            <h1 className="text-white text-xl font-medium">Member Chats</h1>
-            <SearchOutlined className="text-white text-xl cursor-pointer" />
-          </div>
-
-          {/* Search Bar */}
-          <div className="px-3 py-2 bg-white border-b border-[#E9EDEF]">
-            <Select
-              showSearch
-              placeholder="Select member to view chats..."
-              optionFilterProp="children"
-              value={selectedMemberId}
-              onChange={(value) => setSelectedMemberId(value)}
-              allowClear
-              style={{ width: '100%' }}
-              size="large"
-              virtual
-              listHeight={400}
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
-                (option?.email ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={memberOptions}
-              optionRender={(option) => (
-                <div className="flex flex-col">
-                  <span className="font-medium">{option.data.label}</span>
-                  <span className="text-xs text-gray-500">{option.data.email}</span>
-                </div>
-              )}
-            />
-          </div>
-
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto bg-white">
-            {loading ? (
-              <div className="flex justify-center items-center h-full">
-                <Spin size="large" />
-              </div>
-            ) : filteredList.length > 0 ? (
-              filteredList.map((item, idx) => (
-                <div
-                  key={`${item.roomId}-${idx}`}
-                  onClick={() => handleRoomClick(item)}
-                  className="flex items-center gap-3 px-4 py-3 border-b border-[#E9EDEF] hover:bg-[#F5F6F6] cursor-pointer transition-colors"
-                  style={{
-                    backgroundColor: activeRoomId === item.roomId ? '#F0F2F5' : 'transparent'
-                  }}
-                >
-                  <Avatar
-                    size={50}
-                    src={item.memberAvatar}
-                    style={{ backgroundColor: primaryColor, flexShrink: 0 }}
-                  >
-                    {item.memberName?.charAt(0)?.toUpperCase()}
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-medium text-[#111B21] text-[16px] truncate">
-                        {item.memberName}
-                      </p>
-                      <span className="text-xs text-[#667781]">
-                        {new Date(item.lastMessageTime).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-[#667781] truncate">
-                        {item.roomType === 'GROUP' ? `📁 ${item.roomName}` : item.lastMessage || 'No messages'}
-                      </p>
-                      {item.messageCount > 0 && (
-                        <Badge
-                          count={item.messageCount}
-                          style={{ backgroundColor: '#25D366' }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <Empty description="No chats found" className="mt-20" />
-            )}
-          </div>
-        </div>
-
-        {/* Right: Chat Window */}
-        <div className="flex-1 flex flex-col">
-          {activeRoomId ? (
-            <ChatWindow
-              showMobileHeader={false}
-              readOnly={true}
-              onBack={() => dispatch(setActiveRoom(''))}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-[#F0F2F5]">
-              <Empty
-                image={<MessageOutlined style={{ fontSize: '64px', color: '#8696A0' }} />}
-                description={
-                  <span className="text-[#667781] text-sm">
-                    Select a chat to view conversation
-                  </span>
-                }
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </>
+    <ChatMonitorLayout
+      users={users}
+      usersLoading={loading}
+      chats={chats}
+      chatsLoading={loading}
+      title="Member Chats"
+    />
   );
 }

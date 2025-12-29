@@ -137,12 +137,12 @@ export const getMenuItems = (role, navigate) => {
         label: 'Admin Management',
         path: '/super-admin/admins',
       },
-      {
-        key: '/super-admin/contacts',
-        icon: <ContactsOutlined className="text-[22px]" />,
-        label: 'Contacts',
-        path: '/contacts',
-      },
+      // {
+      //   key: '/super-admin/contacts',
+      //   icon: <ContactsOutlined className="text-[22px]" />,
+      //   label: 'Contacts',
+      //   path: '/contacts',
+      // },
       {
         key: '/super-admin/calls',
         icon: <PhoneOutlined className="text-[22px]" />,

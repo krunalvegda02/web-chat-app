@@ -11,7 +11,7 @@ import { useChatSocket } from '../../hooks/useChatSocket';
 import { useTheme } from '../../hooks/useTheme';
 
 
-const MessageList = memo(function MessageList({ messages = [] }) {
+const MessageList = memo(function MessageList({ messages = [], searchQuery = '', searchResults = [], currentSearchIndex = 0 }) {
   const dispatch = useDispatch();
   const { theme } = useTheme();
   const { user } = useSelector((s) => s.auth);
@@ -376,7 +376,11 @@ const MessageList = memo(function MessageList({ messages = [] }) {
 
             {/* Messages for this date */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {groupedMessages[dateKey].map((message) => {
+              {groupedMessages[dateKey].map((message, msgIdx) => {
+                // Check if this message is a search result
+                const isSearchResult = searchResults.some(r => r.msg._id === message._id);
+                const isCurrentSearchResult = searchResults[currentSearchIndex]?.msg._id === message._id;
+                
                 // Check if this is a call log
                 if (message.type === 'call' && message.callLog) {
                   return (
@@ -390,16 +394,31 @@ const MessageList = memo(function MessageList({ messages = [] }) {
                   );
                 }
                 
-                // Regular message
+                // Regular message with search highlight
                 return (
-                  <MessageBubble
+                  <div
                     key={message._id}
-                    message={message}
-                    currentUser={user}
-                    showAvatar={false}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
+                    id={`msg-${message._id}`}
+                    style={{
+                      backgroundColor: isCurrentSearchResult 
+                        ? 'rgba(255, 235, 59, 0.5)' 
+                        : isSearchResult 
+                        ? 'rgba(255, 235, 59, 0.2)' 
+                        : 'transparent',
+                      borderRadius: '8px',
+                      padding: isSearchResult ? '4px' : '0',
+                      transition: 'background-color 0.3s ease',
+                    }}
+                  >
+                    <MessageBubble
+                      message={message}
+                      currentUser={user}
+                      showAvatar={false}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      searchQuery={searchQuery}
+                    />
+                  </div>
                 );
               })}
             </div>
