@@ -56,10 +56,11 @@ class ChatSocketClient {
           this.isConnected = false;
           console.log('🔌 [SOCKET] Disconnected:', reason);
           
-          // Handle token expiration on disconnect (only if not already on login page)
+          // Handle token expiration on disconnect (only if not already on login page or public chat)
           const currentPath = window.location.pathname;
+          const isPublicChatRoute = currentPath.match(/^\/user\/chats\/[^/]+$/);
           if ((reason === 'io server disconnect' || reason === 'transport close') && 
-              !currentPath.includes('/login') && !currentPath.includes('/register')) {
+              !currentPath.includes('/login') && !currentPath.includes('/register') && !isPublicChatRoute) {
             const token = localStorage.getItem('token');
             if (!token) {
               window.location.href = '/login';
@@ -80,10 +81,11 @@ class ChatSocketClient {
           this.isConnecting = false;
           this.disconnect();
           
-          // Redirect to login on token expiration (only if not already on login page)
+          // Redirect to login on token expiration (only if not already on login page or public chat)
           const currentPath = window.location.pathname;
+          const isPublicChatRoute = currentPath.match(/^\/user\/chats\/[^/]+$/);
           if ((data.message?.includes('expired') || data.message?.includes('Invalid token')) && 
-              !currentPath.includes('/login') && !currentPath.includes('/register')) {
+              !currentPath.includes('/login') && !currentPath.includes('/register') && !isPublicChatRoute) {
             localStorage.removeItem('token');
             window.location.href = '/login';
           }

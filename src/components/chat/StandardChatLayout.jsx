@@ -36,15 +36,30 @@ export default function StandardChatLayout({ roomFilter = null }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [chatOpened, setChatOpened] = useState(false);
+
   const { user } = useSelector((s) => s.auth);
   const { activeRoomId } = useSelector((s) => s.chat);
+  
+  // Check if this is a platform user
+  const isPlatformUser = user?.role === 'USER' && (user?.platformId || user?.externalUserId);
+  
+  // For platform users on mobile, always show chat if there's an active room
+  const shouldShowChatOnMobile = chatOpened && activeRoomId;
+  
+  // For platform users, force chat opened state if there's an active room
+  useEffect(() => {
+    if (isPlatformUser && activeRoomId && !chatOpened) {
+      console.log('📱 [StandardChatLayout] Platform user with active room, opening chat');
+      setChatOpened(true);
+    }
+  }, [isPlatformUser, activeRoomId, chatOpened]);
 
   const [showModal, setShowModal] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [searchUserTerm, setSearchUserTerm] = useState('');
-  const [chatOpened, setChatOpened] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -358,7 +373,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
   );
 
   if (window.innerWidth < 768) {
-    if (chatOpened && activeRoomId) {
+    if (shouldShowChatOnMobile) {
       return (
         <>
           <style>{`body { overflow: hidden !important; }`}</style>
@@ -366,10 +381,29 @@ export default function StandardChatLayout({ roomFilter = null }) {
             <ChatWindow 
               showMobileHeader={true}
               onBack={() => {
+                // For platform users, don't allow going back to room list
+                if (isPlatformUser) {
+                  console.log('🚫 [StandardChatLayout] Platform user cannot go back to room list');
+                  return;
+                }
                 dispatch(setActiveRoom(''));
                 setTimeout(() => setChatOpened(false), 0);
               }}
             />
+          </div>
+        </>
+      );
+    }
+    
+    // For platform users, don't show room list - they should be directly in chat
+    if (isPlatformUser) {
+      return (
+        <>
+          <style>{`body { overflow: hidden !important; }`}</style>
+          <div className="fixed top-0 left-0 right-0 bottom-14 flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
+            <div className="flex-1 flex items-center justify-center">
+              <Spin size="large" tip="Loading chat..." />
+            </div>
           </div>
         </>
       );

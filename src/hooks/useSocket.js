@@ -27,7 +27,9 @@ export const useSocket = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    if (!token || isConnected) return;
+    // ✅ Skip socket connection for public chat routes (no token)
+    const isPublicChatRoute = window.location.pathname.match(/^\/user\/chats\/[^/]+$/);
+    if (!token || isConnected || isPublicChatRoute) return;
 
     const initializeSocket = async () => {
       setIsLoading(true);

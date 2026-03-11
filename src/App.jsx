@@ -17,6 +17,8 @@ import { useAppNotifications } from "./hooks/useAppNotifications";
 import NotificationPrompt from "./components/common/NotificationPrompt";
 import WhatsAppNotification from "./components/common/WhatsAppNotification";
 import { useSocket } from "./hooks/useSocket";
+import { useAuthSync } from "./hooks/useAuthSync";
+import PlatformGateway from "./components/platform/PlatformGateway";
 
 function AppContent() {
   const dispatch = useDispatch();
@@ -25,6 +27,7 @@ function AppContent() {
   const [showCallWindow, setShowCallWindow] = useState(false);
   
   useSocket();
+  useAuthSync();
   const { notifications, handleNotification, closeNotification } = useAppNotifications();
   useNotifications(handleNotification);
 
@@ -97,24 +100,29 @@ function AppContent() {
   console.log('✅ [App] Initialized, rendering routes');
 
   return (
-    <>
+    <PlatformGateway>
       <Routes>
-        {pageRoutes.map(({ layout: Layout, routes, requiredRoles }, i) => (
-          <Route
-            key={i}
-            element={
-              requiredRoles ? (
-                <ProtectedRoute requiredRoles={requiredRoles}>
-                  {Layout ? <Layout /> : <></>}
-                </ProtectedRoute>
-              ) : Layout ? <Layout /> : <></>
-            }
-          >
-            {routes.map((route, idx) => (
-              <Route key={idx} path={route.path} element={<route.element />} />
-            ))}
-          </Route>
-        ))}
+        {pageRoutes.map(({ layout: Layout, routes, requiredRoles, wrapper: Wrapper }, i) => {
+          const layoutElement = Layout ? <Layout /> : <></>;
+          const wrappedLayout = Wrapper ? <Wrapper>{layoutElement}</Wrapper> : layoutElement;
+
+          return (
+            <Route
+              key={i}
+              element={
+                requiredRoles ? (
+                  <ProtectedRoute requiredRoles={requiredRoles}>
+                    {wrappedLayout}
+                  </ProtectedRoute>
+                ) : wrappedLayout
+              }
+            >
+              {routes.map((route, idx) => (
+                <Route key={idx} path={route.path} element={<route.element />} />
+              ))}
+            </Route>
+          );
+        })}
       </Routes>
 
       {user && <NotificationPrompt />}
@@ -133,38 +141,7 @@ function AppContent() {
           </div>
         </div>
       )}
-      {/* Call Features - Commented Out */}
-      {/* {callState.isInCall && !showCallWindow && (
-        <ActiveCallBanner
-          participant={callState.participant}
-          callStatus={callState.callStatus}
-          duration={callState.duration}
-          onClick={() => setShowCallWindow(true)}
-        />
-      )}
-
-      {callState.isInCall && callState.isIncoming && callState.callStatus === 'ringing' && (
-        <IncomingCallNotification
-          caller={callState.participant}
-          onAccept={acceptCall}
-          onDecline={rejectCall}
-        />
-      )}
-
-      {callState.isInCall && showCallWindow && !(callState.isIncoming && callState.callStatus === 'ringing') && (
-        <AudioCallWindow
-          participant={callState.participant}
-          callStatus={callState.callStatus}
-          onEndCall={endCall}
-          onToggleMute={toggleMute}
-          isMuted={callState.isMuted}
-          onToggleSpeaker={toggleSpeaker}
-          isSpeakerOn={callState.isSpeakerOn}
-          callDuration={callState.duration}
-          onMinimize={() => setShowCallWindow(false)}
-        />
-      )} */}
-    </>
+    </PlatformGateway>
   );
 }
 

@@ -1,273 +1,4 @@
 
-// import { useEffect, useState } from 'react';
-// import { useDispatch, useSelector } from 'react-redux';
-// import {
-//   fetchMessages,
-//   joinRoomThunk,
-//   setActiveRoom,
-// } from '../../redux/slices/chatSlice';
-// import MessageList from './MessageList';
-// import MessageInput from './MessageInput';
-// import { Spin, Empty, Button, Avatar, Space, Tooltip } from 'antd';
-// import {
-//   PhoneOutlined,
-//   VideoCameraOutlined,
-//   MoreOutlined,
-//   ArrowLeftOutlined,
-// } from '@ant-design/icons';
-// import OnlineStatus from './OnlineStatus';
-// import { useTheme } from '../../hooks/useTheme';
-
-// /**
-//  * ✅ OPTIMAL ChatWindow Component
-//  * Combines:
-//  * - Full Redux chat logic
-//  * - Complete theming support
-//  * - Mobile responsiveness
-//  * - Online status indicator
-//  * - Professional UI
-//  */
-// export default function ChatWindow({ isMobile = false }) {
-//   const dispatch = useDispatch();
-//   const { theme } = useTheme();
-//   const { activeRoomId, messagesByRoom, loadingMessages, rooms, onlineUsers } = useSelector(
-//     (s) => s.chat
-//   );
-//   const { user } = useSelector((s) => s.auth);
-//   const [roomDetails, setRoomDetails] = useState(null);
-
-//   // ✅ Join room and fetch messages
-//   useEffect(() => {
-//     if (activeRoomId) {
-//       console.log(`📍 ChatWindow: Active room changed to ${activeRoomId}`);
-//       dispatch(joinRoomThunk(activeRoomId));
-//       dispatch(fetchMessages({ roomId: activeRoomId, page: 1, limit: 50 }));
-
-//       const roomsArray = Array.isArray(rooms)
-//         ? rooms
-//         : rooms?.data?.rooms || rooms?.rooms || rooms?.data || [];
-//       const room = roomsArray.find((r) => r._id === activeRoomId);
-//       setRoomDetails(room);
-//     }
-//   }, [activeRoomId, dispatch, rooms]);
-
-//   // ✅ Show empty state if no room selected
-//   if (!activeRoomId) {
-//     return (
-//       <div
-//         style={{
-//           display: 'flex',
-//           alignItems: 'center',
-//           justifyContent: 'center',
-//           height: '100%',
-//           backgroundColor: theme.backgroundColor,
-//           color: theme.borderColor,
-//         }}
-//       >
-//         <Empty
-//           description="Choose a chat from the list to begin messaging"
-//           style={{ marginTop: '50px', color: theme.borderColor }}
-//         />
-//       </div>
-//     );
-//   }
-
-//   const isLoading = loadingMessages[activeRoomId];
-//   const messages = messagesByRoom[activeRoomId] || [];
-//   const otherParticipant = roomDetails?.participants?.find(
-//     (p) => p.userId?._id !== user?._id
-//   )?.userId;
-
-//   const isOtherUserOnline = onlineUsers.includes(otherParticipant?._id);
-
-//   return (
-//     <div
-//       style={{
-//         display: 'flex',
-//         flexDirection: 'column',
-//         height: '100%',
-//         backgroundColor: theme.backgroundColor,
-//         backgroundImage: theme.chatBackgroundImage
-//           ? `url(${theme.chatBackgroundImage})`
-//           : 'none',
-//         backgroundSize: 'cover',
-//         backgroundPosition: 'center',
-//       }}
-//     >
-//       {/* ===== HEADER ===== */}
-//       <div
-//         style={{
-//           display: 'flex',
-//           alignItems: 'center',
-//           justifyContent: 'space-between',
-//           padding: '12px 16px',
-//           borderBottom: `1px solid ${theme.borderColor}`,
-//           backgroundColor: theme.headerBackground,
-//         }}
-//       >
-//         {/* Left: Back Button + Participant Info */}
-//         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-//           {isMobile && (
-//             <Button
-//               type="text"
-//               icon={<ArrowLeftOutlined />}
-//               onClick={() => dispatch(setActiveRoom(''))}
-//               style={{ color: theme.primaryColor }}
-//             />
-//           )}
-
-//           {/* Logo + App Name (if available) */}
-//           {theme.logoUrl && (
-//             <img
-//               src={theme.logoUrl}
-//               alt={theme.appName}
-//               style={{
-//                 height: `${theme.logoHeight || 40}px`,
-//                 objectFit: 'contain',
-//               }}
-//             />
-//           )}
-
-//           {/* Participant Avatar */}
-//           {otherParticipant && (
-//             <>
-//               <Avatar
-//                 size="large"
-//                 style={{
-//                   backgroundColor: theme.accentColor,
-//                   cursor: 'pointer',
-//                 }}
-//               >
-//                 {otherParticipant.name?.[0]?.toUpperCase() || 'U'}
-//               </Avatar>
-
-//               {/* Participant Name + Status */}
-//               <div>
-//                 <div
-//                   style={{
-//                     fontWeight: '500',
-//                     color: theme.headerText,
-//                     fontSize: '16px',
-//                   }}
-//                 >
-//                   {otherParticipant.name}
-//                 </div>
-//                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-//                   <OnlineStatus
-//                     isOnline={isOtherUserOnline}
-//                     size="sm"
-//                   />
-//                   <span
-//                     style={{
-//                       fontSize: '12px',
-//                       color: theme.borderColor,
-//                     }}
-//                   >
-//                     {isOtherUserOnline ? 'Online' : 'Offline'}
-//                   </span>
-//                 </div>
-//               </div>
-//             </>
-//           )}
-//         </div>
-
-//         {/* Right: Action Buttons */}
-//         <Space>
-//           <Tooltip title="Start Call">
-//             <Button
-//               type="text"
-//               icon={<PhoneOutlined />}
-//               style={{ color: theme.primaryColor }}
-//             />
-//           </Tooltip>
-//           <Tooltip title="Start Video">
-//             <Button
-//               type="text"
-//               icon={<VideoCameraOutlined />}
-//               style={{ color: theme.primaryColor }}
-//             />
-//           </Tooltip>
-//           <Tooltip title="More Options">
-//             <Button
-//               type="text"
-//               icon={<MoreOutlined />}
-//               style={{ color: theme.primaryColor }}
-//             />
-//           </Tooltip>
-//         </Space>
-//       </div>
-
-//       {/* ===== MESSAGES AREA ===== */}
-//       {isLoading ? (
-//         <div
-//           style={{
-//             flex: 1,
-//             display: 'flex',
-//             alignItems: 'center',
-//             justifyContent: 'center',
-//             backgroundColor: theme.backgroundColor,
-//           }}
-//         >
-//           <Spin tip="Loading messages..." />
-//         </div>
-//       ) : (
-//         <div
-//           style={{
-//             flex: 1,
-//             overflowY: 'auto',
-//             backgroundColor: theme.backgroundColor,
-//             backgroundImage: theme.chatBackgroundImage
-//               ? `url(${theme.chatBackgroundImage})`
-//               : 'none',
-//             backgroundSize: 'cover',
-//             backgroundPosition: 'center',
-//             backgroundAttachment: 'fixed',
-//           }}
-//         >
-//           {/* Overlay for background image */}
-//           {theme.chatBackgroundImage && (
-//             <div
-//               style={{
-//                 position: 'absolute',
-//                 inset: 0,
-//                 backgroundColor: `rgba(255, 255, 255, ${theme.blurEffect || 0.1})`,
-//                 pointerEvents: 'none',
-//               }}
-//             />
-//           )}
-
-//           {/* Messages */}
-//           <div style={{ position: 'relative', zIndex: 1 }}>
-//             <MessageList messages={messages} />
-//           </div>
-//         </div>
-//       )}
-
-//       {/* ===== INPUT AREA ===== */}
-//       <div
-//         style={{
-//           padding: '12px 16px',
-//           borderTop: `1px solid ${theme.borderColor}`,
-//           backgroundColor: theme.backgroundColor,
-//         }}
-//       >
-//         <MessageInput />
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
-
-
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -325,6 +56,13 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
   // Check if user is a platform user (should have limited access)
   const isPlatformUser = user?.role === 'USER' && user?.platformId;
+  const isSecurePlatformUser = user?.externalUserId && user?.platformId; // Enhanced security check
+  console.log(isPlatformUser ? '👤 Platform user detected' : '👤 Regular user', { 
+    user, 
+    isPlatformUser, 
+    isSecurePlatformUser,
+    hasExternalId: !!user?.externalUserId
+  });
 
   // ✅ Get room details from rooms (memoized)
   const currentRoom = useMemo(() => {
@@ -464,10 +202,13 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       return;
     }
 
-    // Prevent duplicate joins
-    if (hasJoinedRoom.current) return;
-    hasJoinedRoom.current = true;
-
+    // Prevent duplicate joins - CRITICAL: Check if already joined this specific room
+    if (hasJoinedRoom.current === activeRoomId) {
+      console.log(`⏭️ Already joined room ${activeRoomId}, skipping`);
+      return;
+    }
+    
+    hasJoinedRoom.current = activeRoomId;
     console.log(`📍 ChatWindow: Joining room ${activeRoomId}`);
 
     let isMounted = true;
@@ -475,7 +216,36 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     const loadRoom = async () => {
       try {
         setMessagesLoaded(false);
-        joinRoom(activeRoomId, readOnly);
+        
+        // Only join room via socket if user is authenticated AND socket is connected
+        if (user && chatSocketClient && chatSocketClient.isReady()) {
+          joinRoom(activeRoomId, readOnly);
+        } else {
+          console.log('⏭️ [ChatWindow] Skipping socket join - no user or socket not connected');
+        }
+
+        // For unauthenticated users accessing a specific room, redirect to platform auth
+        if (!user && activeRoomId) {
+          console.log('🔐 [ChatWindow] Unauthenticated user trying to access room, redirecting to platform auth');
+          // Check if this looks like a platform integration URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
+          const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
+          
+          if (hasApiKey || hasUserData) {
+            // This looks like a platform integration, let the platform detection handle it
+            console.log('🔄 [ChatWindow] Platform integration detected, waiting for authentication...');
+          } else {
+            // No platform data, redirect to login
+            console.log('🔄 [ChatWindow] No platform data, redirecting to login');
+            window.location.href = '/login';
+          }
+          
+          if (isMounted) {
+            setMessagesLoaded(true);
+          }
+          return;
+        }
 
         const result = await dispatch(fetchMessages({
           roomId: activeRoomId,
@@ -517,14 +287,12 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     return () => {
       isMounted = false;
       console.log(`🚪 Leaving room: ${activeRoomId}`);
-      leaveRoom(activeRoomId);
-      hasJoinedRoom.current = false;
+      if (user && chatSocketClient && chatSocketClient.isReady()) {
+        leaveRoom(activeRoomId);
+      }
+      // Don't reset hasJoinedRoom here to prevent re-joining
     };
-  }, [activeRoomId, dispatch, readOnly, user?._id]);
-
-  // ❌ REMOVED: Auto-mark-as-read logic that was causing infinite loop
-  // Messages are marked as read via socket events when user joins room
-  // See: Backend chatSocket.js join_room event handler
+  }, [activeRoomId, dispatch, readOnly]);
 
   // Handle incoming calls
   useEffect(() => {
@@ -663,8 +431,8 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           {otherParticipant ? (
             <>
               <div 
-                style={{ position: 'relative', flexShrink: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
-                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
+                style={{ position: 'relative', flexShrink: 0, cursor: (isPlatformUser || isSecurePlatformUser) ? 'default' : 'pointer' }}
+                onClick={() => !(isPlatformUser || isSecurePlatformUser) && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <Avatar src={otherParticipant.avatar} size={40} name={displayName} />
                 {isOtherUserOnline && (
@@ -683,8 +451,8 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
                 )}
               </div>
               <div 
-                style={{ flex: 1, minWidth: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
-                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
+                style={{ flex: 1, minWidth: 0, cursor: (isPlatformUser || isSecurePlatformUser) ? 'default' : 'pointer' }}
+                onClick={() => !(isPlatformUser || isSecurePlatformUser) && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <div style={{ fontWeight: 600, color: theme?.headerTextColor || '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {displayName}
@@ -718,7 +486,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
             />
           </Tooltip>
           {/* Hide call button for platform users */}
-          {!isPlatformUser && (
+          {!isPlatformUser && !isSecurePlatformUser && (
             <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
               <Button
                 type="text"

@@ -87,6 +87,24 @@ const authSlice = createSlice({
       state.user = action.payload;
       state.initialized = true;
     },
+    setPlatformAuth(state, action) {
+      const { user, token, refreshToken } = action.payload;
+      state.user = user;
+      state.token = token;
+      state.refreshToken = refreshToken;
+      state.initialized = true;
+      state.loading = false;
+      state.error = null;
+    },
+    setPlatformAuth(state, action) {
+      const { user, token, refreshToken } = action.payload;
+      state.user = user;
+      state.token = token;
+      state.refreshToken = refreshToken;
+      state.initialized = true;
+      state.loading = false;
+      state.error = null;
+    },
     clearAuth(state) {
       state.user = null;
       state.token = null;
@@ -233,7 +251,7 @@ const authSlice = createSlice({
 
 console.log('Auth Slice Initial State:', initialState);
 
-export const { clearError, setUser, clearAuth, setInitialized } = authSlice.actions;
+export const { clearError, setUser, setPlatformAuth, clearAuth, setInitialized } = authSlice.actions;
 
 // Auth Selectors
 export const selectAuth = (state) => state.auth;

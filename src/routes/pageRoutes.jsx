@@ -2,14 +2,16 @@ import AuthLayout from "../layouts/AuthLayout";
 import AdminLayout from "../layouts/AdminLayout";
 import SuperAdminLayout from "../layouts/SuperAdminLayout";
 import UserChatLayout from "../layouts/UserLayout";
+import PublicChatLayout from "../layouts/PublicChatLayout";
 import SharedLayout from "../layouts/SharedLayout";
+import PlatformAwareRoute from "./PlatformAwareRoute";
 import { Navigate } from "react-router-dom";
 
 // Auth Pages
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
-// import UserJoinPage from "../pages/user/UserJoinPage";
+import PlatformAuth from "../components/auth/PlatformAuth";
 
 // Super Admin Pages
 import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
@@ -30,7 +32,7 @@ import UserChatPage from "../pages/user/UserChatPage";
 import CallLogs from "../pages/common/CallLogsPage";
 import ContactsNew from "../pages/common/ContactsPageNew";
 import Profile from "../pages/common/Profile";
-import UserProfile from "../pages/user/UserProfile";
+import UserProfile from "../pages/common/Profile";
 
 // Error Pages
 import Unauthorized from "../pages/common/Unauthorized";
@@ -41,18 +43,31 @@ import JoinPage from "../pages/user/JoinPage";
 // CENTRALIZED ROUTE CONFIG
 // ------------------------------------
 export const pageRoutes = [
+    // ✅ PLATFORM ROUTES FIRST: Direct chat access for platform users (NO AUTH REQUIRED)
+    // Wrapped with PlatformAwareRoute to prevent rendering until auth is complete
+    {
+        layout: PublicChatLayout,
+        requiredRoles: null,
+        wrapper: PlatformAwareRoute,
+        routes: [
+            { path: "/user/chats/:roomId", element: UserChatPage },
+            { path: "/user/chats", element: UserChatPage },
+        ],
+    },
+
+    // Auth Pages
     {
         layout: AuthLayout,
         routes: [
             { path: "/login", element: LoginPage },
             { path: "/register", element: RegisterPage },
             { path: "/reset-password", element: ResetPasswordPage },
-            // { path: "/join/:tenantSlug", element: UserJoinPage },
-
             { path: "/join", element: JoinPage },
+            { path: "/platform-auth", element: PlatformAuth },
         ],
     },
 
+    // Admin Routes
     {
         layout: AdminLayout,
         requiredRoles: ["TENANT_ADMIN", "PLATFORM_ADMIN"],
@@ -65,22 +80,23 @@ export const pageRoutes = [
             { path: "/admin/whatsapp-test", element: WhatsAppTestPage },
         ],
     },
+
+    // Super Admin Routes
     {
         layout: SuperAdminLayout,
         requiredRoles: ["SUPER_ADMIN"],
         routes: [
-            // { path: "/super-admin", element: SuperAdminDashboard },
             { path: "/super-admin/admins", element: SuperAdminAdminsList },
             { path: "/super-admin/chats", element: SuperAdminChat },
             { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
         ],
     },
+
+    // Authenticated User Routes
     {
         layout: UserChatLayout,
-        requiredRoles: ["USER"],
+        requiredRoles: ["USER", "PLATFORM_ADMIN"],
         routes: [
-            { path: "/user/chats", element: UserChatPage },
-            // Redirects for backward compatibility
             { path: "/user/contacts", element: () => <Navigate to="/contacts" replace /> },
             { path: "/user/calls", element: () => <Navigate to="/calls" replace /> },
         ],
@@ -89,7 +105,7 @@ export const pageRoutes = [
     // Shared routes for all authenticated users
     {
         layout: SharedLayout,
-            requiredRoles: ["USER", "TENANT_ADMIN", "PLATFORM_ADMIN", "SUPER_ADMIN"],
+        requiredRoles: ["USER", "TENANT_ADMIN", "PLATFORM_ADMIN", "SUPER_ADMIN"],
         routes: [
             { path: "/profile", element: Profile },
             { path: "/profile/:userId", element: UserProfile },

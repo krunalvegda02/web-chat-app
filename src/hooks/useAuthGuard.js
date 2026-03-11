@@ -7,11 +7,21 @@ export const useAuthGuard = (allowedRoles = []) => {
   const { user, token, loading, initialized } = useSelector((state) => state.auth);
   
   const isAuthenticated = !!user && !!token;
-  const isAuthorized = allowedRoles.length === 0 || allowedRoles.includes(user?.role);
+  
+  // ✅ Build the list of allowed roles
+  let rolesForCheck = [...allowedRoles];
+  
+  // ✅ If USER is in allowed roles, also allow PLATFORM_ADMIN
+  if (rolesForCheck.includes('USER') && !rolesForCheck.includes('PLATFORM_ADMIN')) {
+    rolesForCheck.push('PLATFORM_ADMIN');
+  }
+  
+  const isAuthorized = rolesForCheck.length === 0 || rolesForCheck.includes(user?.role);
   const hasAccess = isAuthenticated && isAuthorized;
 
   console.log('🔐 [useAuthGuard] Hook called', {
     allowedRoles,
+    rolesForCheck,
     isAuthenticated,
     userRole: user?.role,
     isAuthorized,
@@ -27,6 +37,7 @@ export const useAuthGuard = (allowedRoles = []) => {
       isAuthenticated,
       isAuthorized,
       userRole: user?.role,
+      rolesForCheck,
     });
 
     if (initialized && !loading) {
@@ -37,6 +48,7 @@ export const useAuthGuard = (allowedRoles = []) => {
         console.error('🚫 [useAuthGuard] Not authorized!', {
           userRole: user?.role,
           allowedRoles,
+          rolesForCheck,
           redirectingTo: '/unauthorized',
         });
         navigate('/unauthorized');
@@ -44,7 +56,7 @@ export const useAuthGuard = (allowedRoles = []) => {
         console.log('✅ [useAuthGuard] Authorized, allowing access');
       }
     }
-  }, [isAuthenticated, isAuthorized, initialized, loading, navigate, user?.role, allowedRoles]);
+  }, [isAuthenticated, isAuthorized, initialized, loading, navigate, user?.role, rolesForCheck]);
 
   return {
     user,

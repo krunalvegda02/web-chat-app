@@ -1,11 +1,13 @@
 
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { Form, Input, Button, Card, Checkbox, Typography, Alert, Divider } from 'antd';
-import { LockOutlined, UserOutlined } from '@ant-design/icons';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { Form, Input, Button, Card, Checkbox, Typography, Alert, Divider, Switch } from 'antd';
+import { LockOutlined, UserOutlined, ApiOutlined } from '@ant-design/icons';
 import { login, clearError } from '../../redux/slices/authSlice.jsx';
 import { useTheme } from '../../hooks/useTheme';
+import { usePlatformIntegration } from '../../hooks/usePlatformIntegration';
+import { securityUtils } from '../../helper/secureApiClient';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -14,12 +16,24 @@ export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const [searchParams] = useSearchParams();
   const { loading, error, user, token } = useSelector((s) => s.auth);
   const [form] = Form.useForm();
   const [rememberMe, setRememberMe] = useState(false);
   const [requiresPhoneVerification, setRequiresPhoneVerification] = useState(false);
   const [userId, setUserId] = useState(null);
   const [lastPhone, setLastPhone] = useState(null);
+  const [usePlatformAuth, setUsePlatformAuth] = useState(false);
+  
+  // Platform integration setup
+  const apiKey = searchParams.get('apiKey') || import.meta.env.VITE_PLATFORM_API_KEY;
+  const isPlatformMode = !!apiKey || searchParams.has('platform');
+  const {
+    platformChatLogin,
+    isValidApiKey,
+    error: platformError,
+    loading: platformLoading
+  } = usePlatformIntegration(apiKey);
 
   console.log('🔐 [LoginPage] Auth state:', {
     loading,
@@ -45,10 +59,47 @@ export default function LoginPage() {
     }
   }, [form]);
 
-  // ✅ Handle unified login (email or phone)
+  // ✅ Handle unified login (email or phone) with platform support
   const handleLogin = async (values) => {
     try {
-      console.log('🔐 [LoginPage] handleLogin called');
+      console.log('🔐 [LoginPage] handleLogin called', { usePlatformAuth, isPlatformMode });
+      
+      // Platform authentication flow
+      if (usePlatformAuth && isPlatformMode && isValidApiKey) {
+        const userData = {
+          name: values.name?.trim(),
+          email: values.identifier?.includes('@') ? values.identifier.trim() : values.email?.trim(),
+          phone: values.identifier?.includes('@') ? values.phone : values.identifier.replace(/\D/g, ''),
+          password: values.password,
+          externalUserId: values.externalUserId || `login_${Date.now()}`
+        };
+        
+        // Validate platform data
+        if (!userData.email || !userData.phone) {
+          form.setFields([
+            { name: 'email', errors: userData.email ? [] : ['Email is required for platform login'] },
+            { name: 'phone', errors: userData.phone ? [] : ['Phone is required for platform login'] }
+          ]);
+          return;
+        }
+        
+        console.log('🔐 [LoginPage] Using platform authentication');
+        const result = await platformChatLogin(userData);
+        
+        if (result.success) {
+          console.log('✅ [LoginPage] Platform login successful');
+          setTimeout(() => {
+            const redirectUrl = result.data.redirectUrl || '/user/chats';
+            window.location.href = redirectUrl;
+          }, 500);
+          return;
+        } else {
+          console.error('❌ [LoginPage] Platform login failed:', result.error);
+          return;
+        }
+      }
+      
+      // Regular authentication flow
       const identifier = values.identifier.trim();
       const isEmail = identifier.includes('@');
       
@@ -204,18 +255,57 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px', border: `1px solid ${theme?.borderColor || '#E9EDEF'}` }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>💬</div>
-          <Title level={2} style={{ color: theme?.primaryColor || '#008069', marginBottom: 8 }}>Sign In</Title>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>
+            {isPlatformMode ? '🔐' : '💬'}
+          </div>
+          <Title level={2} style={{ color: theme?.primaryColor || '#008069', marginBottom: 8 }}>
+            {isPlatformMode ? 'Platform Login' : 'Sign In'}
+          </Title>
           <Text type="secondary">
-            Connect with contacts and start chatting
+            {isPlatformMode ? 'Secure platform integration login' : 'Connect with contacts and start chatting'}
           </Text>
         </div>
 
+        {/* Platform Mode Indicator */}
+        {isPlatformMode && (
+          <Alert
+            message={isValidApiKey ? "Secure Platform Mode" : "Invalid API Key"}
+            description={isValidApiKey ? 
+              "Platform integration is active with a valid API key." : 
+              "The provided API key is invalid. Contact your platform administrator."
+            }
+            type={isValidApiKey ? "success" : "error"}
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {/* Platform Auth Toggle */}
+        {isPlatformMode && isValidApiKey && (
+          <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f6f8fa', borderRadius: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <Text strong>Platform Authentication</Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Use secure platform integration login
+                </Text>
+              </div>
+              <Switch
+                checked={usePlatformAuth}
+                onChange={setUsePlatformAuth}
+                checkedChildren={<ApiOutlined />}
+                unCheckedChildren={<UserOutlined />}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Error Alert */}
-        {error && (
+        {(error || platformError) && (
           <Alert
             message="Login Failed"
-            description={error}
+            description={platformError || error}
             type="error"
             showIcon
             closable
@@ -231,29 +321,92 @@ export default function LoginPage() {
           onFinish={handleLogin}
           autoComplete="off"
         >
-          <Form.Item
-            name="identifier"
-            rules={[
-              { required: true, message: 'Email or phone is required' }
-            ]}
-          >
-            <Input
-              size="large"
-              prefix={<UserOutlined />}
-              placeholder="Email or phone number"
-              disabled={loading}
-            />
-          </Form.Item>
+          {/* Platform-specific fields */}
+          {usePlatformAuth && isPlatformMode && (
+            <>
+              <Form.Item
+                name="name"
+                label="Full Name"
+                rules={[
+                  { required: true, message: 'Name is required for platform login' },
+                  { min: 2, message: 'Name must be at least 2 characters' }
+                ]}
+              >
+                <Input
+                  size="large"
+                  prefix={<UserOutlined />}
+                  placeholder="Enter your full name"
+                  disabled={loading || platformLoading}
+                />
+              </Form.Item>
+              
+              <Form.Item
+                name="email"
+                label="Email Address"
+                rules={[
+                  { required: true, message: 'Email is required' },
+                  { type: 'email', message: 'Please enter a valid email' }
+                ]}
+              >
+                <Input
+                  size="large"
+                  prefix={<UserOutlined />}
+                  placeholder="Enter your email"
+                  disabled={loading || platformLoading}
+                />
+              </Form.Item>
+              
+              <Form.Item
+                name="phone"
+                label="Phone Number"
+                rules={[
+                  { required: true, message: 'Phone is required' },
+                  { 
+                    validator: (_, value) => {
+                      if (!value) return Promise.resolve();
+                      return securityUtils.isValidPhone(value) 
+                        ? Promise.resolve() 
+                        : Promise.reject('Invalid phone number');
+                    }
+                  }
+                ]}
+              >
+                <Input
+                  size="large"
+                  prefix={<UserOutlined />}
+                  placeholder="Enter your phone number"
+                  disabled={loading || platformLoading}
+                />
+              </Form.Item>
+            </>
+          )}
+          
+          {/* Regular login field */}
+          {(!usePlatformAuth || !isPlatformMode) && (
+            <Form.Item
+              name="identifier"
+              rules={[
+                { required: true, message: 'Email or phone is required' }
+              ]}
+            >
+              <Input
+                size="large"
+                prefix={<UserOutlined />}
+                placeholder="Email or phone number"
+                disabled={loading || platformLoading}
+              />
+            </Form.Item>
+          )}
 
           <Form.Item
             name="password"
-            rules={[{ required: true, message: 'Password is required' }]}
+            rules={[{ required: !usePlatformAuth, message: 'Password is required' }]}
           >
             <Input.Password
               size="large"
               prefix={<LockOutlined />}
-              placeholder="Enter password"
-              disabled={loading}
+              placeholder="Enter password (optional for platform login)"
+              disabled={loading || platformLoading}
             />
           </Form.Item>
 
@@ -271,11 +424,12 @@ export default function LoginPage() {
               type="primary"
               size="large"
               htmlType="submit"
-              loading={loading}
+              loading={loading || platformLoading}
+              disabled={isPlatformMode && !isValidApiKey}
               block
               style={{ backgroundColor: theme?.primaryColor || '#008069', borderColor: theme?.primaryColor || '#008069' }}
             >
-              Sign In
+              {(loading || platformLoading) ? 'Signing In...' : (usePlatformAuth ? 'Secure Platform Login' : 'Sign In')}
             </Button>
           </Form.Item>
         </Form>
