@@ -123,9 +123,7 @@ export default function ChatMonitorLayout({
   };
 
   const combinedList = chats;
-  const filteredList = selectedUserId
-    ? combinedList.filter(item => item.participantId === selectedUserId)
-    : combinedList;
+  const filteredList = combinedList;
 
   // Message search
   useEffect(() => {
@@ -147,28 +145,14 @@ export default function ChatMonitorLayout({
     }
   }, [currentMessageSearchIndex, messageSearchResults]);
 
-  const allParticipants = new Map();
-  users.forEach(user => {
-    allParticipants.set(user.id, {
+  const userOptions = useMemo(() => {
+    return users.map(user => ({
       value: user.id,
       label: user.name,
       email: user.email,
-      type: user.role || 'ADMIN'
-    });
-  });
-  
-  chats.forEach(chat => {
-    if (chat.participantId) {
-      allParticipants.set(chat.participantId, {
-        value: chat.participantId,
-        label: chat.participantName,
-        email: chat.participantEmail || '',
-        type: 'USER'
-      });
-    }
-  });
-
-  const userOptions = Array.from(allParticipants.values());
+      type: user.role
+    }));
+  }, [users]);
 
   // Mobile view
   if (window.innerWidth < 768) {
@@ -212,7 +196,11 @@ export default function ChatMonitorLayout({
             </div>
 
             <div className="flex-1 overflow-y-auto bg-white">
-              {chatsLoading ? (
+              {!selectedUserId ? (
+                <div className="flex items-center justify-center h-full">
+                  <Empty description="Select a user to monitor their chats" />
+                </div>
+              ) : chatsLoading ? (
                 <div className="flex justify-center items-center h-full">
                   <Spin size="large" />
                 </div>
@@ -251,9 +239,16 @@ export default function ChatMonitorLayout({
           <style>{`body { overflow: hidden !important; } nav[class*="bottom-0"] { display: none !important; }`}</style>
           <div className="fixed inset-0 flex flex-col bg-white z-[150]">
             <div className="bg-[#008069] px-4 py-3 flex items-center gap-3">
-              <button onClick={() => { setChatOpened(false); setSelectedChat(null); setSearchOpen(false); setMessageSearchQuery(''); }} className="text-white">←</button>
+              <button onClick={() => { setChatOpened(false); setSelectedChat(null); setSearchOpen(false); setMessageSearchQuery(''); }} className="text-white text-2xl leading-none p-0 border-0 bg-transparent cursor-pointer">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                  <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(180 12 12)"/>
+                </svg>
+              </button>
               <Avatar size={36} style={{ backgroundColor: '#FFFFFF', color: primaryColor, border: '2px solid rgba(255,255,255,0.3)' }}>{selectedChat.participantName?.charAt(0)?.toUpperCase()}</Avatar>
-              <div className="flex-1"><Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>{selectedChat.participantName}</Text></div>
+              <div className="flex-1">
+                <Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>{selectedChat.participantName}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', display: 'block' }}>{selectedUser?.name || 'Monitoring'}</Text>
+              </div>
               <Button type="text" icon={<SearchOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />} onClick={() => setSearchOpen(!searchOpen)} />
             </div>
             {searchOpen && (
@@ -340,7 +335,11 @@ export default function ChatMonitorLayout({
           </div>
 
           <div className="flex-1 overflow-y-auto bg-white">
-            {chatsLoading ? (
+            {!selectedUserId ? (
+              <div className="flex items-center justify-center h-full">
+                <Empty description="Select a user to monitor their chats" />
+              </div>
+            ) : chatsLoading ? (
               <div className="flex justify-center items-center h-full"><Spin size="large" /></div>
             ) : filteredList.length > 0 ? (
               filteredList.map((item, idx) => (
@@ -374,7 +373,10 @@ export default function ChatMonitorLayout({
             <>
               <div className="bg-[#008069] px-2.5 py-2.5 flex items-center gap-3">
                 <Avatar size={40} style={{ backgroundColor: '#FFFFFF', color: primaryColor, border: '2px solid rgba(255,255,255,0.3)' }}>{selectedChat.participantName?.charAt(0)?.toUpperCase()}</Avatar>
-                <div className="flex-1"><Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>{selectedChat.participantName}</Text></div>
+                <div className="flex-1">
+                  <Text strong style={{ color: '#FFFFFF', fontSize: '14px', display: 'block' }}>{selectedChat.participantName}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', display: 'block' }}>{selectedUser?.name || 'Monitoring'}</Text>
+                </div>
                 <Button type="text" icon={<SearchOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />} onClick={() => setSearchOpen(!searchOpen)} />
               </div>
               {searchOpen && (

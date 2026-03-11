@@ -13,18 +13,25 @@ import {
   Spin,
   Button,
   Empty,
+  Badge,
   Typography,
   Pagination,
+  Divider,
 } from 'antd';
 import {
   SearchOutlined,
+  MailOutlined,
   UserAddOutlined,
   MessageOutlined,
+  CheckCircleOutlined,
+  PhoneOutlined,
 } from '@ant-design/icons';
 import {
-  createOrGetRoom,
+  createDirectRoom,
+  createAdminChat,
   setActiveRoom,
   fetchRooms,
+  fetchAvailableUsers,
 } from '../../redux/slices/chatSlice';
 import { _get, _post } from '../../helper/apiClient';
 
@@ -48,18 +55,17 @@ export default function StandardChatLayout({ roomFilter = null }) {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 50;
+  const pageSize = 10;
 
   useSocket();
 
   useEffect(() => {
-    const roomId = searchParams.get('room') || searchParams.get('roomId');
+    const roomId = searchParams.get('room');
     if (roomId && roomId !== activeRoomId) {
-      console.log('✅ Opening room from URL:', roomId);
       dispatch(setActiveRoom(roomId));
       setChatOpened(true);
     }
-  }, [searchParams, dispatch, activeRoomId]);
+  }, [searchParams, dispatch]);
 
   useEffect(() => {
     if (activeRoomId) {
@@ -123,7 +129,9 @@ export default function StandardChatLayout({ roomFilter = null }) {
     setSearchLoading(true);
     try {
       const response = await _get(`/users/search?query=${searchUserTerm}`);
+      console.log('Full API response:', response);
       const users = response?.data?.data?.users || [];
+      console.log('Extracted users:', users);
       const mappedUsers = users.map((u) => ({
         _id: u._id,
         name: u.name,
@@ -133,8 +141,10 @@ export default function StandardChatLayout({ roomFilter = null }) {
         role: u.role,
         isSearchResult: true,
       }));
+      console.log('Search results:', mappedUsers);
       setSearchResults(mappedUsers);
     } catch (error) {
+      console.error('Search error:', error);
       message.error('Search failed');
     } finally {
       setSearchLoading(false);
@@ -157,20 +167,28 @@ export default function StandardChatLayout({ roomFilter = null }) {
           identifier: selectedUser.email || selectedUser.phone,
           contactName: selectedUser.name,
         });
+        message.success('Contact added');
       } catch (error) {
         if (error.response?.status !== 400) {
           throw error;
         }
       }
 
-      const result = await dispatch(createOrGetRoom({ userId: selectedUser._id })).unwrap();
+      const currentUserIsAdmin = ['ADMIN', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(user?.role);
+      const selectedUserIsAdmin = ['ADMIN', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(selectedUser.role);
+      const isAdminChat = currentUserIsAdmin && selectedUserIsAdmin;
+
+      const result = isAdminChat
+        ? await dispatch(createAdminChat({ adminId: selectedUser._id })).unwrap()
+        : await dispatch(createDirectRoom({ userId: selectedUser._id })).unwrap();
 
       const roomId = result?.data?.room?._id || result?.room?._id || result?._id;
 
       if (roomId) {
         dispatch(setActiveRoom(roomId));
-        await dispatch(fetchRooms());
+        dispatch(fetchRooms());
         setChatOpened(true);
+        message.success('Chat opened successfully');
         setShowModal(false);
       }
     } catch (error) {
@@ -184,14 +202,21 @@ export default function StandardChatLayout({ roomFilter = null }) {
     try {
       setCreatingRoom(true);
 
-      const result = await dispatch(createOrGetRoom({ userId: selectedUser._id })).unwrap();
+      const currentUserIsAdmin = ['ADMIN', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(user?.role);
+      const selectedUserIsAdmin = ['ADMIN', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(selectedUser.role);
+      const isAdminChat = currentUserIsAdmin && selectedUserIsAdmin;
+
+      const result = isAdminChat
+        ? await dispatch(createAdminChat({ adminId: selectedUser._id })).unwrap()
+        : await dispatch(createDirectRoom({ userId: selectedUser._id })).unwrap();
 
       const roomId = result?.data?.room?._id || result?.room?._id || result?._id;
 
       if (roomId) {
         dispatch(setActiveRoom(roomId));
-        await dispatch(fetchRooms());
+        dispatch(fetchRooms());
         setChatOpened(true);
+        message.success('Chat opened successfully');
         setShowModal(false);
       }
     } catch (error) {
@@ -201,29 +226,39 @@ export default function StandardChatLayout({ roomFilter = null }) {
     }
   };
 
+  const getRoleBadgeColor = useCallback((role) => {
+    switch (role) {
+      case 'ADMIN':
+      case 'TENANT_ADMIN':
+        return '#EF4444';
+      case 'SUPER_ADMIN':
+        return '#8B5CF6';
+      case 'USER':
+        return '#00A884';
+      default:
+        return '#9CA3AF';
+    }
+  }, []);
+
+  const getRoleDisplayName = useCallback((role) => {
+    const roleMap = {
+      'ADMIN': 'Admin',
+      'TENANT_ADMIN': 'Tenant Admin',
+      'SUPER_ADMIN': 'Super Admin',
+      'USER': 'User',
+    };
+    return roleMap[role] || role;
+  }, []);
+
   const sortedUsers = useMemo(() => {
-    let users = availableUsers;
-    
-    // For super admin, use search results when searching
-    if (isSuperAdmin && searchUserTerm.trim()) {
-      users = searchResults;
-    }
-    // For admin/user, filter contacts by search term
-    else if (isNonSuperAdmin && searchUserTerm.trim()) {
-      const query = searchUserTerm.toLowerCase();
-      users = availableUsers.filter(u => {
-        const name = (u.contactName || u.name || '').toLowerCase();
-        const phone = (u.phone || '').toLowerCase();
-        return name.includes(query) || phone.includes(query);
-      });
-    }
-    
+    const users = searchUserTerm.trim() ? searchResults : availableUsers;
+    console.log('sortedUsers - searchUserTerm:', searchUserTerm, 'searchResults:', searchResults, 'availableUsers:', availableUsers, 'users:', users);
     return [...users].sort((a, b) => {
       const nameA = (a.contactName || a.name || '').toLowerCase();
       const nameB = (b.contactName || b.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
-  }, [searchUserTerm, searchResults, availableUsers, isNonSuperAdmin, isSuperAdmin]);
+  }, [searchUserTerm, searchResults, availableUsers]);
 
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -231,7 +266,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
     return sortedUsers.slice(startIndex, endIndex);
   }, [sortedUsers, currentPage]);
 
-  const groupedUsers = useMemo(() => {
+  const paginatedGroupedUsers = useMemo(() => {
     const groups = {};
     paginatedUsers.forEach(user => {
       const firstLetter = (user.contactName || user.name || '?').charAt(0).toUpperCase();
@@ -243,119 +278,8 @@ export default function StandardChatLayout({ roomFilter = null }) {
     return groups;
   }, [paginatedUsers]);
 
-  const alphabetIndex = useMemo(() => {
-    return Object.keys(groupedUsers).sort();
-  }, [groupedUsers]);
-
   const totalUsers = sortedUsers.length;
   const primaryColor = theme?.primaryColor || '#008069';
-
-  const renderContactList = () => (
-    <div style={{ maxHeight: '450px', overflowY: 'auto', position: 'relative' }}>
-      {creatingRoom || loadingUsers || searchLoading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <Spin tip={creatingRoom ? 'Creating chat...' : searchLoading ? 'Searching...' : 'Loading...'} />
-        </div>
-      ) : totalUsers > 0 ? (
-        <>
-          {alphabetIndex.map((letter) => (
-            <div key={letter} id={`letter-${letter}`}>
-              <div style={{ padding: '8px 16px', backgroundColor: '#F5F5F5', position: 'sticky', top: 0, zIndex: 1 }}>
-                <Text strong style={{ color: primaryColor, fontSize: '14px' }}>{letter}</Text>
-              </div>
-              {groupedUsers[letter].map((userItem) => (
-                <div
-                  key={userItem._id}
-                  className="px-4 py-3 cursor-pointer transition-all"
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    opacity: creatingRoom ? 0.6 : 1,
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
-                  onClick={() => {
-                    if (isNonSuperAdmin && userItem.isSearchResult && !isUserInContacts(userItem._id)) {
-                      handleAddContactAndChat(userItem);
-                    } else {
-                      handleCreateRoom(userItem);
-                    }
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar size={48} style={{ backgroundColor: primaryColor, fontWeight: 600 }}>
-                      {userItem.name?.charAt(0)?.toUpperCase()}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <Text strong style={{ fontSize: '16px', display: 'block' }}>
-                        {userItem.contactName || userItem.name}
-                      </Text>
-                      <Text style={{ color: '#667781', fontSize: '14px', display: 'block' }}>
-                        {userItem.phone || userItem.email}
-                      </Text>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-          
-          {/* Alphabet Index - WhatsApp Style */}
-          <div style={{ 
-            position: 'absolute', 
-            right: '4px', 
-            top: '50%',
-            transform: 'translateY(-50%)',
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center',
-            zIndex: 10
-          }}>
-            {alphabetIndex.map((letter) => (
-              <a
-                key={letter}
-                href={`#letter-${letter}`}
-                style={{
-                  fontSize: '10px',
-                  color: '#54656F',
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  padding: '1px 3px',
-                  lineHeight: '1',
-                  display: 'block',
-                  textAlign: 'center',
-                }}
-              >
-                {letter}
-              </a>
-            ))}
-          </div>
-
-          {totalUsers > pageSize && (
-            <div style={{ marginTop: '16px', textAlign: 'center', paddingBottom: '8px' }}>
-              <Pagination
-                current={currentPage}
-                total={totalUsers}
-                pageSize={pageSize}
-                onChange={(page) => setCurrentPage(page)}
-                showSizeChanger={false}
-                size="small"
-              />
-            </div>
-          )}
-        </>
-      ) : (
-        <Empty 
-          description={
-            isSuperAdmin
-              ? 'Search by name, email or phone to find users'
-              : searchUserTerm
-              ? 'No contacts found'
-              : 'No contacts yet. Search to add new contacts.'
-          }
-        />
-      )}
-    </div>
-  );
 
   if (window.innerWidth < 768) {
     if (chatOpened && activeRoomId) {
@@ -391,7 +315,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
                 <UserAddOutlined style={{ color: primaryColor, fontSize: '18px' }} />
               </div>
               <span style={{ fontSize: '16px', fontWeight: 600 }}>
-                {isSuperAdmin ? 'Search Users' : 'My Contacts'}
+                {isSuperAdmin ? 'Search and find Users to chat' : 'My Contacts'}
               </span>
             </div>
           }
@@ -402,40 +326,95 @@ export default function StandardChatLayout({ roomFilter = null }) {
           centered
         >
           <div className="mb-4">
-            {isSuperAdmin ? (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Search by name, email or phone..."
-                  value={searchUserTerm}
-                  onChange={(e) => setSearchUserTerm(e.target.value)}
-                  onPressEnter={handleSearchClick}
-                  size="large"
-                  style={{ borderRadius: '8px', flex: 1 }}
-                />
-                <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  onClick={handleSearchClick}
-                  loading={searchLoading}
-                  size="large"
-                  style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
-                >
-                  Search
-                </Button>
-              </div>
-            ) : (
+            <div className="flex gap-2">
               <Input
-                placeholder="Search contacts..."
+                placeholder={isSuperAdmin ? "Search by name, email or phone..." : "Search contacts..."}
                 value={searchUserTerm}
                 onChange={(e) => setSearchUserTerm(e.target.value)}
+                onPressEnter={handleSearchClick}
                 size="large"
-                prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
-                style={{ borderRadius: '8px' }}
+                style={{ borderRadius: '8px', flex: 1 }}
+              />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={handleSearchClick}
+                loading={searchLoading}
+                size="large"
+                style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
+              >
+                Search
+              </Button>
+            </div>
+          </div>
+
+          <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+            {creatingRoom || loadingUsers || searchLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <Spin tip={creatingRoom ? 'Creating chat...' : searchLoading ? 'Searching...' : 'Loading...'} />
+              </div>
+            ) : totalUsers > 0 ? (
+              <>
+                <div className="space-y-1">
+                  {paginatedUsers.map((userItem) => (
+                    <div
+                      key={userItem._id}
+                      className="px-4 py-3 cursor-pointer transition-all"
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        opacity: creatingRoom ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                      onClick={() => {
+                        if (isNonSuperAdmin && userItem.isSearchResult && !isUserInContacts(userItem._id)) {
+                          handleAddContactAndChat(userItem);
+                        } else {
+                          handleCreateRoom(userItem);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar size={48} style={{ backgroundColor: primaryColor, fontWeight: 600 }}>
+                          {userItem.name?.charAt(0)?.toUpperCase()}
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <Text strong style={{ fontSize: '16px', display: 'block' }}>
+                            {userItem.contactName || userItem.name}
+                          </Text>
+                          <Text style={{ color: '#667781', fontSize: '14px', display: 'block' }}>
+                            {userItem.phone || userItem.email}
+                          </Text>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {totalUsers > pageSize && (
+                  <div style={{ marginTop: '16px', textAlign: 'center', paddingBottom: '8px' }}>
+                    <Pagination
+                      current={currentPage}
+                      total={totalUsers}
+                      pageSize={pageSize}
+                      onChange={(page) => setCurrentPage(page)}
+                      showSizeChanger={false}
+                      size="small"
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <Empty 
+                description={
+                  isSuperAdmin
+                    ? 'Search by name, email or phone to find users'
+                    : searchUserTerm
+                    ? 'No users found'
+                    : 'No contacts yet. Search to add new contacts.'
+                }
               />
             )}
           </div>
-
-          {renderContactList()}
 
           {totalUsers > 0 && (
             <div
@@ -492,7 +471,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
               <UserAddOutlined style={{ color: primaryColor, fontSize: '18px' }} />
             </div>
             <span style={{ fontSize: '16px', fontWeight: 600 }}>
-              {isSuperAdmin ? 'Search Users' : 'My Contacts'}
+              {isSuperAdmin ? 'Search and find Users to chat' : 'My Contacts'}
             </span>
           </div>
         }
@@ -503,40 +482,95 @@ export default function StandardChatLayout({ roomFilter = null }) {
         centered
       >
         <div className="mb-4">
-          {isSuperAdmin ? (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search by name, email or phone..."
-                value={searchUserTerm}
-                onChange={(e) => setSearchUserTerm(e.target.value)}
-                onPressEnter={handleSearchClick}
-                size="large"
-                style={{ borderRadius: '8px', flex: 1 }}
-              />
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                onClick={handleSearchClick}
-                loading={searchLoading}
-                size="large"
-                style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
-              >
-                Search
-              </Button>
-            </div>
-          ) : (
+          <div className="flex gap-2">
             <Input
-              placeholder="Search contacts..."
+              placeholder={isSuperAdmin ? "Search by name, email or phone..." : "Search contacts..."}
               value={searchUserTerm}
               onChange={(e) => setSearchUserTerm(e.target.value)}
+              onPressEnter={handleSearchClick}
               size="large"
-              prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
-              style={{ borderRadius: '8px' }}
+              style={{ borderRadius: '8px', flex: 1 }}
+            />
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={handleSearchClick}
+              loading={searchLoading}
+              size="large"
+              style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
+            >
+              Search
+            </Button>
+          </div>
+        </div>
+
+        <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+          {creatingRoom || loadingUsers || searchLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <Spin tip={creatingRoom ? 'Creating chat...' : searchLoading ? 'Searching...' : 'Loading...'} />
+            </div>
+          ) : totalUsers > 0 ? (
+            <>
+              <div className="space-y-1">
+                {paginatedUsers.map((userItem) => (
+                  <div
+                    key={userItem._id}
+                    className="px-4 py-3 cursor-pointer transition-all"
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      opacity: creatingRoom ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                    onClick={() => {
+                      if (isNonSuperAdmin && userItem.isSearchResult && !isUserInContacts(userItem._id)) {
+                        handleAddContactAndChat(userItem);
+                      } else {
+                        handleCreateRoom(userItem);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar size={48} style={{ backgroundColor: primaryColor, fontWeight: 600 }}>
+                        {userItem.name?.charAt(0)?.toUpperCase()}
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <Text strong style={{ fontSize: '16px', display: 'block' }}>
+                          {userItem.contactName || userItem.name}
+                        </Text>
+                        <Text style={{ color: '#667781', fontSize: '14px', display: 'block' }}>
+                          {userItem.email}
+                        </Text>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {totalUsers > pageSize && (
+                <div style={{ marginTop: '16px', textAlign: 'center', paddingBottom: '8px' }}>
+                  <Pagination
+                    current={currentPage}
+                    total={totalUsers}
+                    pageSize={pageSize}
+                    onChange={(page) => setCurrentPage(page)}
+                    showSizeChanger={false}
+                    size="small"
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <Empty
+              description={
+                isSuperAdmin
+                  ? 'Search by name, email or phone to find users'
+                  : searchUserTerm
+                  ? 'No users found'
+                  : 'No contacts yet. Search to add new contacts.'
+              }
             />
           )}
         </div>
-
-        {renderContactList()}
 
         {totalUsers > 0 && (
           <div

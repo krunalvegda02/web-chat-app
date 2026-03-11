@@ -37,47 +37,54 @@ class NotificationService {
 
   async registerServiceWorker() {
     try {
+      console.log('🔧 [SW] Registering service worker...');
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('✅ [SW] Service Worker registered:', registration);
       await navigator.serviceWorker.ready;
-      console.log('✅ Service Worker registered');
+      console.log('✅ [SW] Service Worker ready');
       return registration;
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      console.error('❌ [SW] Service Worker registration failed:', error);
       throw error;
     }
   }
 
   async getFCMToken() {
     if (!messaging) {
-      console.warn('Firebase messaging not initialized');
+      console.warn('⚠️ [FCM] Firebase messaging not initialized');
       return null;
     }
 
     try {
+      console.log('🔑 [FCM] Requesting FCM token...');
       const currentToken = await getToken(messaging, {
         vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
       });
 
       if (currentToken) {
-        console.log('✅ FCM Token obtained');
+        console.log('✅ [FCM] Token obtained:', currentToken.substring(0, 20) + '...');
         this.token = currentToken;
         store.dispatch(setFCMToken(currentToken));
         await this.saveFCMToken(currentToken);
         return currentToken;
+      } else {
+        console.warn('⚠️ [FCM] No token received');
       }
       return null;
     } catch (error) {
-      console.error('Error getting FCM token:', error);
+      console.error('❌ [FCM] Error getting token:', error.message);
+      console.warn('⚠️ [FCM] Push notifications will not work, but in-app notifications will still function');
       return null;
     }
   }
 
   async saveFCMToken(token) {
     try {
+      console.log('📤 [FCM] Saving token to backend...');
       await store.dispatch(registerFCMToken({ fcmToken: token, platform: 'web' })).unwrap();
-      console.log('✅ FCM token saved to backend');
+      console.log('✅ [FCM] Token saved to backend successfully');
     } catch (error) {
-      console.error('Error saving FCM token:', error);
+      console.error('❌ [FCM] Error saving token to backend:', error);
     }
   }
 
@@ -88,9 +95,14 @@ class NotificationService {
     }
 
     console.log('🎯 Setting up foreground listener...');
+    console.log('🔍 [SERVICE] onNotification callback provided:', !!onNotification);
+    console.log('🔍 [SERVICE] Document visibility:', document.hidden ? 'hidden' : 'visible');
 
     onMessage(messaging, (payload) => {
-      console.log('📬 FCM message received:', payload);
+      console.log('📢 [SERVICE] ===== FCM MESSAGE RECEIVED =====');
+      console.log('📬 [SERVICE] Full payload:', JSON.stringify(payload, null, 2));
+      console.log('🔍 [SERVICE] Document hidden:', document.hidden);
+      console.log('🔍 [SERVICE] Has callback:', !!onNotification);
       
       const { data } = payload;
       const notificationData = {
@@ -103,16 +115,23 @@ class NotificationService {
         messageId: data?.messageId
       };
       
-      // Show custom notification if callback provided, otherwise show browser notification
+      console.log('🔔 [SERVICE] Notification data prepared:', notificationData);
+      
+      // Show custom notification if callback provided
       if (onNotification) {
+        console.log('✅ [SERVICE] Calling onNotification callback');
         onNotification(notificationData);
+        console.log('✅ [SERVICE] Callback executed');
       } else if (document.hidden) {
         // Fallback to browser notification if tab is hidden
+        console.log('📱 [SERVICE] Showing browser notification (tab hidden)');
         new Notification(notificationData.title, {
           body: notificationData.body,
           icon: notificationData.avatar,
           tag: `msg-${notificationData.messageId}`
         });
+      } else {
+        console.log('⚠️ [SERVICE] No notification callback and tab is visible - notification not shown');
       }
     });
     

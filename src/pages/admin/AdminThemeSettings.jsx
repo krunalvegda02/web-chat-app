@@ -10,8 +10,11 @@ import {
   CheckOutlined, EditOutlined, SettingOutlined, SearchOutlined, SendOutlined,
 } from '@ant-design/icons';
 
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+
 export default function ThemeCustomization() {
   const dispatch = useDispatch();
+  const { user: authUser } = useAuthGuard(['ADMIN', 'TENANT_ADMIN', 'PLATFORM_ADMIN']);
   const { user } = useSelector((s) => s.auth || {});
   const { theme = {}, updating, uploading } = useSelector((s) => s.theme || {});
   const [form] = Form.useForm();
@@ -120,7 +123,7 @@ export default function ThemeCustomization() {
     listType: 'picture-card',
   }), [form]);
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center"><Spin size="large" /></div>;
+  if (!user || !authUser) return <div className="min-h-screen flex items-center justify-center"><Spin size="large" /></div>;
 
   const currentTheme = { ...defaultTheme, ...formValues };
 

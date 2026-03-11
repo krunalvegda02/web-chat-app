@@ -26,8 +26,9 @@ import {
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { useDispatch, useSelector } from 'react-redux';
-import { editMessage, deleteMessage, forwardMessageAPI, fetchRooms } from '../../redux/slices/chatSlice';
+import { editMessage, deleteMessage } from '../../redux/slices/chatSlice';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
+import ForwardMessageModal from './ForwardMessageModal';
 
 
 /**
@@ -43,11 +44,8 @@ export default function MessageBubble({
 }) {
   const { theme } = useTheme();
   const dispatch = useDispatch();
-  const { rooms } = useSelector((s) => s.chat);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
-  const [selectedRooms, setSelectedRooms] = useState([]);
-  const [forwardLoading, setForwardLoading] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [previewImage, setPreviewImage] = useState(null);
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
@@ -502,27 +500,6 @@ export default function MessageBubble({
   // ✅ Handle forward message
   const handleForward = () => {
     setIsForwardModalOpen(true);
-    setSelectedRooms([]);
-  };
-
-  const handleForwardSubmit = async () => {
-    if (selectedRooms.length === 0) {
-      antMessage.error('Please select at least one chat');
-      return;
-    }
-
-    setForwardLoading(true);
-    try {
-      await dispatch(forwardMessageAPI({ messageId: message._id, roomIds: selectedRooms })).unwrap();
-      antMessage.success(`Forwarded to ${selectedRooms.length} chat(s)`);
-      setIsForwardModalOpen(false);
-      setSelectedRooms([]);
-      dispatch(fetchRooms());
-    } catch (error) {
-      antMessage.error('Failed to forward message');
-    } finally {
-      setForwardLoading(false);
-    }
   };
 
   // ✅ Context menu items - WhatsApp style
@@ -1196,107 +1173,11 @@ export default function MessageBubble({
       {/* Avatar removed for own messages - WhatsApp style */}
 
       {/* ✅ Forward Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2 pb-2" style={{ borderBottom: '1px solid #E9EDEF' }}>
-            <ShareAltOutlined style={{ color: theme.primaryColor, fontSize: '20px' }} />
-            <span style={{ fontSize: '18px', fontWeight: 500 }}>Forward message to...</span>
-          </div>
-        }
+      <ForwardMessageModal
         open={isForwardModalOpen}
         onCancel={() => setIsForwardModalOpen(false)}
-        footer={null}
-        width={420}
-        centered
-        styles={{
-          header: { padding: '16px 24px 0', marginBottom: 0 },
-          body: { padding: '16px 0 0' }
-        }}
-      >
-        <div className="flex flex-col" style={{ height: '500px' }}>
-          {/* Search */}
-          <div className="px-6 pb-3">
-            <Input
-              placeholder="Search..."
-              prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
-              size="large"
-              style={{ borderRadius: '8px', backgroundColor: '#F0F2F5', border: 'none' }}
-            />
-          </div>
-
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto" style={{ maxHeight: '360px' }}>
-            {(Array.isArray(rooms) ? rooms : []).map((room) => {
-              const otherParticipant = room.participants?.find(
-                p => p.userId?._id !== message.senderId
-              );
-              const displayName = room.type === 'DIRECT' || room.type === 'ADMIN_CHAT'
-                ? otherParticipant?.userId?.name || room.name
-                : room.name;
-              const isSelected = selectedRooms.includes(room._id);
-              
-              return (
-                <div
-                  key={room._id}
-                  onClick={() => {
-                    setSelectedRooms(prev =>
-                      prev.includes(room._id)
-                        ? prev.filter(id => id !== room._id)
-                        : [...prev, room._id]
-                    );
-                  }}
-                  className="flex items-center gap-3 px-6 py-3 cursor-pointer transition-colors"
-                  style={{
-                    backgroundColor: isSelected ? '#F0F2F5' : 'transparent',
-                  }}
-                  onMouseEnter={(e) => !isSelected && (e.currentTarget.style.backgroundColor = '#F5F6F6')}
-                  onMouseLeave={(e) => !isSelected && (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <div className="relative">
-                    <Avatar size={48} name={displayName} style={{ backgroundColor: theme.primaryColor }} />
-                    {isSelected && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primaryColor }}>
-                        <CheckOutlined style={{ color: 'white', fontSize: '10px' }} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate" style={{ color: '#111B21' }}>{displayName}</div>
-                    <div className="text-xs truncate" style={{ color: '#667781' }}>
-                      {room.lastMessage?.content || 'Tap to forward here'}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footer with Send Button */}
-          <div className="px-6 py-3 flex items-center justify-between" style={{ borderTop: '1px solid #E9EDEF', backgroundColor: '#F0F2F5' }}>
-            <div className="text-sm" style={{ color: '#667781' }}>
-              {selectedRooms.length > 0 ? `${selectedRooms.length} selected` : 'Select chats'}
-            </div>
-            <Button
-              type="primary"
-              icon={<ShareAltOutlined />}
-              onClick={handleForwardSubmit}
-              loading={forwardLoading}
-              disabled={selectedRooms.length === 0}
-              size="large"
-              style={{
-                backgroundColor: selectedRooms.length > 0 ? theme.primaryColor : '#D1D7DB',
-                borderColor: selectedRooms.length > 0 ? theme.primaryColor : '#D1D7DB',
-                borderRadius: '24px',
-                paddingLeft: '24px',
-                paddingRight: '24px',
-                fontWeight: 500
-              }}
-            >
-              Send
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        message={message}
+      />
 
       {/* ✅ Edit Modal */}
       <Modal

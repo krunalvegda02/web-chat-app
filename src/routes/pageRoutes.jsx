@@ -11,29 +11,30 @@ import RegisterPage from "../pages/auth/RegisterPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 // import UserJoinPage from "../pages/user/UserJoinPage";
 
-// Admin Pages
-import AdminDashboard from "../pages/admin/AdminChats";
-import AdminThemeSettings from "../pages/admin/AdminThemeSettings";
-import AdminUsersList from "../pages/admin/AdminUsersList";
-
-
 // Super Admin Pages
 import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
 import SuperAdminAdminsList from "../pages/superAdmin/SuperAdmin_AdminsList";
 import SuperAdminChat from "../pages/superAdmin/SuperAdminChat";
+import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
+
+// Admin Pages
+import AdminDashboard from "../pages/admin/AdminChats";
+import AdminThemeSettings from "../pages/admin/AdminThemeSettings";
+import AdminUsersList from "../pages/admin/AdminUsersList";
+import AdminUsersChat from "../pages/admin/Admin_userschat";
+import PlatformClients from "../pages/admin/PlatformClients";
+import WhatsAppTestPage from "../pages/admin/WhatsAppTestPage";
 
 // User Pages
 import UserChatPage from "../pages/user/UserChatPage";
 import CallLogs from "../pages/common/CallLogsPage";
-import Contacts from "../pages/common/ContactsPage";
+import ContactsNew from "../pages/common/ContactsPageNew";
 import Profile from "../pages/common/Profile";
 import UserProfile from "../pages/user/UserProfile";
 
 // Error Pages
 import Unauthorized from "../pages/common/Unauthorized";
 import NotFound from "../pages/common/NotFound";
-import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
-import AdminUsersChat from "../pages/admin/Admin_userschat";
 import JoinPage from "../pages/user/JoinPage";
 
 // ------------------------------------
@@ -54,12 +55,14 @@ export const pageRoutes = [
 
     {
         layout: AdminLayout,
-        requiredRoles: ["ADMIN", "TENANT_ADMIN"],
+        requiredRoles: ["TENANT_ADMIN", "PLATFORM_ADMIN"],
         routes: [
             { path: "/admin", element: AdminDashboard },
             { path: "/admin/theme", element: AdminThemeSettings },
             { path: "/admin/users", element: AdminUsersList },
             { path: "/admin/user-chat", element: AdminUsersChat },
+            { path: "/admin/platform-clients", element: PlatformClients },
+            { path: "/admin/whatsapp-test", element: WhatsAppTestPage },
         ],
     },
     {
@@ -86,11 +89,11 @@ export const pageRoutes = [
     // Shared routes for all authenticated users
     {
         layout: SharedLayout,
-        requiredRoles: ["USER", "ADMIN", "TENANT_ADMIN", "SUPER_ADMIN"],
+            requiredRoles: ["USER", "TENANT_ADMIN", "PLATFORM_ADMIN", "SUPER_ADMIN"],
         routes: [
             { path: "/profile", element: Profile },
             { path: "/profile/:userId", element: UserProfile },
-            { path: "/contacts", element: Contacts },
+            { path: "/contacts", element: ContactsNew },
             { path: "/calls", element: CallLogs },
         ],
     },
@@ -99,6 +102,7 @@ export const pageRoutes = [
     {
         layout: null,
         routes: [
+            { path: "/", element: () => <Navigate to="/login" replace /> },
             { path: "/unauthorized", element: Unauthorized },
             { path: "*", element: NotFound },
         ],

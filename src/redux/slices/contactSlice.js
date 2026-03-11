@@ -1,26 +1,15 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { _get, _post, _delete } from '../../helper/apiClient';
+import { _get, _post, _delete, _put } from '../../helper/apiClient';
+import API from '../../constants/ApiEndpoints';
 
-export const fetchContacts = createAsyncThunk(
-  'contacts/fetchContacts',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await _get('/contacts');
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch contacts');
-    }
-  }
-);
-
-export const searchUsers = createAsyncThunk(
-  'contacts/searchUsers',
+export const searchUserByPhoneOrEmail = createAsyncThunk(
+  'contacts/searchUserByPhoneOrEmail',
   async (query, { rejectWithValue }) => {
     try {
-      const response = await _get(`/contacts/search?query=${query}`);
+      const response = await _get(`${API.CONTACTS.SEARCH_USER}?query=${query}`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to search users');
+      return rejectWithValue(error.response?.data?.message || 'Failed to search user');
     }
   }
 );
@@ -29,7 +18,7 @@ export const addContact = createAsyncThunk(
   'contacts/addContact',
   async (contactData, { rejectWithValue }) => {
     try {
-      const response = await _post('/contacts', contactData);
+      const response = await _post(API.CONTACTS.ADD, contactData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to add contact');
@@ -37,14 +26,38 @@ export const addContact = createAsyncThunk(
   }
 );
 
+export const fetchContacts = createAsyncThunk(
+  'contacts/fetchContacts',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await _get(API.CONTACTS.GET_ALL);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch contacts');
+    }
+  }
+);
+
 export const removeContact = createAsyncThunk(
   'contacts/removeContact',
-  async (userId, { rejectWithValue }) => {
+  async (contactId, { rejectWithValue }) => {
     try {
-      const response = await _delete(`/contacts/${userId}`);
-      return { userId, ...response.data };
+      const response = await _delete(`${API.CONTACTS.REMOVE}/${contactId}`);
+      return { contactId, ...response.data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to remove contact');
+    }
+  }
+);
+
+export const updateContactName = createAsyncThunk(
+  'contacts/updateContactName',
+  async ({ contactId, contactName }, { rejectWithValue }) => {
+    try {
+      const response = await _put(`${API.CONTACTS.UPDATE_NAME}/${contactId}`, { contactName });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update contact name');
     }
   }
 );
@@ -54,6 +67,7 @@ const contactSlice = createSlice({
   initialState: {
     contacts: [],
     searchResults: [],
+    searchedUser: null,
     loading: false,
     searchLoading: false,
     error: null,
@@ -61,6 +75,7 @@ const contactSlice = createSlice({
   reducers: {
     clearSearchResults: (state) => {
       state.searchResults = [];
+      state.searchedUser = null;
     },
     clearError: (state) => {
       state.error = null;
@@ -68,40 +83,53 @@ const contactSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(searchUserByPhoneOrEmail.pending, (state) => {
+        state.searchLoading = true;
+        state.error = null;
+        state.searchedUser = null;
+      })
+      .addCase(searchUserByPhoneOrEmail.fulfilled, (state, action) => {
+        state.searchLoading = false;
+        state.searchedUser = action.payload?.data;
+      })
+      .addCase(searchUserByPhoneOrEmail.rejected, (state, action) => {
+        state.searchLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(addContact.fulfilled, (state) => {
+        state.searchedUser = null;
+      })
+      .addCase(addContact.rejected, (state, action) => {
+        state.error = action.payload;
+      })
       .addCase(fetchContacts.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchContacts.fulfilled, (state, action) => {
         state.loading = false;
-        state.contacts = action.payload?.data?.contacts || action.payload?.contacts || [];
+        state.contacts = action.payload?.data?.contacts || [];
       })
       .addCase(fetchContacts.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(searchUsers.pending, (state) => {
-        state.searchLoading = true;
-        state.error = null;
-      })
-      .addCase(searchUsers.fulfilled, (state, action) => {
-        state.searchLoading = false;
-        state.searchResults = action.payload?.data?.users || action.payload?.users || [];
-      })
-      .addCase(searchUsers.rejected, (state, action) => {
-        state.searchLoading = false;
-        state.error = action.payload;
-      })
-      .addCase(addContact.fulfilled, (state, action) => {
-        state.contacts.push(action.payload.contact);
-      })
-      .addCase(addContact.rejected, (state, action) => {
-        state.error = action.payload;
-      })
       .addCase(removeContact.fulfilled, (state, action) => {
-        state.contacts = state.contacts.filter(c => c.userId._id !== action.payload.userId);
+        state.contacts = state.contacts.filter(c => c._id !== action.payload.contactId);
       })
       .addCase(removeContact.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      .addCase(updateContactName.fulfilled, (state, action) => {
+        const updatedContact = action.payload?.data?.contact;
+        if (updatedContact) {
+          const index = state.contacts.findIndex(c => c._id === updatedContact._id);
+          if (index !== -1) {
+            state.contacts[index] = updatedContact;
+          }
+        }
+      })
+      .addCase(updateContactName.rejected, (state, action) => {
         state.error = action.payload;
       });
   },

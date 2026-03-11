@@ -54,11 +54,11 @@ export default function IncomingCallNotification({
             color: '#005C4B',
           }}
         >
-          {caller?.name?.charAt(0)?.toUpperCase()}
+          {caller?.displayName?.charAt(0)?.toUpperCase() || caller?.name?.charAt(0)?.toUpperCase()}
         </Avatar>
         
         <h2 className="text-white text-lg font-medium mt-4">
-          {caller?.name || 'Unknown'}
+          {caller?.displayName || caller?.phone || caller?.name || 'Unknown'}
         </h2>
         
         <p className="text-white/80 text-sm mt-1">

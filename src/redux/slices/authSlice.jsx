@@ -106,10 +106,14 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.data.user;
-        state.token = action.payload.data.accessToken;
-        state.refreshToken = action.payload.data.refreshToken;
+        console.log('Login fulfilled, full payload:', action.payload);
+        // action.payload is { success, data: { user, accessToken, refreshToken }, message }
+        const { user, accessToken, refreshToken } = action.payload.data || {};
+        state.user = user;
+        state.token = accessToken;
+        state.refreshToken = refreshToken;
         state.initialized = true;
+        console.log('Auth state after login:', { user: state.user, token: state.token });
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -124,9 +128,10 @@ const authSlice = createSlice({
       })
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.data.user;
-        state.token = action.payload.data.accessToken;
-        state.refreshToken = action.payload.data.refreshToken;
+        const { user, accessToken, refreshToken } = action.payload.data || {};
+        state.user = user;
+        state.token = accessToken;
+        state.refreshToken = refreshToken;
         state.initialized = true;
       })
       .addCase(register.rejected, (state, action) => {
@@ -150,11 +155,23 @@ const authSlice = createSlice({
       })
 
       // Logout
+      .addCase(logout.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(logout.fulfilled, (state) => {
         state.user = null;
         state.token = null;
         state.refreshToken = null;
         state.initialized = true;
+        state.loading = false;
+      })
+      .addCase(logout.rejected, (state) => {
+        // Even if logout fails, clear local auth state
+        state.user = null;
+        state.token = null;
+        state.refreshToken = null;
+        state.initialized = true;
+        state.loading = false;
       })
 
       // Fetch Invite Info
@@ -178,9 +195,10 @@ const authSlice = createSlice({
       })
       .addCase(registerWithInvite.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.data.user;
-        state.token = action.payload.data.accessToken;
-        state.refreshToken = action.payload.data.refreshToken;
+        const { user, accessToken, refreshToken } = action.payload.data || {};
+        state.user = user;
+        state.token = accessToken;
+        state.refreshToken = refreshToken;
         state.initialized = true;
       })
       .addCase(registerWithInvite.rejected, (state, action) => {

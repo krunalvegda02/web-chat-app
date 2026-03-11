@@ -1,24 +1,106 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState, useCallback } from 'react';
 import { fetchRooms, setActiveRoom } from '../../redux/slices/chatSlice';
-import { Input, List, Badge, Empty, Button, Spin } from 'antd';
-import { SearchOutlined, PlusOutlined, MessageOutlined } from '@ant-design/icons';
+import { Input, List, Badge, Empty, Button, Spin, Dropdown, Modal, message } from 'antd';
+import { SearchOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import Avatar from '../common/Avatar';
 import OnlineStatus from './OnlineStatus';
 import { format, isToday, isYesterday } from 'date-fns';
 import { useTheme } from '../../hooks/useTheme';
+import API from '../../constants/ApiEndpoints';
+import { _delete } from '../../helper/apiClient';
 
 
-export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null, onRoomClick = null }) {
+export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null, onRoomClick = null, roomFilter = null }) {
   const dispatch = useDispatch();
   const { theme } = useTheme();
   const { rooms, activeRoomId, loadingRooms } = useSelector((s) => s.chat);
-  const { user } = useSelector((s) => s.auth);
+  const { user, token } = useSelector((s) => s.auth);
   const [searchTerm, setSearchTerm] = useState('');
+  const [contextMenuRoom, setContextMenuRoom] = useState(null);
+
+  // ✅ Delete room with WhatsApp-style confirmation
+  const showDeleteConfirm = useCallback((room) => {
+    Modal.confirm({
+      title: (
+        <span style={{ fontSize: '20px', fontWeight: '400', color: '#111B21' }}>
+          Delete chat?
+        </span>
+      ),
+      icon: null,
+      content: (
+        <div style={{ marginTop: '8px' }}>
+          <p style={{ fontSize: '14px', color: '#667781', margin: 0, lineHeight: '20px' }}>
+            Delete chat with <strong style={{ color: '#111B21' }}>{room.name}</strong>?
+          </p>
+          <p style={{ fontSize: '13px', color: '#8696a0', margin: '8px 0 0 0', lineHeight: '18px' }}>
+            This will permanently delete all messages and media from this chat.
+          </p>
+        </div>
+      ),
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      centered: true,
+      width: 400,
+      okButtonProps: {
+        style: {
+          backgroundColor: '#ea0038',
+          borderColor: '#ea0038',
+          color: '#ffffff',
+          height: '36px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+      },
+      cancelButtonProps: {
+        style: {
+          height: '36px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: '#00a884',
+          borderColor: '#d1d7db',
+        },
+      },
+      onOk: async () => {
+        try {
+          await _delete(`${API.CHAT.DELETE_ROOM}/${room._id}`);
+          message.success({
+            content: 'Chat deleted',
+            style: {
+              marginTop: '10vh',
+            },
+          });
+          if (fetchRoomsAction) {
+            dispatch(fetchRoomsAction());
+          } else {
+            dispatch(fetchRooms());
+          }
+          if (activeRoomId === room._id) {
+            dispatch(setActiveRoom(null));
+          }
+        } catch (error) {
+          console.error('Error deleting room:', error);
+          message.error({
+            content: error.response?.data?.message || 'Failed to delete chat',
+            style: {
+              marginTop: '10vh',
+            },
+          });
+        }
+      },
+    });
+  }, [dispatch, fetchRoomsAction, activeRoomId]);
 
   // ✅ Fetch rooms on mount
   useEffect(() => {
     const fetchRoomsData = async () => {
+      // Wait for token to be available
+      if (!token) {
+        console.warn('⚠️ [ROOMLIST] No token available, skipping fetchRooms');
+        return;
+      }
+      
       if (fetchRoomsAction) {
         const result = await dispatch(fetchRoomsAction());
         console.log('📥 [ROOMLIST] Fetched rooms result:', result?.payload?.data?.rooms?.map(r => ({
@@ -36,23 +118,65 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       }
     };
     fetchRoomsData();
-  }, [dispatch, user?.role, fetchRoomsAction]);
+  }, [dispatch, user?.role, token, fetchRoomsAction]);
+
+  // ✅ Listen for room_created event to refresh room list
+  useEffect(() => {
+    const handleRoomCreated = () => {
+      console.log('🔔 [ROOMLIST] room_created event received, refetching rooms');
+      if (fetchRoomsAction) {
+        dispatch(fetchRoomsAction());
+      } else {
+        dispatch(fetchRooms());
+      }
+    };
+
+    const handleRoomDeleted = (event) => {
+      const { roomId } = event.detail || {};
+      console.log('🗑️ [ROOMLIST] room_deleted event received, refetching rooms', roomId);
+      if (fetchRoomsAction) {
+        dispatch(fetchRoomsAction());
+      } else {
+        dispatch(fetchRooms());
+      }
+      // Clear active room if it was deleted
+      if (activeRoomId === roomId) {
+        dispatch(setActiveRoom(null));
+      }
+    };
+
+    window.addEventListener('room_created', handleRoomCreated);
+    window.addEventListener('room_deleted', handleRoomDeleted);
+    return () => {
+      window.removeEventListener('room_created', handleRoomCreated);
+      window.removeEventListener('room_deleted', handleRoomDeleted);
+    };
+  }, [dispatch, fetchRoomsAction, activeRoomId]);
 
   const roomsArray = Array.isArray(rooms)
     ? rooms
     : rooms?.data?.rooms || rooms?.rooms || rooms?.data || [];
+
+  // Apply room type filter if provided
+  const filteredByType = roomFilter 
+    ? roomsArray.filter(room => room.type === roomFilter)
+    : roomsArray;
 
   // Log rooms from Redux state
   useEffect(() => {
     console.log('📦 [ROOMLIST] Rooms from Redux state:', roomsArray.map(r => ({
       id: r._id,
       name: r.name,
+      type: r.type,
       unreadCount: r.unreadCount
     })));
-  }, [roomsArray]);
+    if (roomFilter) {
+      console.log(`🔍 [ROOMLIST] Filtered by type ${roomFilter}:`, filteredByType.length, 'rooms');
+    }
+  }, [roomsArray, roomFilter, filteredByType.length]);
 
   // ✅ Filter rooms by search term
-  const filteredRooms = roomsArray.filter((room) =>
+  const filteredRooms = filteredByType.filter((room) =>
     room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     room.participants?.some(
       (p) =>
@@ -61,31 +185,9 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
     )
   );
 
-  // ✅ Get room display name
   const getRoomDisplayName = useCallback((room) => {
-    // For regular chats, always extract participant names from participants array
-    const participants = room.participants || [];
-    const otherParticipants = participants.filter(p => {
-      const participantId = p.userId?._id || p._id;
-      return participantId !== user?._id;
-    });
-    
-    if (otherParticipants.length > 0) {
-      const names = otherParticipants
-        .map(p => p.userId?.name || p.name)
-        .filter(Boolean);
-      if (names.length > 0) {
-        return names.join(', ');
-      }
-    }
-    
-    // Fallback to room name only if it doesn't contain 'Chat -' pattern
-    if (room.name && !room.name.includes('Chat -')) {
-      return room.name;
-    }
-    
-    return 'Chat';
-  }, [user?._id]);
+    return room.name || 'Chat';
+  }, []);
 
   // ✅ Get participant avatar
   const getParticipantAvatar = useCallback((room) => {
@@ -142,10 +244,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
 
   // ✅ Get unread count
   const getUnreadCount = useCallback((room) => {
-    // console.log(" =============first rppm unread", room)
-      // Backend sends unreadCount as a number directly
     const count = typeof room.unreadCount === 'number' ? room.unreadCount : 0;
-    // console.log(`🔔 [ROOMLIST] Room ${room._id} unread count:`, count, 'raw:', room.unreadCount);
     return count;
   }, []);
 
@@ -289,124 +388,160 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
           <List
             dataSource={filteredRooms}
             renderItem={(room) => {
-                    {console.log("room", room)}
-
               const isActive = activeRoomId === room._id;
               const unreadCount = getUnreadCount(room);
 
-              return (
-                <List.Item
-                  key={`${room._id}-${room.lastMessageTime || ''}-${room.unreadCount || 0}`}
-                  onClick={() => {
-                    dispatch(setActiveRoom(room._id));
-                    if (onRoomClick) onRoomClick(room._id);
-                  }}
-                  style={{
-                    backgroundColor: isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF'),
-                    borderBottom: `1px solid ${theme?.sidebarBorderColor || '#F0F2F5'}`,
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = theme?.sidebarHoverColor || '#F5F6F6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF');
-                  }}
-                >
-                  <List.Item.Meta
-                    avatar={
-                      <div style={{ position: 'relative' }}>
-                        <Badge
-                          count={unreadCount}
-                          offset={[-10, 10]}
-                          style={{
-                            backgroundColor: theme?.unreadBadgeColor || '#25D366',
-                            fontSize: '10px',
-                            minWidth: '20px',
-                          }}
-                        >
-                          <Avatar
-                            name={getRoomDisplayName(room)}
-                            size={44}
-                            src={getParticipantAvatar(room)}
-                          />
-                        </Badge>
+              const menuItems = [
+                {
+                  key: 'delete',
+                  label: (
+                    <span style={{ color: '#ea0038', fontSize: '14px' }}>
+                      Delete chat
+                    </span>
+                  ),
+                  icon: <DeleteOutlined style={{ color: '#ea0038' }} />,
+                  onClick: () => showDeleteConfirm(room),
+                },
+              ];
 
-                        {/* ✅ Online Status Badge */}
-                        {room.type === 'ADMIN_CHAT' && (
-                          <div
+              return (
+                <Dropdown
+                  menu={{ items: menuItems }}
+                  trigger={['contextMenu']}
+                  key={`${room._id}-${room.lastMessageTime || ''}-${room.unreadCount || 0}`}
+                >
+                  <List.Item
+                    onClick={() => {
+                      dispatch(setActiveRoom(room._id));
+                      if (onRoomClick) onRoomClick(room._id);
+                    }}
+                    style={{
+                      backgroundColor: isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF'),
+                      borderBottom: `1px solid ${theme?.sidebarBorderColor || '#F0F2F5'}`,
+                      padding: '12px 16px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) e.currentTarget.style.backgroundColor = theme?.sidebarHoverColor || '#F5F6F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF');
+                    }}
+                  >
+                    <List.Item.Meta
+                      avatar={
+                        <div style={{ position: 'relative' }}>
+                          <Badge
+                            count={unreadCount}
+                            offset={[-10, 10]}
                             style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              right: 0,
+                              backgroundColor: theme?.unreadBadgeColor || '#25D366',
+                              fontSize: '10px',
+                              minWidth: '20px',
                             }}
                           >
-                            <OnlineStatus
-                              userId={
-                                room.participants?.find(
-                                  (p) => p.userId?._id !== user?._id
-                                )?.userId?._id
-                              }
-                              size="sm"
+                            <Avatar
+                              name={getRoomDisplayName(room)}
+                              size={44}
+                              src={getParticipantAvatar(room)}
                             />
+                          </Badge>
+
+                          {room.type === 'ADMIN_CHAT' && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                              }}
+                            >
+                              <OnlineStatus
+                                userId={
+                                  room.participants?.find(
+                                    (p) => p.userId?._id !== user?._id
+                                  )?.userId?._id
+                                }
+                                size="sm"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      }
+                      title={
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontWeight: '500',
+                                color: theme?.sidebarTextColor || '#111B21',
+                                fontSize: '16px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {getRoomDisplayName(room)}
+                            </div>
+                            {room.displayPhone && (
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  color: theme?.timestampColor || '#667781',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  marginTop: '2px',
+                                }}
+                              >
+                                {room.displayPhone}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    }
-                    title={
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <span
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              color: theme?.timestampColor || '#667781',
+                              marginLeft: '8px',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {formatMessageTime(room.lastMessageTime)}
+                          </span>
+                        </div>
+                      }
+                      description={
+                        <div
                           style={{
-                            fontWeight: '500',
-                            color: theme?.sidebarTextColor || '#111B21',
-                            fontSize: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
                           }}
                         >
-                          {getRoomDisplayName(room)}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            color: theme?.timestampColor || '#667781',
-                          }}
-                        >
-                          {formatMessageTime(room.lastMessageTime)}
-                        </span>
-                      </div>
-                    }
-                    description={
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: '14px',
-                            color: unreadCount > 0 ? '#111B21' : '#667781',
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            fontWeight: unreadCount > 0 ? 500 : 400,
-                          }}
-                        >
-                          {getLastMessageText(room)}
-                        </span>
-                      </div>
-                    }
-                  />
-                </List.Item>
+                          <span
+                            style={{
+                              fontSize: '14px',
+                              color: unreadCount > 0 ? '#111B21' : '#667781',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              fontWeight: unreadCount > 0 ? 500 : 400,
+                            }}
+                          >
+                            {getLastMessageText(room)}
+                          </span>
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                </Dropdown>
               );
             }}
           />

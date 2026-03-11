@@ -20,13 +20,23 @@ export default function WhatsAppNotification({ notification, onClose, onReply })
 
   const handleOpen = () => {
     dispatch(setActiveRoom(notification.roomId));
-    navigate(`/chat?room=${notification.roomId}`);
+    
+    // Determine correct route based on user role
+    let chatPath = '/chat';
+    if (notification.userRole === 'SUPER_ADMIN') {
+      chatPath = '/super-admin/chats';
+    } else if (['ADMIN', 'TENANT_ADMIN'].includes(notification.userRole)) {
+      chatPath = '/admin/chats';
+    }
+    
+    navigate(`${chatPath}?room=${notification.roomId}`);
     onClose();
   };
 
   const handleReply = () => {
     if (replyText.trim()) {
       onReply(notification.roomId, replyText);
+      setReplyText('');
       onClose();
     }
   };

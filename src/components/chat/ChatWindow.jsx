@@ -323,6 +323,9 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const messagesContainerRef = useRef(null);
 
+  // Check if user is a platform user (should have limited access)
+  const isPlatformUser = user?.role === 'USER' && user?.platformId;
+
   // ✅ Get room details from rooms (memoized)
   const currentRoom = useMemo(() => {
     if (!activeRoomId) return null;
@@ -395,7 +398,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     return other;
   }, [roomDetails, user]);
 
-  // Get display name for header - show all participants
+  // Get display name for header - show contact name or phone number
   const displayName = useMemo(() => {
     console.log('🔍 DisplayName Debug:', { readOnly, roomDetails, otherParticipant });
     
@@ -410,7 +413,9 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       if (participantNames) return participantNames;
     }
     
-    // For regular chat, show other participant
+    // For regular chat, use room name from backend (which includes contact name logic)
+    if (currentRoom?.name) return currentRoom.name;
+    if (roomDetails?.name) return roomDetails.name;
     if (otherParticipant) return otherParticipant.name;
     
     // Fallback to otherParticipants array
@@ -422,11 +427,14 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       if (names) return names;
     }
     
-    // Last resort: room name
-    if (roomDetails?.name) return roomDetails.name;
-    
     return 'Loading...';
-  }, [otherParticipant, roomDetails, readOnly]);
+  }, [otherParticipant, roomDetails, readOnly, currentRoom]);
+
+  // Get display phone for subtitle
+  const displayPhone = useMemo(() => {
+    if (readOnly) return null;
+    return currentRoom?.displayPhone || roomDetails?.displayPhone || otherParticipant?.phone || null;
+  }, [roomDetails, otherParticipant, readOnly, currentRoom]);
 
   const isOtherUserOnline = useMemo(() => {
     console.log('🔍 Online Check:', { 
@@ -542,7 +550,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       message.warning('User is offline');
       return;
     }
-    initiateCall(otherParticipant, activeRoomId);
+    initiateCall(otherParticipant, activeRoomId, displayName, displayPhone);
   };
 
   // ✅ Show empty state if no room selected
@@ -655,10 +663,10 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           {otherParticipant ? (
             <>
               <div 
-                style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
-                onClick={() => navigate(`/profile/${otherParticipant._id}`)}
+                style={{ position: 'relative', flexShrink: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
+                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
               >
-                <Avatar src={otherParticipant.avatar} size={40} name={otherParticipant.name} />
+                <Avatar src={otherParticipant.avatar} size={40} name={displayName} />
                 {isOtherUserOnline && (
                   <div
                     style={{
@@ -675,14 +683,14 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
                 )}
               </div>
               <div 
-                style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-                onClick={() => navigate(`/profile/${otherParticipant._id}`)}
+                style={{ flex: 1, minWidth: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
+                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <div style={{ fontWeight: 600, color: theme?.headerTextColor || '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {otherParticipant.name}
+                  {displayName}
                 </div>
                 <div style={{ fontSize: '12px', color: theme?.headerIconColor || 'rgba(255,255,255,0.8)' }}>
-                  {isOtherUserOnline ? 'online' : 'offline'}
+                  {displayPhone || (isOtherUserOnline ? 'online' : 'offline')}
                 </div>
               </div>
             </>
@@ -709,15 +717,18 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
               style={{ color: theme?.headerIconColor || '#FFFFFF' }}
             />
           </Tooltip>
-          <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
-            <Button
-              type="text"
-              icon={<PhoneOutlined style={{ fontSize: '18px' }} />}
-              onClick={handleStartCall}
-              disabled={!isOtherUserOnline || readOnly || callState.isInCall}
-              style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : (theme?.headerIconColor || '#FFFFFF') }}
-            />
-          </Tooltip>
+          {/* Hide call button for platform users */}
+          {!isPlatformUser && (
+            <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
+              <Button
+                type="text"
+                icon={<PhoneOutlined style={{ fontSize: '18px' }} />}
+                onClick={handleStartCall}
+                disabled={!isOtherUserOnline || readOnly || callState.isInCall}
+                style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : (theme?.headerIconColor || '#FFFFFF') }}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="More">
             <Button 
               type="text" 

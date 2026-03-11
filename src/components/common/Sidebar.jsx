@@ -17,12 +17,21 @@ export default function Sidebar() {
   const menuItems = getMenuItems(user?.role, navigate);
   const activeKey = location.pathname;
 
+  console.log('🎯 [Sidebar] Rendered', {
+    userRole: user?.role,
+    menuItemsCount: menuItems.length,
+    menuItems: menuItems.map(m => ({ key: m.key, label: m.label })),
+  });
+
   const userMenu = [
     {
       key: 'profile',
       label: 'My Profile',
       icon: <UserOutlined style={{ fontSize: '14px' }} />,
-      onClick: () => navigate('/profile'),
+      onClick: () => {
+        console.log('👤 [Sidebar] Navigating to /profile');
+        navigate('/profile');
+      },
     },
     // {
     //   key: 'settings',
@@ -48,11 +57,17 @@ export default function Sidebar() {
       icon: <LogoutOutlined style={{ fontSize: '14px' }} />,
       danger: true,
       onClick: () => {
+        console.log('🚪 [Sidebar] Logging out');
         logout();
         navigate('/login');
       },
     },
   ];
+
+  console.log('👤 [Sidebar] User menu items:', {
+    count: userMenu.length,
+    items: userMenu.map(m => ({ key: m.key, label: m.label })),
+  });
 
   return (
     <aside ref={sidebarRef} className="hidden md:block fixed left-0 top-0 bottom-0 z-40 w-20 border-r" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>

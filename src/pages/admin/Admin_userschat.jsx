@@ -5,7 +5,7 @@ import { fetchAdminMemberChatsAPI } from '../../redux/slices/chatSlice';
 import ChatMonitorLayout from '../../components/chat/ChatMonitorLayout';
 
 export default function AdminUsersChat() {
-  const { user } = useAuthGuard(['ADMIN', 'TENANT_ADMIN']);
+  const { user } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);

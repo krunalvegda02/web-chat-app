@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
 import { useTheme } from '../../hooks/useTheme';
 import {
@@ -12,34 +12,32 @@ import {
   Space,
   Tag,
   Empty,
-  Row,
-  Col,
   Typography,
   Popconfirm,
-  Statistic,
   List,
   message,
+  Select,
+  Pagination,
 } from 'antd';
 import {
   UserOutlined,
-  DeleteOutlined,
   PlusOutlined,
   MailOutlined,
   LockOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
   CheckCircleOutlined,
-  TeamOutlined,
-  AppstoreOutlined,
   PhoneOutlined,
+  SearchOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  getAllTenants,
-  createTenant,
-  toggleTenantStatus,
-  updateTenant,
-} from '../../redux/slices/tenantSlice.jsx';
+  getAllPlatforms,
+  createPlatform,
+  togglePlatformStatus,
+  updatePlatform,
+} from '../../redux/slices/platformSlice.jsx';
 
 const { Title, Text } = Typography;
 
@@ -47,29 +45,57 @@ export default function SuperAdminAdminsList() {
   useAuthGuard(['SUPER_ADMIN']);
   const { theme } = useTheme();
   const dispatch = useDispatch();
-  const { tenants, loading } = useSelector((state) => state.tenant);
+  const { platforms, loading } = useSelector((state) => state.platform);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
 
   const fetchAdmins = async () => {
-    await dispatch(getAllTenants());
+    await dispatch(getAllPlatforms());
   };
 
   useEffect(() => {
     fetchAdmins();
   }, []);
 
-  const tenantsArray = Array.isArray(tenants)
-    ? tenants
-    : tenants?.data?.tenants || tenants?.tenants || [];
+  const platformsArray = Array.isArray(platforms)
+    ? platforms
+    : platforms?.data?.platforms || platforms?.platforms || [];
+
+  const filteredPlatforms = useMemo(() => {
+    let filtered = platformsArray;
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.name?.toLowerCase().includes(query) ||
+        p.admin?.email?.toLowerCase().includes(query) ||
+        p.admin?.phone?.includes(query)
+      );
+    }
+    
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(p => p.status === statusFilter);
+    }
+    
+    return filtered;
+  }, [platformsArray, searchQuery, statusFilter]);
+
+  const paginatedPlatforms = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPlatforms.slice(start, start + pageSize);
+  }, [filteredPlatforms, currentPage, pageSize]);
 
   const handleCreateAdmin = async (values) => {
-    const result = await dispatch(createTenant(values));
-    if (result.type === 'tenant/createTenant/fulfilled') {
+    const result = await dispatch(createPlatform(values));
+    if (result.type === 'platform/createPlatform/fulfilled') {
       form.resetFields();
       setModalOpen(false);
       await fetchAdmins();
@@ -77,12 +103,12 @@ export default function SuperAdminAdminsList() {
   };
 
   const handleToggleStatus = async (id, currentStatus) => {
-    const result = await dispatch(toggleTenantStatus(id));
-    if (result.type === 'tenant/toggleTenantStatus/fulfilled') {
-      message.success(`Admin ${currentStatus === 'ACTIVE' ? 'deactivated' : 'activated'} successfully`);
+    const result = await dispatch(togglePlatformStatus(id));
+    if (result.type === 'platform/togglePlatformStatus/fulfilled') {
+      message.success(`Platform ${currentStatus === 'ACTIVE' ? 'deactivated' : 'activated'} successfully`);
       await fetchAdmins();
     } else {
-      message.error('Failed to update admin status');
+      message.error('Failed to update platform status');
     }
   };
 
@@ -97,15 +123,15 @@ export default function SuperAdminAdminsList() {
   };
 
   const handleUpdateTenant = async (values) => {
-    const result = await dispatch(updateTenant({ id: editingTenant._id, ...values }));
-    if (result.type === 'tenant/updateTenant/fulfilled') {
-      message.success('Admin workspace updated successfully');
+    const result = await dispatch(updatePlatform({ id: editingTenant._id, ...values }));
+    if (result.type === 'platform/updatePlatform/fulfilled') {
+      message.success('Platform updated successfully');
       editForm.resetFields();
       setEditModalOpen(false);
       setEditingTenant(null);
       await fetchAdmins();
     } else {
-      message.error('Failed to update admin workspace');
+      message.error('Failed to update platform');
     }
   };
 
@@ -294,105 +320,35 @@ export default function SuperAdminAdminsList() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <Row gutter={[12, 12]}>
-          <Col xs={12} sm={12} md={8}>
-            <Card
-              className="border-0"
-              style={{
-                backgroundColor: '#FFFFFF',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                borderRadius: '12px',
-              }}
-            >
-              <Statistic
-                title={
-                  <span style={{ color: '#6B7280', fontSize: '13px' }}>
-                    Total Admins
-                  </span>
-                }
-                value={tenantsArray.length}
-                prefix={
-                  <TeamOutlined
-                    style={{
-                      color: '#008069',
-                      fontSize: '20px',
-                    }}
-                  />
-                }
-                valueStyle={{
-                  color: '#111B21',
-                  fontSize: 'clamp(20px, 4vw, 28px)',
-                  fontWeight: 600,
-                }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={12} md={8}>
-            <Card
-              className="border-0"
-              style={{
-                backgroundColor: '#FFFFFF',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                borderRadius: '12px',
-              }}
-            >
-              <Statistic
-                title={
-                  <span style={{ color: '#6B7280', fontSize: '13px' }}>
-                    Active Workspaces
-                  </span>
-                }
-                value={tenantsArray.length}
-                prefix={
-                  <AppstoreOutlined
-                    style={{
-                      color: '#10B981',
-                      fontSize: '20px',
-                    }}
-                  />
-                }
-                valueStyle={{
-                  color: '#111B21',
-                  fontSize: 'clamp(20px, 4vw, 28px)',
-                  fontWeight: 600,
-                }}
-              />
-            </Card>
-          </Col>
-          {/* <Col xs={24} sm={24} md={8}>
-            <Card
-              className="border-0"
-              style={{
-                backgroundColor: '#FFFFFF',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                borderRadius: '12px',
-              }}
-            >
-              <Statistic
-                title={
-                  <span style={{ color: '#6B7280', fontSize: '13px' }}>
-                    Status
-                  </span>
-                }
-                value="All Active"
-                prefix={
-                  <CheckCircleOutlined
-                    style={{
-                      color: '#10B981',
-                      fontSize: '20px',
-                    }}
-                  />
-                }
-                valueStyle={{
-                  color: '#10B981',
-                  fontSize: 'clamp(16px, 3vw, 20px)',
-                  fontWeight: 600,
-                }}
-              />
-            </Card>
-          </Col> */}
-        </Row>
+        {/* Search and Filter */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <Input
+            placeholder="Search by name, email, or phone..."
+            prefix={<SearchOutlined style={{ color: '#008069' }} />}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            allowClear
+            size="large"
+            style={{ borderRadius: '8px' }}
+          />
+          <Select
+            value={statusFilter}
+            onChange={(value) => {
+              setStatusFilter(value);
+              setCurrentPage(1);
+            }}
+            size="large"
+            style={{ width: '100%', minWidth: '150px', borderRadius: '8px' }}
+            suffixIcon={<FilterOutlined style={{ color: '#008069' }} />}
+          >
+            <Select.Option value="all">All Status</Select.Option>
+            <Select.Option value="ACTIVE">Active</Select.Option>
+            <Select.Option value="INACTIVE">Inactive</Select.Option>
+          </Select>
+        </div>
       </div>
 
       {/* Table - Desktop */}
@@ -404,25 +360,24 @@ export default function SuperAdminAdminsList() {
           borderRadius: '12px',
         }}
       >
-        {tenantsArray.length > 0 ? (
+        {filteredPlatforms.length > 0 ? (
           <Table
             columns={columns}
-            dataSource={tenantsArray}
+            dataSource={filteredPlatforms}
             loading={loading}
             rowKey="_id"
             scroll={{ x: 800 }}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} of ${total}`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
               responsive: true,
             }}
             rowClassName="hover:bg-gray-50 transition-colors"
           />
         ) : (
           <Empty
-            description="No admin workspaces found"
+            description="No platforms found"
             style={{ padding: '40px 0' }}
           />
         )}
@@ -430,11 +385,12 @@ export default function SuperAdminAdminsList() {
 
       {/* List - Mobile */}
       <div className="md:hidden">
-        {tenantsArray.length > 0 ? (
-          <List
-            dataSource={tenantsArray}
-            loading={loading}
-            renderItem={(item) => (
+        {paginatedPlatforms.length > 0 ? (
+          <>
+            <List
+              dataSource={paginatedPlatforms}
+              loading={loading}
+              renderItem={(item) => (
               <Card
                 className="mb-3 border-0"
                 style={{
@@ -546,7 +502,22 @@ export default function SuperAdminAdminsList() {
                 </div>
               </Card>
             )}
-          />
+            />
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredPlatforms.length}
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                }}
+                showSizeChanger
+                showTotal={(total, range) => `${range[0]}-${range[1]} of ${total}`}
+                pageSizeOptions={[5, 10, 20, 50]}
+              />
+            </div>
+          </>
         ) : (
           <Card
             className="border-0"
@@ -556,7 +527,7 @@ export default function SuperAdminAdminsList() {
               borderRadius: '12px',
             }}
           >
-            <Empty description="No admin workspaces found" style={{ padding: '40px 0' }} />
+            <Empty description="No platforms found" style={{ padding: '40px 0' }} />
           </Card>
         )}
       </div>
@@ -599,19 +570,19 @@ export default function SuperAdminAdminsList() {
                   fontWeight: 500,
                 }}
               >
-                Workspace Name
+                Platform name
               </span>
             }
             name="name"
             rules={[
               {
                 required: true,
-                message: 'Please enter workspace name',
+                message: 'Please enter Platform name',
               },
             ]}
           >
             <Input
-              placeholder="Enter workspace name"
+              placeholder="Enter Platform name"
               size="large"
               prefix={
                 <UserOutlined
@@ -777,12 +748,12 @@ export default function SuperAdminAdminsList() {
           autoComplete="off"
         >
           <Form.Item
-            label={<span style={{ color: '#111B21', fontWeight: 500 }}>Workspace Name</span>}
+            label={<span style={{ color: '#111B21', fontWeight: 500 }}>Platform name</span>}
             name="name"
-            rules={[{ required: true, message: 'Please enter workspace name' }]}
+            rules={[{ required: true, message: 'Please enter Platform name' }]}
           >
             <Input
-              placeholder="Enter workspace name"
+              placeholder="Enter Platform name"
               size="large"
               prefix={<UserOutlined style={{ color: '#008069' }} />}
               style={{ borderRadius: '8px' }}

@@ -1,91 +1,74 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
-import { useDispatch } from 'react-redux';
-import { fetchAllPlatformChats } from '../../redux/slices/chatSlice';
+import { _get } from '../../helper/apiClient';
 import ChatMonitorLayout from '../../components/chat/ChatMonitorLayout';
 
 export default function SuperAdminAdminChats() {
   const { user } = useAuthGuard(['SUPER_ADMIN']);
-  const dispatch = useDispatch();
-
   const [loading, setLoading] = useState(false);
-  const [allRooms, setAllRooms] = useState([]);
-  const [error, setError] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUserChats, setSelectedUserChats] = useState([]);
+  const [chatsLoading, setChatsLoading] = useState(false);
 
   useEffect(() => {
-    const loadAllChats = async () => {
+    const loadAllUsers = async () => {
       setLoading(true);
-      setError(null);
       try {
-        const result = await dispatch(fetchAllPlatformChats()).unwrap();
-        console.log('📥 API Response:', result);
-        if (result?.data?.rooms) {
-          console.log('📦 Rooms found:', result.data.rooms.length);
-          setAllRooms(result.data.rooms);
-        } else {
-          console.log('⚠️ No rooms in response');
-          setAllRooms([]);
-        }
+        const response = await _get('/users/all');
+        const users = response?.data?.data?.users || response?.data?.users || [];
+        setAllUsers(users.map(u => ({
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone,
+          role: u.role,
+          avatar: u.avatar
+        })));
       } catch (error) {
-        console.error('Failed to fetch all chats:', error);
-        setError(error.message);
-        setAllRooms([]);
+        console.error('Failed to fetch users:', error);
       } finally {
         setLoading(false);
       }
     };
-    if (user) {
-      loadAllChats();
+    if (user) loadAllUsers();
+  }, [user]);
+
+  const handleUserSelect = useCallback(async (userId) => {
+    setChatsLoading(true);
+    try {
+      const response = await _get(`/chat/user/${userId}/rooms`);
+      const rooms = response?.data?.data?.rooms || response?.data?.rooms || [];
+      setSelectedUserChats(rooms.map(room => {
+        const otherParticipant = room.otherParticipants?.[0];
+        return {
+          id: room._id,
+          roomId: room._id,
+          participantId: otherParticipant?._id,
+          participantName: otherParticipant?.name || 'Unknown',
+          participantEmail: otherParticipant?.email,
+          lastMessage: room.lastMessagePreview,
+          lastMessageTime: room.lastMessageTime,
+          messageCount: 0
+        };
+      }));
+    } catch (error) {
+      console.error('Failed to fetch user chats:', error);
+      setSelectedUserChats([]);
+    } finally {
+      setChatsLoading(false);
     }
-  }, [dispatch, user]);
+  }, []);
 
   if (!user) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
-  // Extract unique users from all rooms
-  const usersMap = new Map();
-  allRooms.forEach(room => {
-    room.participants?.forEach(p => {
-      if (p.userId && p.userId._id) {
-        usersMap.set(p.userId._id, {
-          id: p.userId._id,
-          name: p.userId.name,
-          email: p.userId.email,
-          role: p.userId.role
-        });
-      }
-    });
-  });
-
-  const users = Array.from(usersMap.values());
-
-  // Format chats from rooms
-  const chats = allRooms.map(room => {
-    const otherParticipants = room.participants?.filter(p => p.userId) || [];
-    const firstParticipant = otherParticipants[0]?.userId;
-    
-    return {
-      id: room._id,
-      roomId: room._id,
-      participantId: firstParticipant?._id,
-      participantName: room.type === 'GROUP' ? room.name : firstParticipant?.name,
-      participantEmail: firstParticipant?.email,
-      lastMessage: room.lastMessagePreview,
-      lastMessageTime: room.lastMessageTime,
-      messageCount: room.participantCount
-    };
-  });
-
-  console.log('📊 Formatted chats:', chats.length, chats);
 
   return (
     <ChatMonitorLayout
-      users={users}
+      users={allUsers}
       usersLoading={loading}
-      chats={chats}
-      chatsLoading={loading}
-      onUserSelect={() => {}} // No filtering needed, showing all
-      title="Monitor  Chats"
+      chats={selectedUserChats}
+      chatsLoading={chatsLoading}
+      onUserSelect={handleUserSelect}
+      title="Monitor Chats"
     />
   );
 }

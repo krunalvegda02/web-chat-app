@@ -71,11 +71,11 @@ export default function AudioCallWindow({
             color: '#005C4B',
           }}
         >
-          {participant?.name?.charAt(0)?.toUpperCase()}
+          {participant?.displayName?.charAt(0)?.toUpperCase() || participant?.name?.charAt(0)?.toUpperCase()}
         </Avatar>
         
         <h2 className="text-white text-lg font-medium mt-4">
-          {participant?.name || 'Unknown'}
+          {participant?.displayName || participant?.phone || participant?.name || 'Unknown'}
         </h2>
         
         <p className="text-white/80 text-sm mt-1">

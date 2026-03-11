@@ -14,14 +14,21 @@ export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { theme } = useTheme();
-  const { loading, error } = useSelector((s) => s.auth);
+  const { loading, error, user, token } = useSelector((s) => s.auth);
   const [form] = Form.useForm();
   const [rememberMe, setRememberMe] = useState(false);
   const [requiresPhoneVerification, setRequiresPhoneVerification] = useState(false);
   const [userId, setUserId] = useState(null);
   const [lastPhone, setLastPhone] = useState(null);
 
-  console.log(useSelector((state) => state.auth))
+  console.log('🔐 [LoginPage] Auth state:', {
+    loading,
+    hasError: !!error,
+    hasUser: !!user,
+    hasToken: !!token,
+    userRole: user?.role,
+  });
+
   // ✅ Load saved credentials if "Remember Me" was selected
   useEffect(() => {
     const saved = localStorage.getItem('loginCredentials');
@@ -41,6 +48,7 @@ export default function LoginPage() {
   // ✅ Handle unified login (email or phone)
   const handleLogin = async (values) => {
     try {
+      console.log('🔐 [LoginPage] handleLogin called');
       const identifier = values.identifier.trim();
       const isEmail = identifier.includes('@');
       
@@ -48,6 +56,11 @@ export default function LoginPage() {
         password: values.password,
         ...(isEmail ? { email: identifier } : { phone: identifier.replace(/\D/g, '') })
       };
+
+      console.log('🔐 [LoginPage] Login data:', {
+        isEmail,
+        identifier: isEmail ? identifier : '***',
+      });
 
       // ✅ Save credentials if Remember Me is checked
       if (rememberMe) {
@@ -60,13 +73,25 @@ export default function LoginPage() {
       }
 
       // ✅ Dispatch login action
+      console.log('🔐 [LoginPage] Dispatching login action...');
       const result = await dispatch(login(loginData));
+
+      console.log('🔐 [LoginPage] Login result:', {
+        type: result.type,
+        hasPayload: !!result.payload,
+        payloadData: result.payload?.data ? {
+          hasUser: !!result.payload.data.user,
+          userRole: result.payload.data.user?.role,
+          hasToken: !!result.payload.data.accessToken,
+        } : null,
+      });
 
       if (result.type === 'auth/login/fulfilled') {
         const { data } = result.payload;
 
         // ✅ Check if phone verification required
         if (data.requiresPhoneVerification) {
+          console.log('🔐 [LoginPage] Phone verification required');
           setUserId(data.userId);
           setLastPhone(data.phone);
           setRequiresPhoneVerification(true);
@@ -76,16 +101,35 @@ export default function LoginPage() {
 
         // ✅ Login successful - redirect based on role
         const { user } = data;
-        if (user.role === 'ADMIN' || user.role === 'TENANT_ADMIN') {
-          navigate('/admin');
-        } else if (user.role === 'SUPER_ADMIN') {
-          navigate('/super-admin/chats');
-        } else {
-          navigate('/user/chats');
-        }
+        console.log('✅ [LoginPage] Login successful!', {
+          userRole: user.role,
+          userEmail: user.email,
+          userId: user._id,
+        });
+        
+        // Use setTimeout to ensure Redux state is updated and persisted before navigation
+        console.log('⏳ [LoginPage] Waiting 500ms before redirect...');
+        setTimeout(() => {
+          console.log('🔐 [LoginPage] Redirecting based on role:', user.role);
+          if (user.role === 'PLATFORM_ADMIN') {
+            console.log('🔐 [LoginPage] Redirecting PLATFORM_ADMIN to /admin');
+            navigate('/admin');
+          } else if (user.role === 'SUPER_ADMIN') {
+            console.log('🔐 [LoginPage] Redirecting SUPER_ADMIN to /super-admin/chats');
+            navigate('/super-admin/chats');
+          } else if (user.role === 'USER') {
+            console.log('🔐 [LoginPage] Redirecting USER to /user/chats');
+            navigate('/user/chats');
+          } else {
+            console.log('🔐 [LoginPage] Unknown role, redirecting to /user/chats');
+            navigate('/user/chats');
+          }
+        }, 500);
+      } else {
+        console.error('❌ [LoginPage] Login failed:', result.type, result.payload);
       }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ [LoginPage] Login error:', err);
     }
   };
 

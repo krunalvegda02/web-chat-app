@@ -18,13 +18,13 @@ apiClient.interceptors.request.use(
         // Add auth token from Redux store
         const state = store.getState();
         const token = state.auth?.token;
+        
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
 
         // If data is FormData, remove Content-Type header to let axios set it automatically with boundary
         if (config.data instanceof FormData) {
-            // Delete Content-Type from headers to allow axios to set it with proper boundary
             if (config.headers) {
                 delete config.headers['Content-Type'];
             }

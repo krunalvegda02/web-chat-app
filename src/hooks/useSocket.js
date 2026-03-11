@@ -63,15 +63,21 @@ export const useSocket = () => {
               }));
               console.log('✅ [SOCKET] Message added to Redux state with status:', messageWithStatus.status);
 
-              // ✅ Auto-mark as read if message is from someone else and we're viewing this room
+              // 🔔 Dispatch custom event for notification
+              window.dispatchEvent(new CustomEvent('socket_message', {
+                detail: { type: 'message_received', message: messageWithStatus }
+              }));
+              console.log('🔔 [SOCKET] Dispatched socket_message event for notifications');
+
+              // ✅ Auto-mark as read if message is from someone else, we're viewing this room, AND tab is visible
               const state = window.__REDUX_STORE__?.getState();
               const activeRoomId = state?.chat?.activeRoomId;
               const currentUserId = user?._id?.toString() || user?._id;
               const senderId = data.senderId?.toString() || data.senderId;
 
-              console.log('📦 [SOCKET] Auto-read check:', { activeRoomId, currentUserId, senderId, match: activeRoomId === data.roomId, differentSender: senderId !== currentUserId });
+              console.log('📦 [SOCKET] Auto-read check:', { activeRoomId, currentUserId, senderId, match: activeRoomId === data.roomId, differentSender: senderId !== currentUserId, documentVisible: !document.hidden });
 
-              if (activeRoomId === data.roomId && senderId !== currentUserId) {
+              if (activeRoomId === data.roomId && senderId !== currentUserId && !document.hidden) {
                 // Mark this message as read
                 setTimeout(() => {
                   chatSocketClient.emit('mark_messages_read', {
@@ -184,6 +190,20 @@ export const useSocket = () => {
           chatSocketClient.on('room_updated', (data) => {
             console.log('✅ [SOCKET] room_updated:', data);
             // This will trigger a room re-fetch from the component listening
+          });
+
+          // ✅ Room created event - refetch rooms
+          chatSocketClient.on('room_created', (data) => {
+            console.log('✅ [SOCKET] room_created:', data);
+            // Dispatch custom event to trigger room list refresh
+            window.dispatchEvent(new CustomEvent('room_created', { detail: data }));
+          });
+
+          // ✅ Room deleted event - refetch rooms and clear active room
+          chatSocketClient.on('room_deleted', (data) => {
+            console.log('🗑️ [SOCKET] room_deleted:', data);
+            // Dispatch custom event to trigger room list refresh
+            window.dispatchEvent(new CustomEvent('room_deleted', { detail: data }));
           });
 
           // ✅ User status changed (online/offline)

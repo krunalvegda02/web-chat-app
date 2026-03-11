@@ -1,15 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
-import { Button, Spin, message as antMessage, Modal, Divider } from 'antd';
+import { Button, Spin, message as antMessage, Modal, Input } from 'antd';
 import {
   ArrowLeftOutlined,
   MessageOutlined,
   PhoneOutlined,
   UserDeleteOutlined,
   UserAddOutlined,
-  StarOutlined,
-  StarFilled,
+  EditOutlined,
   MailOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
@@ -17,15 +16,8 @@ import {
 import Avatar from '../../components/common/Avatar';
 import { useDispatch, useSelector } from 'react-redux';
 import { setActiveRoom } from '../../redux/slices/chatSlice';
-import { 
-  getUserById, 
-  addContact, 
-  removeContact, 
-  toggleFavorite, 
-  blockUser, 
-  unblockUser,
-  clearViewedUser 
-} from '../../redux/slices/userSlice';
+import { getUserById, clearViewedUser } from '../../redux/slices/userSlice';
+import { addContact, removeContact, updateContactName } from '../../redux/slices/contactSlice';
 import { useCall } from '../../contexts/CallContext';
 
 export default function UserProfile() {
@@ -37,6 +29,8 @@ export default function UserProfile() {
   const { rooms, onlineUsers } = useSelector((s) => s.chat);
   const { user: currentUser } = useSelector((s) => s.auth);
   const { initiateCall } = useCall();
+  const [editingName, setEditingName] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
 
   useEffect(() => {
     dispatch(getUserById(userId));
@@ -45,8 +39,7 @@ export default function UserProfile() {
 
   const user = viewedUser?.user || viewedUser;
   const isContact = viewedUser?.isContact;
-  const isFavorite = viewedUser?.isFavorite;
-  const isBlocked = viewedUser?.isBlocked;
+  const contact = viewedUser?.contact;
   
   const otherParticipant = user;
   const isOtherUserOnline = user && onlineUsers.includes(user._id);
@@ -60,10 +53,9 @@ export default function UserProfile() {
 
       if (existingRoom) {
         dispatch(setActiveRoom(existingRoom._id));
-        // Navigate with state to open chat directly
         if (currentUser?.role === 'USER') {
           navigate('/user/chats', { state: { openChat: true } });
-        } else if (currentUser?.role === 'ADMIN' || currentUser?.role === 'TENANT_ADMIN') {
+        } else if (currentUser?.role === 'TENANT_ADMIN' || currentUser?.role === 'PLATFORM_ADMIN') {
           navigate('/admin', { state: { openChat: true } });
         } else if (currentUser?.role === 'SUPER_ADMIN') {
           navigate('/super-admin', { state: { openChat: true } });
@@ -88,14 +80,19 @@ export default function UserProfile() {
       antMessage.warning('User is offline');
       return;
     }
-    // Use the same call functionality from ChatWindow
     initiateCall(otherParticipant, null);
   };
 
   const handleAddContact = async () => {
     try {
-      await dispatch(addContact({ userId })).unwrap();
+      await dispatch(addContact({ 
+        userId,
+        contactName: user?.name,
+        phone: user?.phone,
+        email: user?.email
+      })).unwrap();
       antMessage.success('Contact added');
+      dispatch(getUserById(userId));
     } catch (error) {
       antMessage.error('Failed to add contact');
     }
@@ -109,8 +106,9 @@ export default function UserProfile() {
       okType: 'danger',
       onOk: async () => {
         try {
-          await dispatch(removeContact(userId)).unwrap();
+          await dispatch(removeContact(contact?._id)).unwrap();
           antMessage.success('Contact removed');
+          dispatch(getUserById(userId));
         } catch (error) {
           antMessage.error('Failed to remove contact');
         }
@@ -118,37 +116,27 @@ export default function UserProfile() {
     });
   };
 
-  const handleToggleFavorite = async () => {
-    try {
-      await dispatch(toggleFavorite({ userId, isFavorite })).unwrap();
-      antMessage.success(isFavorite ? 'Removed from favorites' : 'Added to favorites');
-    } catch (error) {
-      antMessage.error('Failed to update favorite');
-    }
+  const handleEditContactName = () => {
+    setNewContactName(contact?.contactName || user?.name || '');
+    setEditingName(true);
   };
 
-  const handleBlockUser = () => {
-    Modal.confirm({
-      title: isBlocked ? 'Unblock User' : 'Block User',
-      content: isBlocked
-        ? `Unblock ${user?.name}? You will be able to receive messages from them.`
-        : `Block ${user?.name}? You will no longer receive messages from them.`,
-      okText: isBlocked ? 'Unblock' : 'Block',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          if (isBlocked) {
-            await dispatch(unblockUser(userId)).unwrap();
-            antMessage.success('User unblocked');
-          } else {
-            await dispatch(blockUser(userId)).unwrap();
-            antMessage.success('User blocked');
-          }
-        } catch (error) {
-          antMessage.error('Failed to update block status');
-        }
-      },
-    });
+  const handleSaveContactName = async () => {
+    if (!newContactName.trim()) {
+      antMessage.error('Contact name cannot be empty');
+      return;
+    }
+    try {
+      await dispatch(updateContactName({ 
+        contactId: contact?._id, 
+        contactName: newContactName.trim() 
+      })).unwrap();
+      antMessage.success('Contact name updated');
+      setEditingName(false);
+      dispatch(getUserById(userId));
+    } catch (error) {
+      antMessage.error('Failed to update contact name');
+    }
   };
 
   if (loading) {
@@ -180,8 +168,13 @@ export default function UserProfile() {
         <div className="flex flex-col items-center py-8 px-6" style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
           <Avatar src={user?.avatar} name={user?.name} size={200} />
           <h2 className="text-2xl font-medium mt-4" style={{ color: theme.sidebarTextColor || '#111B21' }}>
-            {user?.name}
+            {isContact && contact?.contactName ? contact.contactName : user?.name}
           </h2>
+          {isContact && contact?.contactName && contact.contactName !== user?.name && (
+            <p className="text-sm mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+              ~{user?.name}
+            </p>
+          )}
           {user?.phone && (
             <p className="text-sm mt-2" style={{ color: theme.timestampColor || '#667781' }}>
               {user.phone}
@@ -271,18 +264,12 @@ export default function UserProfile() {
           {isContact ? (
             <>
               <button
-                onClick={handleToggleFavorite}
+                onClick={handleEditContactName}
                 className="flex items-center gap-4 w-full py-3 px-4 rounded-lg mb-3 transition-all hover:opacity-80"
                 style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}
               >
-                {isFavorite ? (
-                  <StarFilled style={{ fontSize: '20px', color: '#FFD700' }} />
-                ) : (
-                  <StarOutlined style={{ fontSize: '20px', color: theme.sidebarTextColor || '#111B21' }} />
-                )}
-                <span style={{ color: theme.sidebarTextColor || '#111B21' }}>
-                  {isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
-                </span>
+                <EditOutlined style={{ fontSize: '20px', color: theme.primaryColor || '#008069' }} />
+                <span style={{ color: theme.sidebarTextColor || '#111B21' }}>Edit Contact Name</span>
               </button>
 
               <button
@@ -304,19 +291,27 @@ export default function UserProfile() {
               <span style={{ color: theme.primaryColor || '#008069' }}>Add to Contacts</span>
             </button>
           )}
-
-          {/* <button
-            onClick={handleBlockUser}
-            className="flex items-center gap-4 w-full py-3 px-4 rounded-lg transition-all hover:opacity-80"
-            style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}
-          >
-            <UserDeleteOutlined style={{ fontSize: '20px', color: '#EF4444' }} />
-            <span style={{ color: '#EF4444' }}>
-              {isBlocked ? 'Unblock User' : 'Block User'}
-            </span>
-          </button> */}
         </div>
       </div>
+
+      {/* Edit Contact Name Modal */}
+      <Modal
+        title="Edit Contact Name"
+        open={editingName}
+        onCancel={() => setEditingName(false)}
+        onOk={handleSaveContactName}
+        okText="Save"
+        cancelText="Cancel"
+        centered
+      >
+        <Input
+          value={newContactName}
+          onChange={(e) => setNewContactName(e.target.value)}
+          placeholder="Enter contact name"
+          maxLength={50}
+          onPressEnter={handleSaveContactName}
+        />
+      </Modal>
     </div>
   );
 }

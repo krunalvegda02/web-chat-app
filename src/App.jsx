@@ -1,8 +1,10 @@
 import { useDispatch, useSelector } from "react-redux";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { chatSocketClient } from "./sockets/chatSocketClient";
 
 import { fetchMe, setInitialized, clearAuth } from "./redux/slices/authSlice";
+import { setActiveRoom } from "./redux/slices/chatSlice";
 import { pageRoutes } from "./routes/pageRoutes";
 import ProtectedRoute from "./routes/protectedRoutes";
 import LoadingSpinner from "./components/common/LoadingSpinner";
@@ -11,6 +13,7 @@ import IncomingCallNotification from "./components/call/IncomingCallNotification
 import ActiveCallBanner from "./components/call/ActiveCallBanner";
 import { CallProvider, useCall } from "./contexts/CallContext";
 import { useNotifications } from "./hooks/useNotifications";
+import { useAppNotifications } from "./hooks/useAppNotifications";
 import NotificationPrompt from "./components/common/NotificationPrompt";
 import WhatsAppNotification from "./components/common/WhatsAppNotification";
 import { useSocket } from "./hooks/useSocket";
@@ -19,58 +22,39 @@ function AppContent() {
   const dispatch = useDispatch();
   const { initialized, token, user } = useSelector((s) => s.auth);
   const { callState, acceptCall, rejectCall, endCall, toggleMute, toggleSpeaker } = useCall();
-  const { requestPermission } = useNotifications();
-  const { sendMessage } = useSocket();
   const [showCallWindow, setShowCallWindow] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const notificationIds = new Set();
+  
+  useSocket();
+  const { notifications, handleNotification, closeNotification } = useAppNotifications();
+  useNotifications(handleNotification);
 
-  // Handle incoming notifications with deduplication
-  const handleNotification = (notification) => {
-    console.log('🔔 Handling notification:', notification);
-    const notifId = `${notification.senderId}-${notification.messageId}`;
-    if (notificationIds.has(notifId)) {
-      console.log('Duplicate notification blocked:', notifId);
-      return;
-    }
-    notificationIds.add(notifId);
-    const newNotif = { ...notification, id: Date.now() };
-    console.log('✅ Adding notification to state:', newNotif);
-    setNotifications(prev => {
-      console.log('Current notifications:', prev.length);
-      return [...prev, newNotif];
-    });
-    
-    // Clean up old IDs after 10 seconds
-    setTimeout(() => notificationIds.delete(notifId), 10000);
-  };
+  console.log('🚀 [App] AppContent rendered', {
+    initialized,
+    hasToken: !!token,
+    hasUser: !!user,
+    userRole: user?.role,
+  });
 
   // Handle reply from notification
   const handleReply = (roomId, message) => {
-    sendMessage(roomId, message);
+    chatSocketClient.emit('send_message', { roomId, content: message });
   };
 
-  // Request notification permission after user login
-  useEffect(() => {
-    if (user && initialized) {
-      requestPermission(handleNotification).catch(err => console.log('Notification permission:', err));
-    }
-  }, [user, initialized]);
-
-  // Listen for service worker messages (reply from notification)
+  // Listen for service worker messages
   useEffect(() => {
     const handleServiceWorkerMessage = (event) => {
       if (event.data?.type === 'SEND_REPLY') {
-        const { roomId, message } = event.data;
-        sendMessage(roomId, message);
+        chatSocketClient.emit('send_message', { roomId: event.data.roomId, content: event.data.message });
+      } else if (event.data?.type === 'OPEN_CHAT' && event.data.roomId) {
+        dispatch(setActiveRoom(event.data.roomId));
       }
     };
     
     navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
-  }, [sendMessage]);
+  }, [dispatch]);
 
-  // Show call window when call starts (only auto-show for new incoming calls)
+  // Show call window for incoming calls
   useEffect(() => {
     if (callState.isInCall && callState.isIncoming && callState.callStatus === 'ringing') {
       setShowCallWindow(true);
@@ -79,24 +63,39 @@ function AppContent() {
     }
   }, [callState.isInCall, callState.isIncoming, callState.callStatus]);
 
-  // -------------------------------
-  // INITIAL AUTH CHECK
-  // -------------------------------
+  // Initial auth check
   useEffect(() => {
+    console.log('🔐 [App] Initial auth check effect running', {
+      hasToken: !!token,
+      initialized,
+    });
+
     if (token && !initialized) {
-      dispatch(fetchMe())
-        .unwrap()
-        .catch(() => dispatch(clearAuth()));
+      console.log('🔐 [App] Token exists and not initialized, calling fetchMe...');
+      // Token exists, fetch user data to verify it's still valid
+      dispatch(fetchMe()).unwrap().catch((error) => {
+        console.warn('⚠️ [App] fetchMe failed:', error);
+        // If fetchMe fails, keep the token and user data from Redux
+        // Don't clear auth, just mark as initialized
+        console.log('🔐 [App] Calling setInitialized after fetchMe failure');
+        dispatch(setInitialized());
+      });
     } else if (!token && !initialized) {
+      console.log('🔐 [App] No token and not initialized, calling setInitialized');
+      // No token, mark as initialized
       dispatch(setInitialized());
+    } else {
+      console.log('🔐 [App] Already initialized or token check skipped');
     }
   }, [dispatch, token, initialized]);
 
-  if (!initialized) return <LoadingSpinner fullScreen />;
+  if (!initialized) {
+    console.log('⏳ [App] Not initialized, showing spinner');
+    return <LoadingSpinner fullScreen />;
+  }
 
-  // -------------------------------
-  // RENDER ROUTES
-  // -------------------------------
+  console.log('✅ [App] Initialized, rendering routes');
+
   return (
     <>
       <Routes>
@@ -108,11 +107,7 @@ function AppContent() {
                 <ProtectedRoute requiredRoles={requiredRoles}>
                   {Layout ? <Layout /> : <></>}
                 </ProtectedRoute>
-              ) : Layout ? (
-                <Layout />
-              ) : (
-                <></>
-              )
+              ) : Layout ? <Layout /> : <></>
             }
           >
             {routes.map((route, idx) => (
@@ -122,37 +117,24 @@ function AppContent() {
         ))}
       </Routes>
 
-      {/* Notification Permission Prompt */}
       {user && <NotificationPrompt />}
 
-      {/* WhatsApp-style Notifications */}
       {notifications.length > 0 && (
-        <div 
-          className="fixed top-0 right-0 p-4" 
-          style={{ 
-            zIndex: 999999,
-            pointerEvents: 'none'
-          }}
-        >
+        <div className="fixed top-0 right-0 p-4" style={{ zIndex: 999999, pointerEvents: 'none' }}>
           <div className="flex flex-col gap-3" style={{ pointerEvents: 'auto' }}>
-            {notifications.map((notification, index) => (
-              <div key={notification.id}>
-                <WhatsAppNotification
-                  notification={notification}
-                  onClose={() => {
-                    console.log('Closing notification:', notification.id);
-                    setNotifications(prev => prev.filter(n => n.id !== notification.id));
-                  }}
-                  onReply={handleReply}
-                />
-              </div>
+            {notifications.map((notification) => (
+              <WhatsAppNotification
+                key={notification.id}
+                notification={notification}
+                onClose={() => closeNotification(notification.id)}
+                onReply={handleReply}
+              />
             ))}
           </div>
         </div>
       )}
-
-      {/* Global Call Banner - Show when call is active but window is minimized */}
-      {callState.isInCall && !showCallWindow && (
+      {/* Call Features - Commented Out */}
+      {/* {callState.isInCall && !showCallWindow && (
         <ActiveCallBanner
           participant={callState.participant}
           callStatus={callState.callStatus}
@@ -161,7 +143,6 @@ function AppContent() {
         />
       )}
 
-      {/* Incoming Call Notification - Only for receiver when ringing */}
       {callState.isInCall && callState.isIncoming && callState.callStatus === 'ringing' && (
         <IncomingCallNotification
           caller={callState.participant}
@@ -170,7 +151,6 @@ function AppContent() {
         />
       )}
 
-      {/* Active Call Window - Show when window is open and not showing incoming notification */}
       {callState.isInCall && showCallWindow && !(callState.isIncoming && callState.callStatus === 'ringing') && (
         <AudioCallWindow
           participant={callState.participant}
@@ -183,7 +163,7 @@ function AppContent() {
           callDuration={callState.duration}
           onMinimize={() => setShowCallWindow(false)}
         />
-      )}
+      )} */}
     </>
   );
 }

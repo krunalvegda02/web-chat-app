@@ -7,7 +7,7 @@ export const createAsyncThunkHandler = (typePrefix, apiMethod, urlResolver, isMu
       console.log(`🔹 [AsyncThunk] ${typePrefix} - Starting...`);
       const token = getState().auth.token;
       console.log(token)
-      console.log(`🔑 [AsyncThunk] ${typePrefix} - Token:`, token ? 'Present' : 'Missing');
+      // console.log(`🔑 [AsyncThunk] ${typePrefix} - Token:`, token ? 'Present' : 'Missing');
 
       const url = typeof urlResolver === "function" ? urlResolver(payload) : urlResolver;
       console.log(`🎯 [AsyncThunk] ${typePrefix} - URL:`, url);

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { Input, Button, Space, Tooltip, message as antMessage, Upload, Image, Popover } from 'antd';
+import { Input, Button, Space, Tooltip, message as antMessage, Upload, Image, Popover, Spin } from 'antd';
 import {
   SendOutlined,
   PaperClipOutlined,
@@ -12,6 +12,7 @@ import {
   LockOutlined,
   UnlockOutlined,
   SmileOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { addMessage, uploadChatMedia, sendMessageAPI } from '../../redux/slices/chatSlice';
@@ -833,7 +834,7 @@ const MessageInput = memo(function MessageInput() {
             <Button
               type="primary"
               shape="circle"
-              icon={<SendOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
+              icon={isSending ? <LoadingOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} spin /> : <SendOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
               onClick={handleSend}
               disabled={!activeRoomId || isSending || isRecording}
               style={{

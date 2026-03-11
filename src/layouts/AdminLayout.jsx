@@ -5,11 +5,24 @@ import { useAuthGuard } from '../hooks/useAuthGuard';
 
 
 export default function AdminLayout() {
-  const { user } = useAuthGuard(['ADMIN']);
+  const { user, isAuthorized } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
+
+  console.log('🏢 [AdminLayout] Rendered', {
+    hasUser: !!user,
+    userRole: user?.role,
+    isAuthorized,
+  });
 
   // Show nothing while loading
-  if (!user) return null;
+  if (!user) {
+    console.log('🏢 [AdminLayout] No user, returning null');
+    return null;
+  }
 
+  if (!isAuthorized) {
+    console.log('🏢 [AdminLayout] User not authorized, returning null');
+    return null;
+  }
 
   return (
     <ThemeProvider>

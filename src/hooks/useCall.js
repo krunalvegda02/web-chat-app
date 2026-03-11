@@ -94,15 +94,16 @@ export const useCall = () => {
   }, [callState.callId, callState.participant]);
 
   // Initiate call
-  const initiateCall = useCallback(async (participant, roomId) => {
+  const initiateCall = useCallback(async (participant, roomId, displayName, displayPhone) => {
     try {
-      console.log('📞 Initiating call to:', participant.name);
+      const callDisplayName = displayName || participant.phone || participant.name;
+      console.log('📞 Initiating call to:', callDisplayName);
       setCallState({
         isInCall: true,
         isIncoming: false,
         callId: null,
         callType: 'audio',
-        participant,
+        participant: { ...participant, displayName: callDisplayName, displayPhone },
         callStatus: 'calling',
         duration: 0,
         isMuted: false,
@@ -257,12 +258,14 @@ export const useCall = () => {
 
     // Incoming call
     const handleIncomingCall = ({ callId, callerId, callerName, callerAvatar, callType, roomId }) => {
+      // Use callerName which should already be the contact name from backend
+      const displayName = callerName;
       setCallState({
         isInCall: true,
         isIncoming: true,
         callId,
         callType,
-        participant: { _id: callerId, name: callerName, avatar: callerAvatar },
+        participant: { _id: callerId, name: callerName, displayName, avatar: callerAvatar },
         callStatus: 'ringing',
         duration: 0,
         isMuted: false,

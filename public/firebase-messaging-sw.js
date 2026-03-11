@@ -17,79 +17,84 @@ messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message:', payload);
   
   const { data } = payload;
-  const title = data?.title || data?.senderName || 'New Message';
+  const title = data?.senderName || data?.title || 'New Message';
   const body = data?.body || 'You have a new message';
   const icon = data?.avatar || 'https://ui-avatars.com/api/?name=User&background=25D366&color=fff&size=128';
   
   return self.registration.showNotification(title, {
     body,
     icon,
-    badge: 'https://img.icons8.com/color/96/whatsapp--v1.png',
+    badge: '/whatsapp-icon.png',
     data: data || {},
     tag: `msg-${data?.messageId || Date.now()}`,
     requireInteraction: true,
+    silent: false,
+    vibrate: [200, 100, 200],
     actions: [
       {
         action: 'reply',
-        title: 'Reply',
         type: 'text',
+        title: 'Reply',
         placeholder: 'Type a message...'
-      },
-      {
-        action: 'open',
-        title: 'Open'
       }
     ]
   });
 });
 
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked:', event.notification, 'Action:', event.action);
-  event.notification.close();
-
-  const roomId = event.notification.data?.roomId;
-  const senderId = event.notification.data?.senderId;
+  console.log('[SW] Notification clicked - Action:', event.action);
   
-  if (event.action === 'reply' && event.reply) {
-    // Handle inline reply
-    const message = event.reply;
-    console.log('[SW] Reply message:', message);
-    
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          // Send message to any open client
-          for (const client of clientList) {
-            if (client.url.includes(self.location.origin)) {
-              client.postMessage({
+  const data = event.notification.data;
+  const roomId = data?.roomId;
+  const userRole = data?.userRole || 'USER';
+  
+  // Handle inline reply with text input
+  if (event.action === 'reply') {
+    if (event.reply) {
+      console.log('[SW] Reply text:', event.reply);
+      event.notification.close();
+      
+      // Send reply to app
+      event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+          .then((clientList) => {
+            if (clientList.length > 0) {
+              clientList[0].postMessage({
                 type: 'SEND_REPLY',
                 roomId,
-                message,
-                senderId
-              });
-              return client.focus();
-            }
-          }
-          // If no client is open, open one
-          return clients.openWindow(`/chat?room=${roomId}&reply=${encodeURIComponent(message)}`);
-        })
-    );
-  } else {
-    // Handle open action or notification click
-    const url = roomId ? `/chat?room=${roomId}` : '/';
-    
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          for (const client of clientList) {
-            if (client.url.includes(self.location.origin)) {
-              return client.focus().then(() => {
-                client.postMessage({ type: 'OPEN_CHAT', roomId });
+                message: event.reply
               });
             }
-          }
-          return clients.openWindow(url);
-        })
-    );
+            return Promise.resolve();
+          })
+      );
+      return;
+    }
   }
+  
+  // Handle notification body click - open chat
+  event.notification.close();
+  
+  let chatPath = '/chat';
+  if (userRole === 'SUPER_ADMIN') {
+    chatPath = '/super-admin/chats';
+  } else if (['ADMIN', 'TENANT_ADMIN'].includes(userRole)) {
+    chatPath = '/admin/chats';
+  }
+  
+  const url = roomId ? `${chatPath}?room=${roomId}` : chatPath;
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin)) {
+            return client.focus().then(() => {
+              client.postMessage({ type: 'OPEN_CHAT', roomId, userRole });
+            });
+          }
+        }
+        return clients.openWindow(url);
+      })
+  );
 });
