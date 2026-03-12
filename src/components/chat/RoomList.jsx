@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState, useCallback } from 'react';
 import { fetchRooms, setActiveRoom } from '../../redux/slices/chatSlice';
-import { Input, List, Badge, Empty, Button, Spin, Dropdown, Modal, message } from 'antd';
+import { Input, List, Badge, Empty, Button, Spin, Dropdown, Modal, message, App } from 'antd';
 import { SearchOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import Avatar from '../common/Avatar';
 import OnlineStatus from './OnlineStatus';
@@ -10,7 +10,6 @@ import { useTheme } from '../../hooks/useTheme';
 import API from '../../constants/ApiEndpoints';
 import { _delete } from '../../helper/apiClient';
 
-
 export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null, onRoomClick = null, roomFilter = null }) {
   const dispatch = useDispatch();
   const { theme } = useTheme();
@@ -18,10 +17,11 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
   const { user, token } = useSelector((s) => s.auth);
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenuRoom, setContextMenuRoom] = useState(null);
+  const { modal, message: messageApi } = App.useApp();
 
   // ✅ Delete room with WhatsApp-style confirmation
   const showDeleteConfirm = useCallback((room) => {
-    Modal.confirm({
+    modal.confirm({
       title: (
         <span style={{ fontSize: '20px', fontWeight: '400', color: '#111B21' }}>
           Delete chat?
@@ -65,7 +65,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       onOk: async () => {
         try {
           await _delete(`${API.CHAT.DELETE_ROOM}/${room._id}`);
-          message.success({
+          messageApi.success({
             content: 'Chat deleted',
             style: {
               marginTop: '10vh',
@@ -81,7 +81,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
           }
         } catch (error) {
           console.error('Error deleting room:', error);
-          message.error({
+          messageApi.error({
             content: error.response?.data?.message || 'Failed to delete chat',
             style: {
               marginTop: '10vh',
@@ -90,7 +90,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
         }
       },
     });
-  }, [dispatch, fetchRoomsAction, activeRoomId]);
+  }, [dispatch, fetchRoomsAction, activeRoomId, modal, messageApi]);
 
   // ✅ Fetch rooms on mount
   useEffect(() => {
