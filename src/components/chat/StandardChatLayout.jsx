@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSocket } from '../../hooks/useSocket';
@@ -40,13 +40,13 @@ export default function StandardChatLayout({ roomFilter = null }) {
 
   const { user } = useSelector((s) => s.auth);
   const { activeRoomId } = useSelector((s) => s.chat);
-  
+
   // Check if this is a platform user
   const isPlatformUser = user?.role === 'USER' && (user?.platformId || user?.externalUserId);
-  
+
   // For platform users on mobile, always show chat if there's an active room
   const shouldShowChatOnMobile = chatOpened && activeRoomId;
-  
+
   // For platform users, force chat opened state if there's an active room
   useEffect(() => {
     if (isPlatformUser && activeRoomId && !chatOpened) {
@@ -67,24 +67,53 @@ export default function StandardChatLayout({ roomFilter = null }) {
 
   useSocket();
 
-  useEffect(() => {
-    const roomId = searchParams.get('room') || searchParams.get('roomId');
-    if (roomId && roomId !== activeRoomId) {
-      console.log('✅ Opening room from URL:', roomId);
-      dispatch(setActiveRoom(roomId));
-      setChatOpened(true);
-    }
-  }, [searchParams, dispatch, activeRoomId]);
+  const prevUrlRoomId = useRef();
 
+  // Unified URL <-> Redux Sync Effect
   useEffect(() => {
-    if (activeRoomId) {
-      navigate(`?room=${activeRoomId}`, { replace: true });
-      setChatOpened(true);
-    } else {
-      navigate(location.pathname, { replace: true });
-      setChatOpened(false);
+    let urlRoomId = searchParams.get('room') || searchParams.get('roomId');
+
+    // Check if we are on the /user/chats page
+    if (location.pathname.startsWith('/user/chats/')) {
+      urlRoomId = location.pathname.split('/user/chats/')[1] || null;
+    } else if (location.pathname === '/user/chats') {
+      urlRoomId = null;
     }
-  }, [activeRoomId, navigate, location.pathname]);
+
+    // Only attempt sync if they are out of sync
+    if (urlRoomId !== activeRoomId) {
+      if (urlRoomId !== prevUrlRoomId.current) {
+        // The URL changed! (e.g., user clicked Back, or landed on a new page) -> Sync to Redux
+        console.log('🔗 [StandardChatLayout] URL changed. Syncing purely from URL to Redux:', urlRoomId);
+        dispatch(setActiveRoom(urlRoomId || null));
+        setChatOpened(!!urlRoomId);
+      } else {
+        // The URL did not change, but activeRoomId changed! (e.g., user clicked a room) -> Sync to URL
+        console.log('🔗 [StandardChatLayout] Redux changed. Syncing purely from Redux to URL:', activeRoomId);
+        if (activeRoomId) {
+          if (location.pathname.startsWith('/user/chats')) {
+            navigate(`/user/chats/${activeRoomId}`, { replace: true });
+          } else {
+            navigate(`?room=${activeRoomId}`, { replace: true });
+          }
+          setChatOpened(true);
+        } else {
+          if (location.pathname.startsWith('/user/chats')) {
+            navigate(`/user/chats`, { replace: true });
+          } else {
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('room');
+            newParams.delete('roomId');
+            navigate({ pathname: location.pathname, search: newParams.toString() }, { replace: true });
+          }
+          setChatOpened(false);
+        }
+      }
+    }
+
+    // Always keep track of what the URL room ID was LAST seen as
+    prevUrlRoomId.current = urlRoomId;
+  }, [location.pathname, searchParams, activeRoomId, dispatch, navigate]);
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const isAdmin = ['ADMIN', 'TENANT_ADMIN'].includes(user?.role);
@@ -218,7 +247,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
 
   const sortedUsers = useMemo(() => {
     let users = availableUsers;
-    
+
     // For super admin, use search results when searching
     if (isSuperAdmin && searchUserTerm.trim()) {
       users = searchResults;
@@ -232,7 +261,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
         return name.includes(query) || phone.includes(query);
       });
     }
-    
+
     return [...users].sort((a, b) => {
       const nameA = (a.contactName || a.name || '').toLowerCase();
       const nameB = (b.contactName || b.name || '').toLowerCase();
@@ -313,15 +342,15 @@ export default function StandardChatLayout({ roomFilter = null }) {
               ))}
             </div>
           ))}
-          
+
           {/* Alphabet Index - WhatsApp Style */}
-          <div style={{ 
-            position: 'absolute', 
-            right: '4px', 
+          <div style={{
+            position: 'absolute',
+            right: '4px',
             top: '50%',
             transform: 'translateY(-50%)',
-            display: 'flex', 
-            flexDirection: 'column', 
+            display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             zIndex: 10
           }}>
@@ -359,13 +388,13 @@ export default function StandardChatLayout({ roomFilter = null }) {
           )}
         </>
       ) : (
-        <Empty 
+        <Empty
           description={
             isSuperAdmin
               ? 'Search by name, email or phone to find users'
               : searchUserTerm
-              ? 'No contacts found'
-              : 'No contacts yet. Search to add new contacts.'
+                ? 'No contacts found'
+                : 'No contacts yet. Search to add new contacts.'
           }
         />
       )}
@@ -378,7 +407,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
         <>
           <style>{`body { overflow: hidden !important; }`}</style>
           <div className="fixed inset-0 flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
-            <ChatWindow 
+            <ChatWindow
               showMobileHeader={true}
               onBack={() => {
                 // For platform users, don't allow going back to room list
@@ -394,7 +423,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
         </>
       );
     }
-    
+
     // For platform users, don't show room list - they should be directly in chat
     if (isPlatformUser) {
       return (
@@ -408,7 +437,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
         </>
       );
     }
-    
+
     return (
       <>
         <style>{`body { overflow: hidden !important; }`}</style>
@@ -500,7 +529,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
 
         <div className="flex-1 flex flex-col" style={{ overflow: 'hidden' }}>
           {activeRoomId ? (
-            <ChatWindow 
+            <ChatWindow
               showMobileHeader={false}
               onBack={() => dispatch(setActiveRoom(''))}
             />

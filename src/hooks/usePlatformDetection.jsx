@@ -15,7 +15,7 @@ export const usePlatformDetection = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, token, initialized } = useSelector(state => state.auth);
-  
+
   const [platformState, setPlatformState] = useState({
     isDetected: false,
     isProcessing: false,
@@ -25,17 +25,19 @@ export const usePlatformDetection = () => {
   });
 
   // Extract platform parameters from URL (memoized to prevent re-renders)
-  const platformParams = useMemo(() => ({
-    apiKey: searchParams.get('apiKey') || searchParams.get('key'),
-    name: searchParams.get('name'),
-    email: searchParams.get('email'),
-    phone: searchParams.get('phone'),
-    externalUserId: searchParams.get('userId') || searchParams.get('externalUserId'),
-    roomId: searchParams.get('roomId') || searchParams.get('room'),
-    autoLogin: searchParams.get('autoLogin') === 'true' || searchParams.get('auto') === 'true',
-    redirect: searchParams.get('redirect'),
-    platform: searchParams.get('platform')
-  }), [searchParams]);
+  const platformParams = useMemo(() => (
+    {
+      apiKey: searchParams.get('apiKey') || searchParams.get('key'),
+      name: searchParams.get('name'),
+      email: searchParams.get('email'),
+      phone: searchParams.get('phone'),
+      externalUserId: searchParams.get('userId') || searchParams.get('externalUserId'),
+      roomId: searchParams.get('roomId') || searchParams.get('room'),
+      autoLogin: searchParams.get('autoLogin') === 'true' || searchParams.get('auto') === 'true',
+      redirect: searchParams.get('redirect'),
+      platform: searchParams.get('platform')
+    }
+  ), [searchParams]);
 
   // Platform integration hook
   const {
@@ -45,6 +47,12 @@ export const usePlatformDetection = () => {
     error: platformError
   } = usePlatformIntegration(platformParams.apiKey);
 
+  // Normalize phone number for comparison
+  const normalizePhone = useCallback((phone) => {
+    if (!phone) return '';
+    return phone.replace(/\D/g, '');
+  }, []);
+
   // Detect if this is a platform user request (memoized)
   const detectionResult = useMemo(() => {
     const hasApiKey = !!platformParams.apiKey;
@@ -52,9 +60,9 @@ export const usePlatformDetection = () => {
     const hasUserData = !!(platformParams.name && platformParams.email && platformParams.phone);
     const hasAutoLogin = platformParams.autoLogin;
     const isFromExternalDomain = document.referrer && !document.referrer.includes(window.location.hostname);
-    
+
     const isDetected = hasApiKey || hasPlatformParam || (hasUserData && (hasAutoLogin || isFromExternalDomain));
-    
+
     console.log('🔍 [PlatformDetection] Detection analysis:', {
       hasApiKey,
       hasPlatformParam,
@@ -62,8 +70,8 @@ export const usePlatformDetection = () => {
       hasAutoLogin,
       isFromExternalDomain,
       isDetected,
-      referrer: document.referrer,
-      currentHost: window.location.hostname
+      email: platformParams.email,
+      phone: platformParams.phone
     });
 
     return {
@@ -88,56 +96,53 @@ export const usePlatformDetection = () => {
     setPlatformState(prev => ({ ...prev, isProcessing: true, error: null }));
 
     try {
-      console.log('🔐 [PlatformDetection] Performing auto-login for platform user...');
-      
+      console.log('🔐 [PlatformDetection] Performing auto-login for platform user...', userData);
+
       const result = await platformChatLogin(userData);
-      
+
       if (result.success) {
         console.log('✅ [PlatformDetection] Auto-login successful');
-        
+
         // For platform users, ALWAYS navigate directly to their room
         const targetRoom = platformParams.roomId || result.data.room?._id;
-        
+
         if (targetRoom) {
           console.log('🎯 [PlatformDetection] Navigating directly to room:', targetRoom);
-          
+
           // Set active room immediately
           dispatch(setActiveRoom(targetRoom));
-          
+
           // Navigate directly to the room immediately (no delay)
           navigate(`/user/chats/${targetRoom}`, { replace: true });
-          
+
           // Clean URL parameters after navigation
-          setTimeout(() => {
-            const cleanUrl = `/user/chats/${targetRoom}`;
-            window.history.replaceState({}, document.title, cleanUrl);
-          }, 100);
+          window.history.replaceState({}, document.title, `/user/chats/${targetRoom}`);
         } else {
           console.warn('⚠️ [PlatformDetection] No room found for platform user');
           // Fallback to general chat page
           navigate('/user/chats', { replace: true });
         }
-        
-        setPlatformState(prev => ({ 
-          ...prev, 
-          isProcessing: false, 
-          userData: result.data.user 
+
+        setPlatformState(prev => ({
+          ...prev,
+          isProcessing: false,
+          userData: result.data.user
         }));
-        
+
         return true;
       } else {
         throw new Error(result.error || 'Auto-login failed');
       }
     } catch (error) {
       console.error('❌ [PlatformDetection] Auto-login failed:', error);
-      setPlatformState(prev => ({ 
-        ...prev, 
-        isProcessing: false, 
-        error: error.message 
+      setPlatformState(prev => ({
+        ...prev,
+        isProcessing: false,
+        error: error.message
       }));
       return false;
     }
-  }, [platformChatLogin, isValidApiKey, platformParams.roomId, platformParams.redirect, dispatch, navigate]);
+  }, [platformChatLogin, isValidApiKey, platformParams.roomId, dispatch, navigate]);
 
   // Update platform state when detection changes
   useEffect(() => {
@@ -157,15 +162,41 @@ export const usePlatformDetection = () => {
       hasToken: !!token,
       shouldAutoLogin: detectionResult.shouldAutoLogin,
       hasUserData: !!detectionResult.userData,
-      isProcessing: platformState.isProcessing
+      isProcessing: platformState.isProcessing,
+      urlEmail: platformParams.email,
+      urlPhone: platformParams.phone,
+      userEmail: user?.email,
+      userPhone: user?.phone
     });
-    
-    if (!initialized) return;
 
-    // Skip auto-login if user is already authenticated
+    if (!initialized) return;
+    if (platformState.isProcessing) return;
+
+    // Normalize phone numbers for comparison
+    const urlPhoneNormalized = normalizePhone(platformParams.phone);
+    const userPhoneNormalized = normalizePhone(user?.phone);
+
+    // Detect if we need to switch users (Sticky identity fix)
+    const isDifferentUser = user && (
+      (platformParams.email && user.email !== platformParams.email) ||
+      (urlPhoneNormalized && userPhoneNormalized !== urlPhoneNormalized)
+    );
+
+    if (isDifferentUser) {
+      console.log('🔄 [PlatformDetection] Different user detected in URL, forcing re-authentication', {
+        urlEmail: platformParams.email,
+        userEmail: user.email,
+        urlPhone: urlPhoneNormalized,
+        userPhone: userPhoneNormalized
+      });
+      performAutoLogin(detectionResult.userData);
+      return;
+    }
+
+    // Skip auto-login if user is already authenticated and matches
     if (user && token) {
-      console.log('👤 [PlatformDetection] User already authenticated, skipping auto-login');
-      
+      console.log('👤 [PlatformDetection] User already authenticated and matches, skipping auto-login');
+
       // Still handle room navigation if specified
       if (platformParams.roomId) {
         dispatch(setActiveRoom(platformParams.roomId));
@@ -175,29 +206,23 @@ export const usePlatformDetection = () => {
     }
 
     // Perform auto-login if conditions are met
-    if (detectionResult.shouldAutoLogin && detectionResult.userData && !platformState.isProcessing) {
+    if (detectionResult.shouldAutoLogin && detectionResult.userData) {
       console.log('🚀 [PlatformDetection] Initiating auto-login...');
       performAutoLogin(detectionResult.userData);
-    } else {
-      console.log('⚠️ [PlatformDetection] Auto-login conditions not met:', {
-        shouldAutoLogin: detectionResult.shouldAutoLogin,
-        hasUserData: !!detectionResult.userData,
-        isProcessing: platformState.isProcessing
-      });
     }
-  }, [initialized, user, token, detectionResult.shouldAutoLogin, detectionResult.userData, platformState.isProcessing, platformParams.roomId, dispatch, navigate, performAutoLogin]);
+  }, [initialized, user, token, detectionResult.shouldAutoLogin, detectionResult.userData, platformState.isProcessing, platformParams, dispatch, navigate, performAutoLogin, normalizePhone]);
 
   // Handle direct chat links (bypass login completely)
   const handleDirectChatAccess = useCallback(() => {
     const pathMatch = location.pathname.match(/^\/user\/chats\/([a-f0-9]{24})$/);
     const isDirectChatLink = pathMatch && platformState.isDetected;
-    
+
     if (isDirectChatLink && !user && platformState.userData) {
       console.log('🔗 [PlatformDetection] Direct chat link detected, performing auto-login...');
       performAutoLogin(platformState.userData);
       return true;
     }
-    
+
     return false;
   }, [location.pathname, platformState.isDetected, platformState.userData, user, performAutoLogin]);
 
@@ -208,7 +233,7 @@ export const usePlatformDetection = () => {
       console.error('❌ [PlatformDetection] No user data available for platform login');
       return false;
     }
-    
+
     return await performAutoLogin(userData);
   }, [platformState.userData, performAutoLogin]);
 
@@ -217,36 +242,36 @@ export const usePlatformDetection = () => {
     const isLoginPage = location.pathname === '/login';
     const isRegisterPage = location.pathname === '/register';
     const shouldBypass = platformState.isDetected && platformState.shouldAutoLogin && (isLoginPage || isRegisterPage);
-    
+
     if (shouldBypass) {
       console.log('🔄 [PlatformDetection] Bypassing auth page for platform user');
     }
-    
+
     return shouldBypass;
   }, [location.pathname, platformState.isDetected, platformState.shouldAutoLogin]);
 
   return {
     // State
-    isDetected: platformState.isDetected,
+    isDetected: detectionResult.isDetected,
     isProcessing: platformState.isProcessing || platformLoading,
     error: platformState.error || platformError,
-    userData: platformState.userData,
-    shouldAutoLogin: platformState.shouldAutoLogin,
-    
+    userData: platformState.userData || detectionResult.userData,
+    shouldAutoLogin: detectionResult.shouldAutoLogin,
+
     // Platform parameters
     platformParams,
     isValidApiKey,
-    
+
     // Actions
     triggerPlatformLogin,
     shouldBypassCurrentPage,
-    
+
     // Utilities
-    isPlatformUser: platformState.isDetected,
-    hasValidCredentials: !!(platformState.userData && isValidApiKey),
-    
+    isPlatformUser: detectionResult.isDetected,
+    hasValidCredentials: !!(detectionResult.userData && isValidApiKey),
+
     // Status checks
-    canAutoLogin: platformState.shouldAutoLogin && !user && isValidApiKey,
-    isDirectChatAccess: location.pathname.includes('/user/chats/') && platformState.isDetected
+    canAutoLogin: detectionResult.shouldAutoLogin && isValidApiKey,
+    isDirectChatAccess: location.pathname.includes('/user/chats/') && detectionResult.isDetected
   };
 };

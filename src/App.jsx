@@ -25,7 +25,7 @@ function AppContent() {
   const { initialized, token, user } = useSelector((s) => s.auth);
   const { callState, acceptCall, rejectCall, endCall, toggleMute, toggleSpeaker } = useCall();
   const [showCallWindow, setShowCallWindow] = useState(false);
-  
+
   useSocket();
   useAuthSync();
   const { notifications, handleNotification, closeNotification } = useAppNotifications();
@@ -52,7 +52,7 @@ function AppContent() {
         dispatch(setActiveRoom(event.data.roomId));
       }
     };
-    
+
     navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   }, [dispatch]);
@@ -125,6 +125,7 @@ function AppContent() {
         })}
       </Routes>
 
+      {/* notification enable */}
       {user && <NotificationPrompt />}
 
       {notifications.length > 0 && (

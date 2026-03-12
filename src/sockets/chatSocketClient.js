@@ -7,6 +7,8 @@ class ChatSocketClient {
     this.isConnecting = false;
     this.listeners = new Map();
     this.eventQueue = [];
+    this.connectionCheckInterval = null;
+    this.lastToken = null;
   }
 
   async connect(token, onError) {
@@ -28,6 +30,7 @@ class ChatSocketClient {
     }
 
     this.isConnecting = true;
+    this.lastToken = token;
 
     return new Promise((resolve, reject) => {
       try {
@@ -49,18 +52,31 @@ class ChatSocketClient {
           this.isConnecting = false;
           console.log('✅ [SOCKET] Connected:', this.socket.id);
           this._processEventQueue();
+          this._startConnectionMonitor();
           resolve(this.socket);
         });
 
         this.socket.on('disconnect', (reason) => {
           this.isConnected = false;
+          this._stopConnectionMonitor();
           console.log('🔌 [SOCKET] Disconnected:', reason);
-          
-          // Handle token expiration on disconnect (only if not already on login page or public chat)
+
+          // Auto-reconnect on unexpected disconnect
+          if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'transport error') {
+            console.log('🔄 [SOCKET] Attempting auto-reconnect...');
+            setTimeout(() => {
+              if (this.lastToken && !this.socket?.connected) {
+                this.connect(this.lastToken).catch(err => {
+                  console.error('❌ [SOCKET] Auto-reconnect failed:', err.message);
+                });
+              }
+            }, 2000);
+          }
+
+          // Handle token expiration on disconnect
           const currentPath = window.location.pathname;
-          const isPublicChatRoute = currentPath.match(/^\/user\/chats\/[^/]+$/);
-          if ((reason === 'io server disconnect' || reason === 'transport close') && 
-              !currentPath.includes('/login') && !currentPath.includes('/register') && !isPublicChatRoute) {
+          if ((reason === 'io server disconnect' || reason === 'transport close') &&
+            !currentPath.includes('/login') && !currentPath.includes('/register')) {
             const token = localStorage.getItem('token');
             if (!token) {
               window.location.href = '/login';
@@ -80,16 +96,15 @@ class ChatSocketClient {
           console.error('❌ [AUTH] Error:', data.message);
           this.isConnecting = false;
           this.disconnect();
-          
+
           // Redirect to login on token expiration (only if not already on login page or public chat)
           const currentPath = window.location.pathname;
-          const isPublicChatRoute = currentPath.match(/^\/user\/chats\/[^/]+$/);
-          if ((data.message?.includes('expired') || data.message?.includes('Invalid token')) && 
-              !currentPath.includes('/login') && !currentPath.includes('/register') && !isPublicChatRoute) {
+          if ((data.message?.includes('expired') || data.message?.includes('Invalid token')) &&
+            !currentPath.includes('/login') && !currentPath.includes('/register')) {
             localStorage.removeItem('token');
             window.location.href = '/login';
           }
-          
+
           if (onError) {
             onError({ type: 'AUTH_ERROR', message: data.message });
           }
@@ -115,7 +130,27 @@ class ChatSocketClient {
     if (!this.socket?.connected) {
       console.warn(`⚠️ Socket not connected. Queueing event: ${event}`);
       this.eventQueue.push({ event, data });
-      return Promise.reject(new Error('Socket not connected'));
+
+      // Return a promise that resolves when socket connects and event is sent
+      return new Promise((resolve) => {
+        let timeoutId;
+        const checkInterval = setInterval(() => {
+          if (this.socket?.connected) {
+            clearInterval(checkInterval);
+            clearTimeout(timeoutId);
+            this.socket.emit(event, data);
+            console.log(`📤 [QUEUED-SENT] ${event}:`, data);
+            resolve();
+          }
+        }, 100);
+
+        // Timeout after 5 seconds - silently resolve to prevent UI blocking
+        timeoutId = setTimeout(() => {
+          clearInterval(checkInterval);
+          console.warn(`⚠️ [EMIT] Socket connection timeout for: ${event} - will retry when connected`);
+          resolve(); // Silently resolve to prevent hanging
+        }, 5000);
+      });
     }
 
     console.log(`📤 [EMIT] ${event}:`, data);
@@ -173,7 +208,27 @@ class ChatSocketClient {
     }
   }
 
+  _startConnectionMonitor() {
+    this._stopConnectionMonitor();
+    this.connectionCheckInterval = setInterval(() => {
+      if (!this.socket?.connected && this.lastToken) {
+        console.warn('⚠️ [MONITOR] Socket disconnected, attempting reconnect...');
+        this.connect(this.lastToken).catch(err => {
+          console.error('❌ [MONITOR] Reconnect failed:', err.message);
+        });
+      }
+    }, 10000); // Check every 10 seconds
+  }
+
+  _stopConnectionMonitor() {
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+  }
+
   disconnect() {
+    this._stopConnectionMonitor();
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -181,6 +236,7 @@ class ChatSocketClient {
       this.isConnecting = false;
       this.listeners.clear();
       this.eventQueue = [];
+      this.lastToken = null;
       console.log('🔌 Socket disconnected');
     }
   }

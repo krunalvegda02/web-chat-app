@@ -24,7 +24,7 @@ export default function UserChat() {
   const hasPlatformParam = urlParams.get('platform') === 'test' || urlParams.get('platform') === 'true';
   const isPlatformUser = user?.role === 'USER' && (user?.platformId || user?.externalUserId);
   const isPlatformIntegration = hasApiKey || hasUserData || hasPlatformParam || isPlatformUser;
-  
+
   console.log('🔍 [UserChatPage] Platform detection:', {
     hasApiKey,
     hasUserData,
@@ -48,18 +48,18 @@ export default function UserChat() {
     hasApiKey,
     hasUserData
   });
- 
+
   // Auto-redirect platform users to their chat room if they land on room list
   useEffect(() => {
     if (isPlatformUser && !roomId && initialized && user) {
       console.log('🔄 [UserChatPage] Platform user detected without roomId, fetching rooms to redirect...');
-      
+
       // Fetch rooms to get the platform user's room
       dispatch(fetchRooms()).then((result) => {
         if (result.payload?.data?.rooms?.length > 0) {
           const firstRoom = result.payload.data.rooms[0];
           console.log('🔄 [UserChatPage] Redirecting platform user to room:', firstRoom._id);
-          
+
           // Set active room and navigate immediately
           dispatch(setActiveRoom(firstRoom._id));
           navigate(`/user/chats/${firstRoom._id}`, { replace: true });
@@ -70,13 +70,8 @@ export default function UserChat() {
     }
   }, [isPlatformUser, roomId, initialized, user, dispatch, navigate]);
 
-  // Set active room from URL params
-  useEffect(() => {
-    if (roomId && roomId !== activeRoomId) {
-      console.log('🔍 [UserChatPage] Setting active room from URL:', roomId);
-      dispatch(setActiveRoom(roomId));
-    }
-  }, [roomId, activeRoomId, dispatch]);
+  // Active room is purely managed securely by StandardChatLayout now
+
 
   useEffect(() => {
     const info = `User: ${user?._id}, Token: ${!!token}, RoomId: ${roomId}, ActiveRoom: ${activeRoomId}, Platform: ${isPlatformIntegration}`;
@@ -127,7 +122,7 @@ export default function UserChat() {
         </div>
       );
     }
-    
+
     // If this is platform integration but user/token missing, show loading
     if (isPlatformIntegration) {
       console.log('⏳ [UserChatPage] Platform integration detected but auth missing, waiting...');
@@ -140,7 +135,7 @@ export default function UserChat() {
         </div>
       );
     }
-    
+
     // General access denied
     return (
       <div
@@ -165,25 +160,8 @@ export default function UserChat() {
         minHeight: '100vh',
       }}
     >
-      {/* Debug info */}
-      <div style={{ 
-        position: 'fixed', 
-        bottom: 10, 
-        right: 10, 
-        background: '#000', 
-        color: '#0f0', 
-        padding: '10px', 
-        fontSize: '10px',
-        zIndex: 9999,
-        maxWidth: '300px',
-        borderRadius: '4px',
-        fontFamily: 'monospace',
-        maxHeight: '100px',
-        overflow: 'auto'
-      }}>
-        {debugInfo}
-      </div>
-      
+      {/* Debug info removed for production */}
+
       <StandardChatLayout />
     </div>
   );

@@ -27,9 +27,8 @@ export const useSocket = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // ✅ Skip socket connection for public chat routes (no token)
-    const isPublicChatRoute = window.location.pathname.match(/^\/user\/chats\/[^/]+$/);
-    if (!token || isConnected || isPublicChatRoute) return;
+    // We only skip if there is NO token. We no longer use a problematic regex to skip.
+    if (!token || isConnected) return;
 
     const initializeSocket = async () => {
       setIsLoading(true);
@@ -51,14 +50,14 @@ export const useSocket = () => {
             console.log('✅ [SOCKET] message_received:', data);
             console.log('📦 [SOCKET] Current user role:', user?.role);
             console.log('📦 [SOCKET] Dispatching socketMessageReceived for room:', data?.roomId);
-            
+
             if (data && data.roomId) {
               // ✅ FIX: Ensure status is 'sent' for immediate tick mark
               const messageWithStatus = {
                 ...data,
                 status: data.status || 'sent'
               };
-              
+
               dispatch(socketMessageReceived({
                 roomId: data.roomId,
                 message: messageWithStatus

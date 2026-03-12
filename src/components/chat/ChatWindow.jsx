@@ -53,16 +53,26 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   const [searchResults, setSearchResults] = useState([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const messagesContainerRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const previousMessagesLength = useRef(0);
 
   // Check if user is a platform user (should have limited access)
-  const isPlatformUser = user?.role === 'USER' && user?.platformId;
-  const isSecurePlatformUser = user?.externalUserId && user?.platformId; // Enhanced security check
-  console.log(isPlatformUser ? '👤 Platform user detected' : '👤 Regular user', { 
-    user, 
-    isPlatformUser, 
-    isSecurePlatformUser,
-    hasExternalId: !!user?.externalUserId
-  });
+  const isPlatformUser = useMemo(() => {
+    const hasExternalId = !!user?.externalUserId;
+    const hasPlatformId = !!user?.platformId;
+    const isUserRole = user?.role === 'USER';
+    const result = isUserRole && (hasExternalId || hasPlatformId);
+    console.log('🔍 Platform User Check:', {
+      user,
+      hasExternalId,
+      hasPlatformId,
+      isUserRole,
+      isPlatformUser: result
+    });
+    return result;
+  }, [user]);
+
+  console.log(isPlatformUser ? '👤 Platform user detected - hiding controls' : '👤 Regular user - showing all controls');
 
   // ✅ Get room details from rooms (memoized)
   const currentRoom = useMemo(() => {
@@ -127,6 +137,44 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     setCurrentSearchIndex(0);
   };
 
+  // ✅ Auto-scroll to bottom
+  const scrollToBottom = useCallback((force = false) => {
+    if (force) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+    if (isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
+  // Scroll to bottom on initial load
+  useEffect(() => {
+    if (messages.length > 0 && previousMessagesLength.current === 0) {
+      setTimeout(() => scrollToBottom(true), 100);
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (messages.length > previousMessagesLength.current && previousMessagesLength.current > 0) {
+      const lastMessage = messages[messages.length - 1];
+      const isMyMessage = lastMessage?.senderId === user?._id;
+
+      if (isMyMessage) {
+        scrollToBottom(true);
+      } else {
+        scrollToBottom(false);
+      }
+    }
+    previousMessagesLength.current = messages.length;
+  }, [messages, scrollToBottom, user?._id]);
+
   // ✅ Get other participant or all participants for display
   const otherParticipant = useMemo(() => {
     if (!roomDetails || !roomDetails.participants) return null;
@@ -139,7 +187,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   // Get display name for header - show contact name or phone number
   const displayName = useMemo(() => {
     console.log('🔍 DisplayName Debug:', { readOnly, roomDetails, otherParticipant });
-    
+
     // For read-only mode (admin monitoring), show all participants
     if (readOnly && roomDetails?.participants) {
       console.log('📋 Participants:', roomDetails.participants);
@@ -150,12 +198,12 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       console.log('✅ Participant Names:', participantNames);
       if (participantNames) return participantNames;
     }
-    
+
     // For regular chat, use room name from backend (which includes contact name logic)
     if (currentRoom?.name) return currentRoom.name;
     if (roomDetails?.name) return roomDetails.name;
     if (otherParticipant) return otherParticipant.name;
-    
+
     // Fallback to otherParticipants array
     if (roomDetails?.otherParticipants && roomDetails.otherParticipants.length > 0) {
       const names = roomDetails.otherParticipants
@@ -164,7 +212,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
         .join(' & ');
       if (names) return names;
     }
-    
+
     return 'Loading...';
   }, [otherParticipant, roomDetails, readOnly, currentRoom]);
 
@@ -175,8 +223,8 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   }, [roomDetails, otherParticipant, readOnly, currentRoom]);
 
   const isOtherUserOnline = useMemo(() => {
-    console.log('🔍 Online Check:', { 
-      otherParticipant, 
+    console.log('🔍 Online Check:', {
+      otherParticipant,
       otherParticipantId: otherParticipant?._id,
       onlineUsers,
       includes: otherParticipant && onlineUsers.includes(otherParticipant._id)
@@ -207,7 +255,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       console.log(`⏭️ Already joined room ${activeRoomId}, skipping`);
       return;
     }
-    
+
     hasJoinedRoom.current = activeRoomId;
     console.log(`📍 ChatWindow: Joining room ${activeRoomId}`);
 
@@ -216,7 +264,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     const loadRoom = async () => {
       try {
         setMessagesLoaded(false);
-        
+
         // Only join room via socket if user is authenticated AND socket is connected
         if (user && chatSocketClient && chatSocketClient.isReady()) {
           joinRoom(activeRoomId, readOnly);
@@ -231,7 +279,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           const urlParams = new URLSearchParams(window.location.search);
           const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
           const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
-          
+
           if (hasApiKey || hasUserData) {
             // This looks like a platform integration, let the platform detection handle it
             console.log('🔄 [ChatWindow] Platform integration detected, waiting for authentication...');
@@ -240,7 +288,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
             console.log('🔄 [ChatWindow] No platform data, redirecting to login');
             window.location.href = '/login';
           }
-          
+
           if (isMounted) {
             setMessagesLoaded(true);
           }
@@ -255,7 +303,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
         if (isMounted) {
           setMessagesLoaded(true);
-          
+
           // Mark all messages as read after loading (only if not readOnly)
           if (!readOnly) {
             const loadedMessages = result?.data?.messages || result?.messages || [];
@@ -265,7 +313,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
                 return senderId !== user?._id && msg.status !== 'read';
               })
               .map(msg => msg._id);
-            
+
             if (unreadMessageIds.length > 0) {
               setTimeout(() => {
                 markMessagesAsRead(activeRoomId, unreadMessageIds);
@@ -371,7 +419,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
   // ✅ Show loading state only when actively loading
   const isLoading = loadingMessages[activeRoomId] || (!messagesLoaded && messages.length === 0);
-  
+
   if (isLoading) {
     return (
       <div
@@ -413,7 +461,8 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-          {showMobileHeader && (
+          {/* Hide back button for platform users */}
+          {showMobileHeader && !isPlatformUser && (
             <Button
               type="text"
               icon={<ArrowLeftOutlined style={{ fontSize: '20px' }} />}
@@ -430,9 +479,9 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
           {otherParticipant ? (
             <>
-              <div 
-                style={{ position: 'relative', flexShrink: 0, cursor: (isPlatformUser || isSecurePlatformUser) ? 'default' : 'pointer' }}
-                onClick={() => !(isPlatformUser || isSecurePlatformUser) && navigate(`/profile/${otherParticipant._id}`)}
+              <div
+                style={{ position: 'relative', flexShrink: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
+                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <Avatar src={otherParticipant.avatar} size={40} name={displayName} />
                 {isOtherUserOnline && (
@@ -450,9 +499,9 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
                   />
                 )}
               </div>
-              <div 
-                style={{ flex: 1, minWidth: 0, cursor: (isPlatformUser || isSecurePlatformUser) ? 'default' : 'pointer' }}
-                onClick={() => !(isPlatformUser || isSecurePlatformUser) && navigate(`/profile/${otherParticipant._id}`)}
+              <div
+                style={{ flex: 1, minWidth: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
+                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <div style={{ fontWeight: 600, color: theme?.headerTextColor || '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {displayName}
@@ -485,25 +534,27 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
               style={{ color: theme?.headerIconColor || '#FFFFFF' }}
             />
           </Tooltip>
-          {/* Hide call button for platform users */}
-          {!isPlatformUser && !isSecurePlatformUser && (
-            <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
-              <Button
-                type="text"
-                icon={<PhoneOutlined style={{ fontSize: '18px' }} />}
-                onClick={handleStartCall}
-                disabled={!isOtherUserOnline || readOnly || callState.isInCall}
-                style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : (theme?.headerIconColor || '#FFFFFF') }}
-              />
-            </Tooltip>
-          )}
-          <Tooltip title="More">
-            <Button 
-              type="text" 
-              icon={<MoreOutlined style={{ fontSize: '18px' }} />}
-              style={{ color: theme?.headerIconColor || '#FFFFFF' }}
-            />
-          </Tooltip>
+          {/* Hide call and more buttons for platform users */}
+          {/* {!isPlatformUser && (
+            <>
+              <Tooltip title={callState.isInCall ? "Call in progress" : "Audio Call"}>
+                <Button
+                  type="text"
+                  icon={<PhoneOutlined style={{ fontSize: '18px' }} />}
+                  onClick={handleStartCall}
+                  disabled={!isOtherUserOnline || readOnly || callState.isInCall}
+                  style={{ color: callState.isInCall ? 'rgba(255,255,255,0.5)' : (theme?.headerIconColor || '#FFFFFF') }}
+                />
+              </Tooltip>
+              <Tooltip title="More">
+                <Button 
+                  type="text" 
+                  icon={<MoreOutlined style={{ fontSize: '18px' }} />}
+                  style={{ color: theme?.headerIconColor || '#FFFFFF' }}
+                />
+              </Tooltip>
+            </>
+          )} */}
         </Space>
       </div>
 
@@ -569,20 +620,22 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           overflowX: 'hidden',
           padding: '20px',
           display: 'flex',
-          flexDirection: 'column-reverse',
+          flexDirection: 'column',
           background: theme?.chatBackgroundColor || '#E5DDD5',
           backgroundImage: theme?.chatBackgroundImage ? `url(${theme.chatBackgroundImage})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       >
-        <MessageList 
-          messages={messages} 
+        <MessageList
+          messages={messages}
           roomId={activeRoomId}
           searchQuery={searchQuery}
           searchResults={searchResults}
           currentSearchIndex={currentSearchIndex}
         />
+        {/* Auto-scroll anchor moved to parent container */}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Typing Indicator - Fixed */}

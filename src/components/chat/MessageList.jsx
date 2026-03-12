@@ -16,9 +16,7 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
   const { theme } = useTheme();
   const { user } = useSelector((s) => s.auth);
   const { typingUsers, activeRoomId, loadingMessages } = useSelector((s) => s.chat);
-  const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const previousMessagesLength = useRef(0);
   const markedAsReadRef = useRef(new Set());
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -81,10 +79,10 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
       })
       .map((message) => {
         // Normalize senderId - handle both object and string formats
-        const senderId = typeof message.senderId === 'object' && message.senderId?._id 
-          ? message.senderId._id 
+        const senderId = typeof message.senderId === 'object' && message.senderId?._id
+          ? message.senderId._id
           : (message.senderId || message.sender?._id);
-        
+
         // Normalize sender - use senderId object if it's populated, otherwise use sender
         const sender = message.sender || (typeof message.senderId === 'object' ? message.senderId : null) || {
           _id: senderId,
@@ -104,78 +102,40 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
     return filtered;
   }, [messages, user?._id]);
 
-  // ✅ Auto-scroll to bottom on new messages (only if user is at bottom or sent the message)
-  const scrollToBottom = useCallback((force = false) => {
-    if (force) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
 
-    const container = messagesContainerRef.current?.parentElement;
-    if (!container) return;
-
-    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-    
-    if (isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, []);
-
-  // Scroll to bottom only on initial load
-  useEffect(() => {
-    if (validMessages.length > 0 && previousMessagesLength.current === 0) {
-      setTimeout(() => scrollToBottom(true), 100);
-    }
-  }, [validMessages.length, scrollToBottom]);
-
-  useEffect(() => {
-    // Only auto-scroll for NEW messages (not pagination)
-    if (validMessages.length > previousMessagesLength.current && previousMessagesLength.current > 0) {
-      const lastMessage = validMessages[validMessages.length - 1];
-      const isMyMessage = lastMessage?.senderId === user?._id;
-      
-      if (isMyMessage) {
-        scrollToBottom(true);
-      } else {
-        scrollToBottom(false);
-      }
-    }
-    
-    previousMessagesLength.current = validMessages.length;
-  }, [validMessages, scrollToBottom, user?._id]);
 
   // ✅ Mark messages as read when viewing them (debounced)
   useEffect(() => {
     if (activeRoomId && validMessages.length > 0) {
       const currentUserId = user?._id?.toString();
-      
+
       const unreadMessageIds = validMessages
         .filter((m) => {
           const messageSenderId = m.senderId?.toString();
           const isNotMine = messageSenderId !== currentUserId;
           const isUnread = m.status !== 'read';
           const notMarkedYet = !markedAsReadRef.current.has(m._id);
-          
+
           return isNotMine && isUnread && notMarkedYet;
         })
         .map((m) => m._id);
 
       if (unreadMessageIds.length > 0) {
         console.log(`📖 [MessageList] Marking ${unreadMessageIds.length} messages as read:`, unreadMessageIds);
-        
+
         // Mark them in our ref to prevent duplicate calls
         unreadMessageIds.forEach(id => markedAsReadRef.current.add(id));
-        
+
         // Debounce the socket call
         const timer = setTimeout(() => {
           markMessagesAsRead(activeRoomId, unreadMessageIds);
         }, 500);
-        
+
         return () => clearTimeout(timer);
       }
     }
   }, [activeRoomId, validMessages, user?._id, markMessagesAsRead]);
-  
+
   // Clear marked messages when room changes
   useEffect(() => {
     markedAsReadRef.current.clear();
@@ -192,15 +152,15 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
     if (container.scrollTop < 100) {
       setLoadingMore(true);
       previousScrollHeight.current = container.scrollHeight;
-      
+
       try {
         const result = await dispatch(fetchMessages({ roomId: activeRoomId, page: page + 1, limit: 20 })).unwrap();
         const newMessages = result?.data?.messages || result?.messages || [];
-        
+
         if (newMessages.length === 0 || newMessages.length < 20) {
           setHasMore(false);
         }
-        
+
         if (newMessages.length > 0) {
           setPage(prev => prev + 1);
           // Maintain scroll position
@@ -346,7 +306,7 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
           <Spin size="small" />
         </div>
       )}
-      
+
       {Object.keys(groupedMessages)
         .sort()
         .map((dateKey) => (
@@ -370,7 +330,8 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
                 }}
               >
-                {formatDateLabel(new Date(dateKey))}
+                {/* Fixed the date key usage */}
+                {formatDateLabel(new Date(dateKey + 'T00:00:00'))}
               </div>
             </div>
 
@@ -380,7 +341,7 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
                 // Check if this message is a search result
                 const isSearchResult = searchResults.some(r => r.msg._id === message._id);
                 const isCurrentSearchResult = searchResults[currentSearchIndex]?.msg._id === message._id;
-                
+
                 // Check if this is a call log
                 if (message.type === 'call' && message.callLog) {
                   return (
@@ -393,18 +354,18 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
                     />
                   );
                 }
-                
+
                 // Regular message with search highlight
                 return (
                   <div
                     key={message._id}
                     id={`msg-${message._id}`}
                     style={{
-                      backgroundColor: isCurrentSearchResult 
-                        ? 'rgba(255, 235, 59, 0.5)' 
-                        : isSearchResult 
-                        ? 'rgba(255, 235, 59, 0.2)' 
-                        : 'transparent',
+                      backgroundColor: isCurrentSearchResult
+                        ? 'rgba(255, 235, 59, 0.5)'
+                        : isSearchResult
+                          ? 'rgba(255, 235, 59, 0.2)'
+                          : 'transparent',
                       borderRadius: '8px',
                       padding: isSearchResult ? '4px' : '0',
                       transition: 'background-color 0.3s ease',
@@ -424,14 +385,6 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
             </div>
           </div>
         ))}
-
-      {/* Typing indicator */}
-      {typingUsers.length > 0 && (
-        <TypingIndicator typingUsers={typingUsers} />
-      )}
-
-      {/* Auto-scroll anchor */}
-      <div ref={messagesEndRef} />
     </div>
   );
 });

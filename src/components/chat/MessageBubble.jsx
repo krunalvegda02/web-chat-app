@@ -52,6 +52,14 @@ export default function MessageBubble({
   const [audioStates, setAudioStates] = useState({});
   const audioRefs = useRef({});
 
+  // Check if user is a platform user
+  const isPlatformUser = useMemo(() => {
+    const hasExternalId = !!currentUser?.externalUserId;
+    const hasPlatformId = !!currentUser?.platformId;
+    const isUserRole = currentUser?.role === 'USER';
+    return isUserRole && (hasExternalId || hasPlatformId);
+  }, [currentUser]);
+
   // Highlight search text
   const highlightText = (text) => {
     if (!searchQuery || !text) return text;
@@ -506,7 +514,8 @@ export default function MessageBubble({
   // Only allow edit for text messages without media
   const canEdit = message.type === 'text' && (!message.media || message.media.length === 0);
   
-  const menuItems = [
+  // Hide all context menu options for platform users
+  const menuItems = isPlatformUser ? [] : [
     {
       key: 'forward',
       label: (
@@ -566,8 +575,8 @@ export default function MessageBubble({
         />
       )}
 
-      {/* ✅ Forward button - left side for my messages */}
-      {isMine && (
+      {/* ✅ Forward button - left side for my messages - Hidden for platform users */}
+      {isMine && !isPlatformUser && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -1155,8 +1164,8 @@ export default function MessageBubble({
         </Tooltip>
       </Dropdown>
 
-      {/* ✅ Forward button - right side for sender's messages */}
-      {!isMine && (
+      {/* ✅ Forward button - right side for sender's messages - Hidden for platform users */}
+      {!isMine && !isPlatformUser && (
         <button
           onClick={(e) => {
             e.stopPropagation();
