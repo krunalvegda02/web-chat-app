@@ -70,7 +70,7 @@ export const useSocket = () => {
               }));
               console.log('🔔 [SOCKET] Dispatched socket_message event for notifications');
 
-              // ✅ Auto-mark as read if message is from someone else, we're viewing this room, AND tab is visible
+              // ✅ Auto-mark as read logic - ONLY for messages that are actually being viewed
               const state = window.__REDUX_STORE__?.getState();
               const activeRoomId = state?.chat?.activeRoomId;
               const currentUserId = user?._id?.toString() || user?._id;
@@ -78,45 +78,73 @@ export const useSocket = () => {
 
               console.log('📦 [SOCKET] Auto-read check:', { activeRoomId, currentUserId, senderId, match: activeRoomId === data.roomId, differentSender: senderId !== currentUserId, documentVisible: !document.hidden });
 
-              if (activeRoomId === data.roomId && senderId !== currentUserId && !document.hidden) {
-                // Mark this message as read
+              // ONLY auto-mark as read if:
+              // 1. User is actively viewing the specific room where message was received
+              // 2. Message is from someone else (not own message)
+              // 3. Document/tab is visible (user is actually looking at it)
+              // 4. NOT in read-only mode (like admin monitoring)
+              const shouldAutoMarkRead = (
+                activeRoomId === data.roomId && 
+                senderId !== currentUserId && 
+                !document.hidden &&
+                user?.role !== 'PLATFORM_ADMIN' // Platform admins shouldn't auto-mark as read
+              );
+
+              if (shouldAutoMarkRead) {
+                // Mark this specific message as read after a delay
                 setTimeout(() => {
                   chatSocketClient.emit('mark_messages_read', {
                     roomId: data.roomId,
                     messageIds: [data._id]
                   });
-                  console.log(`📖 [AUTO] Auto-marked message ${data._id} as read`);
-                }, 500);
+                  console.log(`📖 [AUTO] Auto-marked message ${data._id} as read (user actively viewing room)`);
+                }, 1000); // Increased delay to ensure user actually sees the message
               }
             }
           });
 
-          // ✅ FIX: Message sent event (emit by server after send succeeds)
+          // ✅ FIX: Message sent event (emit by server after send succeeds) with immediate status update
           chatSocketClient.on('message_sent', (data) => {
-            console.log('✅ [SOCKET] message_sent:', data);
-            if (data && data.messageId && data.roomId) {
+            console.log('✅ [SOCKET] message_sent RECEIVED:', data);
+            if (data && (data.tempId || data.messageId) && data.roomId) {
+              console.log(`📦 [SOCKET] Reconciling optimistic message ${data.tempId} with DB ID ${data.messageId}`);
               dispatch(updateMessageStatus({
                 roomId: data.roomId,
-                messageId: data.messageId,
-                status: 'sent' // ✅ FIX: Change to 'sent' instead of 'delivered'
+                messageId: data.tempId || data.messageId,
+                status: data.status || 'sent',
+                newId: data.messageId // ✅ Pass the permanent ID
               }));
+              
+              // Force immediate UI update
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('message_status_updated', {
+                  detail: { roomId: data.roomId, messageId: data.messageId, status: data.status }
+                }));
+              }, 50);
             }
           });
 
-          // ✅ Message delivered event
+          // ✅ Message delivered event with immediate UI update
           chatSocketClient.on('message_delivered', (data) => {
-            console.log('✅ [SOCKET] message_delivered:', data);
+            console.log('✅ [SOCKET] message_delivered RECEIVED:', data);
             if (data && data.messageId && data.roomId) {
-              console.log(`📦 [SOCKET] Dispatching updateMessageStatus for message ${data.messageId} to delivered`);
+              console.log(`📦 [SOCKET] Updating message ${data.messageId} to delivered`);
               dispatch(updateMessageStatus({
                 roomId: data.roomId,
                 messageId: data.messageId,
                 status: 'delivered'
               }));
+              
+              // Force immediate UI update
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('message_status_updated', {
+                  detail: { roomId: data.roomId, messageId: data.messageId, status: 'delivered' }
+                }));
+              }, 50);
             }
           });
 
-          // ✅ FIX: Messages read event with proper roomId
+          // ✅ FIX: Messages read event with proper roomId and immediate UI update
           chatSocketClient.on('messages_read', (data) => {
             console.log('👁️👁️👁️ [SOCKET] ========== messages_read EVENT RECEIVED ==========');
             console.log('👁️ [SOCKET] Full data:', JSON.stringify(data, null, 2));
@@ -128,13 +156,25 @@ export const useSocket = () => {
               console.log(`👁️ [SOCKET] ✅ Valid data - Dispatching updateMessagesReadStatus for ${data.messageIds.length} messages`);
               console.log('👁️ [SOCKET] Current Redux state before update:', window.__REDUX_STORE__?.getState()?.chat?.messagesByRoom[data.roomId]);
 
+              // Immediately update Redux state
               dispatch(updateMessagesReadStatus({
                 roomId: data.roomId,
                 messageIds: data.messageIds
               }));
 
+              // Force a React re-render by dispatching a timestamp update
+              setTimeout(() => {
+                const currentState = window.__REDUX_STORE__?.getState();
+                const messages = currentState?.chat?.messagesByRoom[data.roomId] || [];
+                console.log(`👁️ [SOCKET] Post-update verification - ${messages.filter(m => data.messageIds.includes(m._id) && m.status === 'read').length}/${data.messageIds.length} messages now marked as read`);
+                
+                // Trigger a custom event to force UI refresh if needed
+                window.dispatchEvent(new CustomEvent('messages_read_updated', {
+                  detail: { roomId: data.roomId, messageIds: data.messageIds }
+                }));
+              }, 100);
+
               console.log(`✅ [SOCKET] Redux action dispatched - messages should now show as read`);
-              console.log('👁️ [SOCKET] Current Redux state after update:', window.__REDUX_STORE__?.getState()?.chat?.messagesByRoom[data.roomId]);
             } else {
               console.error('❌ [SOCKET] Invalid messages_read data:', {
                 hasData: !!data,
@@ -210,17 +250,23 @@ export const useSocket = () => {
           // ✅ User status changed (online/offline)
           chatSocketClient.on('user_status_changed', (data) => {
             console.log(`✅ [SOCKET] user_status_changed: ${data.userId} is now ${data.status}`);
+
+            const userId = data.userId?.toString();
+            if (!userId) return;
+
             // Trigger a re-fetch of online users or update local state
             if (data.status === 'online') {
               const state = window.__REDUX_STORE__?.getState();
               const currentOnlineUsers = state?.chat?.onlineUsers || [];
-              if (!currentOnlineUsers.includes(data.userId)) {
-                dispatch(setOnlineUsers([...currentOnlineUsers, data.userId]));
+              const isAlreadyOnline = currentOnlineUsers.some(id => id.toString() === userId);
+
+              if (!isAlreadyOnline) {
+                dispatch(setOnlineUsers([...currentOnlineUsers, userId]));
               }
             } else if (data.status === 'offline') {
               const state = window.__REDUX_STORE__?.getState();
               const currentOnlineUsers = state?.chat?.onlineUsers || [];
-              dispatch(setOnlineUsers(currentOnlineUsers.filter(id => id !== data.userId)));
+              dispatch(setOnlineUsers(currentOnlineUsers.filter(id => id.toString() !== userId)));
             }
           });
 

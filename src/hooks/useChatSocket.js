@@ -10,11 +10,11 @@ export const useChatSocket = () => {
 
   return {
     socket: chatSocketClient,
-    
+
     joinRoom: (roomId, readOnly = false) => {
       chatSocketClient.emit('join_room', { roomId, readOnly });
     },
-    
+
     leaveRoom: (roomId) => {
       chatSocketClient.emit('leave_room', { roomId });
     },
@@ -31,8 +31,8 @@ export const useChatSocket = () => {
       chatSocketClient.emit('stop_typing', { roomId });
     },
 
-    sendMessage: (roomId, content, media) => {
-      chatSocketClient.emit('send_message', { roomId, content, media });
+    sendMessage: (roomId, content, media, tempId) => {
+      chatSocketClient.emit('send_message', { roomId, content, media, tempId });
     },
 
     editMessage: (messageId, content) => {

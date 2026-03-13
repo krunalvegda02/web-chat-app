@@ -223,13 +223,18 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   }, [roomDetails, otherParticipant, readOnly, currentRoom]);
 
   const isOtherUserOnline = useMemo(() => {
+    if (!otherParticipant?._id || !Array.isArray(onlineUsers)) return false;
+
+    const otherId = otherParticipant._id.toString();
+    const isOnline = onlineUsers.some(id => id.toString() === otherId);
+
     console.log('🔍 Online Check:', {
-      otherParticipant,
-      otherParticipantId: otherParticipant?._id,
-      onlineUsers,
-      includes: otherParticipant && onlineUsers.includes(otherParticipant._id)
+      otherParticipantId: otherId,
+      onlineUsersCount: onlineUsers.length,
+      isOnline
     });
-    return otherParticipant && onlineUsers.includes(otherParticipant._id);
+
+    return isOnline;
   }, [otherParticipant, onlineUsers]);
 
   // ✅ Update room details only when room changes
@@ -303,24 +308,6 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
         if (isMounted) {
           setMessagesLoaded(true);
-
-          // Mark all messages as read after loading (only if not readOnly)
-          if (!readOnly) {
-            const loadedMessages = result?.data?.messages || result?.messages || [];
-            const unreadMessageIds = loadedMessages
-              .filter(msg => {
-                const senderId = msg.senderId?._id || msg.senderId;
-                return senderId !== user?._id && msg.status !== 'read';
-              })
-              .map(msg => msg._id);
-
-            if (unreadMessageIds.length > 0) {
-              setTimeout(() => {
-                markMessagesAsRead(activeRoomId, unreadMessageIds);
-                console.log(`📖 Marked ${unreadMessageIds.length} messages as read`);
-              }, 500);
-            }
-          }
         }
       } catch (error) {
         console.error(`❌ Failed to load room:`, error);
@@ -341,6 +328,85 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
       // Don't reset hasJoinedRoom here to prevent re-joining
     };
   }, [activeRoomId, dispatch, readOnly]);
+
+  // ✅ Track when messages become visible and mark as read only then
+  useEffect(() => {
+    if (!activeRoomId || readOnly) return;
+
+    // Use Intersection Observer to track when messages are actually visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleMessageIds = [];
+        
+        entries.forEach(entry => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            const messageId = entry.target.getAttribute('data-message-id');
+            const messageStatus = entry.target.getAttribute('data-message-status');
+            const messageSenderId = entry.target.getAttribute('data-message-sender');
+            
+            // Only mark as read if:
+            // 1. Message is not already read
+            // 2. Message is not from current user
+            // 3. Message element is more than 50% visible
+            if (messageId && messageStatus !== 'read' && messageSenderId !== user?._id) {
+              visibleMessageIds.push(messageId);
+            }
+          }
+        });
+
+        // Mark visible messages as read after a delay
+        if (visibleMessageIds.length > 0) {
+          setTimeout(() => {
+            if (!document.hidden && activeRoomId) {
+              markMessagesAsRead(activeRoomId, visibleMessageIds);
+              console.log(`👁️ [ChatWindow] Marked ${visibleMessageIds.length} visible messages as read`);
+            }
+          }, 1500); // 1.5 second delay for actual reading time
+        }
+      },
+      {
+        threshold: 0.5, // Message must be 50% visible
+        rootMargin: '0px 0px -50px 0px' // Only count if not at very bottom edge
+      }
+    );
+
+    // Observe all message elements
+    const messageElements = document.querySelectorAll('[data-message-id]');
+    messageElements.forEach(el => observer.observe(el));
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [activeRoomId, readOnly, user?._id, markMessagesAsRead]);
+
+  // ✅ Listen for real-time message status updates
+  useEffect(() => {
+    const handleMessageStatusUpdate = (event) => {
+      const { roomId, messageId, status } = event.detail;
+      if (roomId === activeRoomId) {
+        console.log(`🔄 [ChatWindow] Real-time status update: ${messageId} -> ${status}`);
+        // Force a re-render by updating a timestamp
+        setMessagesLoaded(prev => !prev ? true : prev);
+      }
+    };
+
+    const handleMessagesReadUpdate = (event) => {
+      const { roomId, messageIds } = event.detail;
+      if (roomId === activeRoomId) {
+        console.log(`👁️ [ChatWindow] Real-time read update: ${messageIds.length} messages marked as read`);
+        // Force a re-render
+        setMessagesLoaded(prev => !prev ? true : prev);
+      }
+    };
+
+    window.addEventListener('message_status_updated', handleMessageStatusUpdate);
+    window.addEventListener('messages_read_updated', handleMessagesReadUpdate);
+
+    return () => {
+      window.removeEventListener('message_status_updated', handleMessageStatusUpdate);
+      window.removeEventListener('messages_read_updated', handleMessagesReadUpdate);
+    };
+  }, [activeRoomId]);
 
   // Handle incoming calls
   useEffect(() => {

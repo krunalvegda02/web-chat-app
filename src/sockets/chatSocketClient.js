@@ -51,6 +51,15 @@ class ChatSocketClient {
           this.isConnected = true;
           this.isConnecting = false;
           console.log('✅ [SOCKET] Connected:', this.socket.id);
+
+          // ✅ FIX: Re-register all existing listeners on the new socket instance
+          this.listeners.forEach((callbacks, event) => {
+            callbacks.forEach(callback => {
+              this.socket.on(event, callback);
+            });
+            console.log(`📡 [SOCKET] Re-registered ${callbacks.length} listeners for: ${event}`);
+          });
+
           this._processEventQueue();
           this._startConnectionMonitor();
           resolve(this.socket);

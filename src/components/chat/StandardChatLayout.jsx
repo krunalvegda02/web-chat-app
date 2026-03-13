@@ -116,7 +116,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
   }, [location.pathname, searchParams, activeRoomId, dispatch, navigate]);
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  const isAdmin = ['ADMIN', 'TENANT_ADMIN'].includes(user?.role);
+  const isAdmin = ['ADMIN', 'TENANT_ADMIN', 'PLATFORM_ADMIN'].includes(user?.role);
   const isRegularUser = user?.role === 'USER';
   const isNonSuperAdmin = isAdmin || isRegularUser;
 

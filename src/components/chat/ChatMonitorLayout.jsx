@@ -29,11 +29,12 @@ export default function ChatMonitorLayout({
   chatsLoading = false,
   onUserSelect = () => {},
   title = 'Monitor Chats',
+  initialSelectedUserId = null,
 }) {
   const { theme } = useTheme();
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(initialSelectedUserId);
   const [chatOpened, setChatOpened] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -48,6 +49,13 @@ export default function ChatMonitorLayout({
 
   const primaryColor = '#008069';
   const veryLightGreen = '#F0FDF4';
+
+  // Update selectedUserId when initialSelectedUserId changes
+  useEffect(() => {
+    if (initialSelectedUserId && initialSelectedUserId !== selectedUserId) {
+      setSelectedUserId(initialSelectedUserId);
+    }
+  }, [initialSelectedUserId, selectedUserId]);
 
   const formatDateLabel = (date) => {
     const msgDate = new Date(date);

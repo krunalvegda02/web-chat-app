@@ -156,7 +156,7 @@ export const joinRoomThunk = (roomId) => async () => {
   try {
     await chatSocketClient.emit('join_room', { roomId });
     console.log('✅ Joined room:', roomId);
-    
+
     setTimeout(() => {
       chatSocketClient.emit('mark_room_read', { roomId });
       console.log('✅ Marked room as read:', roomId);
@@ -183,6 +183,7 @@ const initialState = {
   userOnlineStatus: {},
   isSendingMessage: false,
   pendingMessageIds: [],
+  _lastReadUpdate: 0, // Force re-render trigger
 };
 
 
@@ -197,7 +198,7 @@ const chatSlice = createSlice({
       const roomId = action.payload;
       const previousRoomId = state.activeRoomId;
       state.activeRoomId = roomId;
-      
+
       // ✅ Clear unread count when switching to a room
       if (roomId && Array.isArray(state.rooms)) {
         state.rooms = state.rooms.map(room => {
@@ -208,7 +209,7 @@ const chatSlice = createSlice({
           return room;
         });
       }
-      
+
       console.log(`🏠 [REDUX] Active room set to: ${roomId} (previous: ${previousRoomId})`);
     },
 
@@ -243,9 +244,9 @@ const chatSlice = createSlice({
       const { roomId, message } = action.payload;
 
       console.log('🔵 [REDUX] ========== socketMessageReceived ==========');
-      console.log('🔵 [REDUX] Room ID:', roomId);
-      console.log('🔵 [REDUX] Message:', { _id: message._id, content: message.content, type: message.type, status: message.status });
+      console.log('🔵 [REDUX] message_received event payload:', JSON.stringify(message, null, 2));
       console.log('🔵 [REDUX] Current messages in room:', state.messagesByRoom[roomId]?.length || 0);
+      console.log('🔵 [REDUX] Pending message IDs in state:', state.pendingMessageIds);
 
       if (message.type === 'call') {
         console.log('📞 [DEBUG] CALL MESSAGE RECEIVED:', {
@@ -270,28 +271,33 @@ const chatSlice = createSlice({
       }
 
       const beforeCount = state.messagesByRoom[roomId].length;
-      
+
       // ✅ Find and replace optimistic message by matching content and sender
       let replacedOptimistic = false;
       let finalMessage = null;
       const messageSenderId = (message.senderId?._id || message.senderId)?.toString();
-      
+
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map((m) => {
         if (m.optimistic && !replacedOptimistic) {
+          // ✅ Match by real ID OR tempId
+          const isIdMatch = m._id === message._id || (message.tempId && m._id === message.tempId);
+          console.log(`🔍 [REDUX] Comparing m._id (${m._id}) with server info. Match: ${!!isIdMatch}`);
+
           const mSenderId = m.senderId?.toString();
-          
-          // Match by sender and either:
+          const messageSenderId = (message.senderId?._id || message.senderId)?.toString();
+
+          // Fallback Match by sender and either:
           // 1. Same content (for text messages)
           // 2. Same media type and similar timestamp (for media messages)
           const contentMatch = m.content === message.content;
-          const mediaMatch = m.media?.length > 0 && message.media?.length > 0 && 
-                            m.type === message.type &&
-                            Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000; // Within 5 seconds
-          
-          if (mSenderId === messageSenderId && (contentMatch || mediaMatch)) {
+          const mediaMatch = m.media?.length > 0 && message.media?.length > 0 &&
+            m.type === message.type &&
+            Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000;
+
+          if (isIdMatch || (mSenderId === messageSenderId && (contentMatch || mediaMatch))) {
             console.log(`🔄 [REDUX] Replacing optimistic message ${m._id} with real message ${message._id}`);
             replacedOptimistic = true;
-            
+
             finalMessage = {
               ...message,
               sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
@@ -302,13 +308,13 @@ const chatSlice = createSlice({
               type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
               _updatedAt: Date.now(),
             };
-            
+
             return finalMessage;
           }
         }
         return m;
       });
-      
+
       // If no optimistic message was replaced, add as new message
       if (!replacedOptimistic) {
         finalMessage = {
@@ -321,14 +327,14 @@ const chatSlice = createSlice({
           type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
           _updatedAt: Date.now(),
         };
-        
+
         console.log('✅ [REDUX] Adding new message:', { _id: finalMessage._id, sender: finalMessage.sender?.name, status: finalMessage.status });
         state.messagesByRoom[roomId].push(finalMessage);
       }
-      
+
       const afterCount = state.messagesByRoom[roomId].length;
       console.log(`📊 [REDUX] Messages: ${beforeCount} → ${afterCount}`);
-      
+
       console.log('🔵 [REDUX] Total messages in room after add:', state.messagesByRoom[roomId].length);
 
       state.pendingMessageIds = state.pendingMessageIds.filter(id => !id.startsWith('temp-'));
@@ -357,8 +363,8 @@ const chatSlice = createSlice({
 
     // ✅ Update single message status
     updateMessageStatus(state, action) {
-      const { roomId, messageId, status } = action.payload;
-      console.log(`📊 [REDUX] updateMessageStatus called:`, { roomId, messageId, status });
+      const { roomId, messageId, status, newId } = action.payload;
+      console.log(`📊 [REDUX] updateMessageStatus called:`, { roomId, messageId, status, newId });
 
       if (!state.messagesByRoom[roomId]) {
         console.warn(`⚠️ [REDUX] Room ${roomId} not found for updateMessageStatus`);
@@ -367,11 +373,18 @@ const chatSlice = createSlice({
 
       // Create new array to trigger re-render
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
-        if (message._id === messageId || message._id.toString() === messageId.toString()) {
-          console.log(`✅ [REDUX] Updating message ${messageId} status from ${message.status} to ${status}`);
+        // ✅ Match by real ID OR tempId
+        const isMatch = message._id === messageId ||
+          message._id.toString() === messageId.toString() ||
+          (message.tempId && message.tempId === messageId);
+
+        if (isMatch) {
+          console.log(`✅ [REDUX] Updating message ${messageId} status from ${message.status} to ${status}${newId ? ` and ID to ${newId}` : ''}`);
           return {
             ...message,
+            _id: newId || message._id, // ✅ Replace tempId with real database ID
             status,
+            optimistic: newId ? false : message.optimistic, // ✅ Clear optimistic flag if we have a permanent ID
             _updatedAt: Date.now(), // ✅ Force re-render
             ...(status === 'read' && { readAt: new Date().toISOString() })
           };
@@ -416,7 +429,7 @@ const chatSlice = createSlice({
     // ✅ Track typing users by room
     addTypingUser(state, action) {
       const { userId, roomId } = action.payload;
-      
+
       if (!state.typingUsers[roomId]) {
         state.typingUsers[roomId] = [];
       }
@@ -431,7 +444,7 @@ const chatSlice = createSlice({
     // ✅ Remove typing user from specific room
     removeTypingUser(state, action) {
       const { userId, roomId } = action.payload;
-      
+
       if (state.typingUsers[roomId]) {
         state.typingUsers[roomId] = state.typingUsers[roomId].filter(id => id !== userId);
         console.log(`🛑 [REDUX] User ${userId} stopped typing in room ${roomId}`);
@@ -466,10 +479,10 @@ const chatSlice = createSlice({
     },
 
 
-    // ✅ Mark messages as read
+    // ✅ Mark messages as read with enhanced re-render triggers
     updateMessagesReadStatus(state, action) {
       const { roomId, messageIds } = action.payload;
-      console.log(`🟦 [REDUX] updateMessagesReadStatus called with:`, { roomId, messageIds });
+      console.log(`🔵 [REDUX] updateMessagesReadStatus called with:`, { roomId, messageIds });
 
       if (!state.messagesByRoom[roomId]) {
         console.warn(`⚠️ [REDUX] Room ${roomId} not found in messagesByRoom`);
@@ -477,28 +490,33 @@ const chatSlice = createSlice({
         return;
       }
 
-      console.log(`🟦 [REDUX] Messages in room before update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
+      console.log(`🔵 [REDUX] Messages in room before update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
 
       let updatedCount = 0;
       const messageIdStrings = messageIds.map(id => id.toString());
-      console.log(`🟦 [REDUX] Looking for message IDs:`, messageIdStrings);
+      console.log(`🔵 [REDUX] Looking for message IDs:`, messageIdStrings);
       
+      const updateTimestamp = Date.now();
+      const updateId = Math.random();
+
       // Create completely new array to force re-render
       const updatedMessages = state.messagesByRoom[roomId].map(message => {
         const messageIdStr = message._id.toString();
-        console.log(`🟦 [REDUX] Checking message ${messageIdStr}, current status: ${message.status}, included: ${messageIdStrings.includes(messageIdStr)}`);
-        
+        console.log(`🔵 [REDUX] Checking message ${messageIdStr}, current status: ${message.status}, included: ${messageIdStrings.includes(messageIdStr)}`);
+
         if (messageIdStrings.includes(messageIdStr)) {
           // Only update if status is not already 'read'
           if (message.status !== 'read') {
             updatedCount++;
             console.log(`✅ [REDUX] Updating message ${messageIdStr} from ${message.status} to read`);
-            // Create completely new object with timestamp to force re-render
+            // Create completely new object with multiple re-render triggers
             return {
               ...message,
               status: 'read',
               readAt: new Date().toISOString(),
-              _updatedAt: Date.now() // Force React to detect change
+              _updatedAt: updateTimestamp, // Force React to detect change
+              _readUpdateId: updateId, // Additional unique identifier
+              _statusChangeTimestamp: updateTimestamp // Another re-render trigger
             };
           } else {
             console.log(`⏭️ [REDUX] Message ${messageIdStr} already read, skipping`);
@@ -515,7 +533,10 @@ const chatSlice = createSlice({
       });
 
       console.log(`👁️ [REDUX] Marked ${updatedCount}/${messageIds.length} messages as read in room ${roomId}`);
-      console.log(`🟦 [REDUX] Messages in room after update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
+      console.log(`🔵 [REDUX] Messages in room after update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
+      
+      // Force a state change notification
+      state._lastReadUpdate = updateTimestamp;
     },
 
 
@@ -607,10 +628,10 @@ const chatSlice = createSlice({
       const { roomId, unreadCount } = action.payload;
       console.log("=========action", action.payload);
       if (!Array.isArray(state.rooms)) return;
-      
+
       // ✅ Ensure unreadCount is a valid number
       const validUnreadCount = typeof unreadCount === 'number' && unreadCount >= 0 ? unreadCount : 0;
-      
+
       state.rooms = state.rooms.map(room => {
         if (room._id === roomId) {
           console.log(`🔔 [REDUX] Unread count updated for room ${roomId}: ${room.unreadCount} → ${validUnreadCount}`);
@@ -634,16 +655,16 @@ const chatSlice = createSlice({
       .addCase(fetchRooms.fulfilled, (state, action) => {
         state.loadingRooms = false;
         const roomsArray = action.payload?.data?.rooms || action.payload?.rooms || action.payload?.data || [];
-        
+
         console.log(`📦 [REDUX] fetchRooms.fulfilled - Raw payload:`, action.payload);
-        console.log(`📦 [REDUX] fetchRooms.fulfilled - Rooms array:`, roomsArray.map(r => ({ 
-          id: r._id, 
-          name: r.name, 
-          unreadCount: r.unreadCount 
+        console.log(`📦 [REDUX] fetchRooms.fulfilled - Rooms array:`, roomsArray.map(r => ({
+          id: r._id,
+          name: r.name,
+          unreadCount: r.unreadCount
         })));
-        
+
         state.rooms = Array.isArray(roomsArray) ? roomsArray : [];
-        
+
         console.log(`📥 [REDUX] Fetched ${state.rooms.length} rooms - State updated`);
         console.log(`📥 [REDUX] Current activeRoomId:`, state.activeRoomId);
 
@@ -671,26 +692,26 @@ const chatSlice = createSlice({
 
         const messagesArray = action.payload?.data?.messages || action.payload?.messages || [];
         const roomData = action.payload?.data?.room;
-        
-        const normalizedMessages = Array.isArray(messagesArray) 
+
+        const normalizedMessages = Array.isArray(messagesArray)
           ? messagesArray.map(msg => {
-              let messageStatus = msg.status || 'sent';
-              
-              if (msg.readBy && Array.isArray(msg.readBy) && msg.readBy.length > 0) {
-                messageStatus = 'read';
-              } else if (msg.status === 'delivered') {
-                messageStatus = 'delivered';
-              }
-              
-              return {
-                ...msg,
-                sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
-                senderId: msg.senderId?._id || msg.senderId,
-                status: messageStatus,
-                media: Array.isArray(msg.media) ? msg.media : [],
-                type: msg.type || (msg.media && msg.media.length > 0 ? (msg.media[0].type || 'image') : 'text'),
-              };
-            })
+            let messageStatus = msg.status || 'sent';
+
+            if (msg.readBy && Array.isArray(msg.readBy) && msg.readBy.length > 0) {
+              messageStatus = 'read';
+            } else if (msg.status === 'delivered') {
+              messageStatus = 'delivered';
+            }
+
+            return {
+              ...msg,
+              sender: msg.senderId && typeof msg.senderId === 'object' ? msg.senderId : msg.sender,
+              senderId: msg.senderId?._id || msg.senderId,
+              status: messageStatus,
+              media: Array.isArray(msg.media) ? msg.media : [],
+              type: msg.type || (msg.media && msg.media.length > 0 ? (msg.media[0].type || 'image') : 'text'),
+            };
+          })
           : [];
 
         // Reverse messages since backend returns newest first

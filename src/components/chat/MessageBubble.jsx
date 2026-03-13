@@ -63,9 +63,9 @@ export default function MessageBubble({
   // Highlight search text
   const highlightText = (text) => {
     if (!searchQuery || !text) return text;
-    
+
     const parts = text.split(new RegExp(`(${searchQuery})`, 'gi'));
-    return parts.map((part, i) => 
+    return parts.map((part, i) =>
       part.toLowerCase() === searchQuery.toLowerCase() ? (
         <mark key={i} style={{ backgroundColor: '#FFEB3B', padding: '2px 0', borderRadius: '2px' }}>
           {part}
@@ -80,11 +80,11 @@ export default function MessageBubble({
     : (message.senderId || message.sender?._id);
   const isMine = messageSenderId === currentUser?._id || message.sender?._id === currentUser?._id;
 
-  // ✅ Status icons - WhatsApp style (white for sent messages)
+  // ✅ Status icons - WhatsApp style (white for sent messages) with real-time updates
   const statusConfig = useMemo(() => {
     const status = (message.status || 'sent').toLowerCase();
-    console.log("========status========", status);
-    console.log(`📊 [MessageBubble] Status config for message ${message._id}: ${status}`);
+    // ✅ Enhanced logging for real-time debugging
+    console.log(`📊 [MessageBubble] ID: ${message._id}, Status: ${status}, Optimistic: ${!!message.optimistic}, UpdatedAt: ${message._updatedAt}`);
     const configs = {
       sending: {
         icon: (
@@ -118,10 +118,10 @@ export default function MessageBubble({
       },
     };
     return configs[status] || configs.sent;
-  }, [message.status, message._id, message._updatedAt]);
+  }, [message.status, message._id, message._updatedAt, message.optimistic]);
 
   // ✅ Dynamic border radius from theme
-  const bubbleRadius = isMine 
+  const bubbleRadius = isMine
     ? `${theme.senderBubbleRadius || 8}px`
     : `${theme.receiverBubbleRadius || 8}px`;
 
@@ -180,7 +180,7 @@ export default function MessageBubble({
     if (!url || url.includes('/api/v1/uploads/') || url.includes('localhost') || url.includes('127.0.0.1')) {
       return null;
     }
-    
+
     if (url.includes('cloudinary.com')) {
       // For PDFs, use fl_attachment with proper filename
       if (url.includes('.pdf')) {
@@ -194,7 +194,7 @@ export default function MessageBubble({
       // For image/video files, add fl_attachment
       return url.replace('/upload/', '/upload/fl_attachment/');
     }
-    
+
     return url;
   };
 
@@ -291,22 +291,22 @@ export default function MessageBubble({
   // ✅ Reusable download button component
   const DownloadButton = ({ url, fileName, size = 'md' }) => {
     const downloadUrl = getDownloadUrl(url);
-    
+
     // Don't render button for local URLs
     if (!downloadUrl) return null;
-    
+
     const sizeClasses = {
       sm: 'w-6 h-6',
       md: 'w-7 h-7',
       lg: 'w-8 h-8'
     };
-    
+
     const iconSizes = {
       sm: 'text-[10px]',
       md: 'text-xs',
       lg: 'text-sm'
     };
-    
+
     return (
       <a
         href={downloadUrl}
@@ -513,7 +513,7 @@ export default function MessageBubble({
   // ✅ Context menu items - WhatsApp style
   // Only allow edit for text messages without media
   const canEdit = message.type === 'text' && (!message.media || message.media.length === 0);
-  
+
   // Hide all context menu options for platform users
   const menuItems = isPlatformUser ? [] : [
     {
@@ -565,7 +565,12 @@ export default function MessageBubble({
       : 'max-w-[75%] sm:max-w-[60%]';
 
   return (
-    <div className={`flex mb-3 gap-2 items-end group ${isMine ? 'justify-end' : 'justify-start'}`}>
+    <div 
+      className={`flex mb-3 gap-2 items-end group ${isMine ? 'justify-end' : 'justify-start'}`}
+      data-message-id={message._id}
+      data-message-status={message.status}
+      data-message-sender={messageSenderId}
+    >
       {/* ✅ Avatar for other users */}
       {!isMine && (
         <Avatar
@@ -639,7 +644,7 @@ export default function MessageBubble({
                       <div
                         key={i}
                         className="relative cursor-pointer overflow-hidden"
-                        style={{ 
+                        style={{
                           paddingTop: '100%',
                           borderRadius: i === 0 ? `${bubbleRadius} 0 0 0` : `0 ${bubbleRadius} 0 0`
                         }}
@@ -720,7 +725,7 @@ export default function MessageBubble({
                       <div
                         key={i}
                         className="relative cursor-pointer overflow-hidden group"
-                        style={{ 
+                        style={{
                           paddingTop: '100%',
                           borderRadius: i === 0 ? `${bubbleRadius} 0 0 0` : i === 1 ? `0 ${bubbleRadius} 0 0` : '0'
                         }}
@@ -967,7 +972,7 @@ export default function MessageBubble({
                   const fileName = m.fileName || getFileName(m.url);
                   const fileExt = fileName.split('.').pop()?.toUpperCase() || 'FILE';
                   const isCloudinary = m.url.includes('cloudinary.com');
-                  
+
                   return (
                     <div
                       key={i}
@@ -1151,7 +1156,7 @@ export default function MessageBubble({
               >
                 {formatTime(message.createdAt)}
               </span>
-           
+
 
               {/* Status icon for own messages - WhatsApp style */}
               {isMine && (
@@ -1201,7 +1206,7 @@ export default function MessageBubble({
         onCancel={() => setIsEditModalOpen(false)}
         okText="Save Changes"
         cancelText="Cancel"
-        okButtonProps={{ 
+        okButtonProps={{
           style: { backgroundColor: theme.primaryColor, borderColor: theme.primaryColor },
           disabled: !editContent.trim() || editContent === message.content
         }}
@@ -1209,9 +1214,9 @@ export default function MessageBubble({
       >
         <div className="space-y-3">
           <div className="text-sm opacity-70">Original message:</div>
-          <div 
+          <div
             className="p-3 rounded-lg text-sm italic"
-            style={{ 
+            style={{
               backgroundColor: theme.secondaryColor,
               color: theme.textColor,
               maxHeight: '100px',
@@ -1220,7 +1225,7 @@ export default function MessageBubble({
           >
             {message.content}
           </div>
-          
+
           <div className="text-sm opacity-70 mt-4">New message:</div>
           <Input.TextArea
             value={editContent}
@@ -1235,7 +1240,7 @@ export default function MessageBubble({
               borderColor: theme.borderColor
             }}
           />
-          
+
           {editContent.trim() && editContent !== message.content && (
             <div className="text-xs opacity-60 flex items-center gap-1">
               <CheckOutlined style={{ color: theme.primaryColor }} />

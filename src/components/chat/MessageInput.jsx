@@ -42,11 +42,11 @@ const MessageInput = memo(function MessageInput() {
   const { user } = useSelector((s) => s.auth);
   const { sendMessage: sendSocketMessage, startTyping, stopTyping } = useChatSocket();
 
-  const sendMessage = async (roomId, content, type = 'text', media = []) => {
+  const sendMessage = async (roomId, content, type = 'text', media = [], tempId) => {
     if (media.length > 0) {
-      return dispatch(sendMessageAPI({ roomId, content, type, media })).unwrap();
+      return dispatch(sendMessageAPI({ roomId, content, type, media, tempId })).unwrap();
     }
-    return sendSocketMessage(roomId, content);
+    return sendSocketMessage(roomId, content, media, tempId);
   };
 
   // ✅ Cleanup on unmount
@@ -140,7 +140,7 @@ const MessageInput = memo(function MessageInput() {
 
       dispatch(addMessage({ roomId: activeRoomId, message: optimisticMessage }));
 
-      await sendMessage(activeRoomId, trimmed || '', messageType, mediaUrls);
+      await sendMessage(activeRoomId, trimmed || '', messageType, mediaUrls, tempId);
 
       setValue('');
       setFileList([]);
@@ -362,7 +362,7 @@ const MessageInput = memo(function MessageInput() {
 
       dispatch(addMessage({ roomId: activeRoomId, message: optimisticMessage }));
 
-      await sendMessage(activeRoomId, 'Voice message', 'voice', mediaUrls);
+      await sendMessage(activeRoomId, 'Voice message', 'voice', mediaUrls, tempId);
       setAudioBlob(null);
       antMessage.success('Voice message sent');
     } catch (error) {
