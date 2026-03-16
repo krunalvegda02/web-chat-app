@@ -464,6 +464,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                             display: 'flex',
                             alignItems: 'flex-start',
                             justifyContent: 'space-between',
+                            gap: '8px',
                           }}
                         >
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -475,6 +476,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
+                                marginBottom: '2px',
                               }}
                             >
                               {getRoomDisplayName(room)}
@@ -487,20 +489,26 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                  marginTop: '2px',
                                 }}
                               >
                                 {room.displayPhone}
                               </div>
                             )}
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'flex-end', 
+                            gap: '2px',
+                            flexShrink: 0,
+                            minWidth: 'fit-content'
+                          }}>
                             <span
                               style={{
                                 fontSize: '12px',
                                 color: unreadCount > 0 ? (theme?.primaryColor || '#00A884') : (theme?.timestampColor || '#667781'),
                                 fontWeight: unreadCount > 0 ? '500' : '400',
-                                flexShrink: 0,
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {formatMessageTime(room.lastMessageTime)}
@@ -510,16 +518,17 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                                 style={{
                                   backgroundColor: theme?.primaryColor || '#00A884',
                                   color: '#FFFFFF',
-                                  borderRadius: '12px',
-                                  minWidth: '20px',
-                                  height: '20px',
+                                  borderRadius: '10px',
+                                  minWidth: '18px',
+                                  height: '18px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  fontSize: '12px',
+                                  fontSize: '11px',
                                   fontWeight: '600',
-                                  padding: '0 6px',
+                                  padding: '0 4px',
                                   boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                  alignSelf: 'flex-end',
                                 }}
                               >
                                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -534,7 +543,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            marginTop: '2px',
+                            gap: '8px',
                           }}
                         >
                           <span
@@ -546,7 +555,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               fontWeight: unreadCount > 0 ? '500' : '400',
-                              marginRight: '8px',
+                              lineHeight: '1.2',
                             }}
                           >
                             {getLastMessageText(room)}
