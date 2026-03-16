@@ -61,8 +61,26 @@ export const createAsyncThunkHandler = (typePrefix, apiMethod, urlResolver, isMu
     } catch (error) {
       console.error(`❌ [AsyncThunk] ${typePrefix} - Error:`, error.message);
       console.error(`❌ [AsyncThunk] ${typePrefix} - Error response:`, error.response?.data);
+      console.error(`❌ [AsyncThunk] ${typePrefix} - Error status:`, error.response?.status);
       console.error(`❌ [AsyncThunk] ${typePrefix} - Error stack:`, error.stack);
-      return rejectWithValue(error.response?.data?.message || error.message);
+      
+      // Extract the most specific error message
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (error.response?.data) {
+        const responseData = error.response.data;
+        // Try different possible error message fields
+        errorMessage = responseData.message || 
+                      responseData.error || 
+                      responseData.details || 
+                      responseData.msg ||
+                      (typeof responseData === 'string' ? responseData : errorMessage);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.error(`❌ [AsyncThunk] ${typePrefix} - Final error message:`, errorMessage);
+      return rejectWithValue(errorMessage);
     }
   });
 

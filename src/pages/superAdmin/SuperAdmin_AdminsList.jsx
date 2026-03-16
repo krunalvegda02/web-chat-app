@@ -15,9 +15,9 @@ import {
   Typography,
   Popconfirm,
   List,
-  message,
   Select,
   Pagination,
+  App,
 } from 'antd';
 import {
   UserOutlined,
@@ -46,6 +46,7 @@ export default function SuperAdminAdminsList() {
   const { theme } = useTheme();
   const dispatch = useDispatch();
   const { platforms, loading } = useSelector((state) => state.platform);
+  const { message } = App.useApp(); // Use App.useApp() for better message handling
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -54,6 +55,8 @@ export default function SuperAdminAdminsList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
 
@@ -94,11 +97,39 @@ export default function SuperAdminAdminsList() {
   }, [filteredPlatforms, currentPage, pageSize]);
 
   const handleCreateAdmin = async (values) => {
-    const result = await dispatch(createPlatform(values));
-    if (result.type === 'platform/createPlatform/fulfilled') {
-      form.resetFields();
-      setModalOpen(false);
-      await fetchAdmins();
+    setCreateLoading(true);
+    try {
+      const result = await dispatch(createPlatform(values));
+      
+      if (result.type === 'platform/createPlatform/fulfilled') {
+        message.success('Platform admin created successfully!');
+        form.resetFields();
+        setModalOpen(false);
+        await fetchAdmins();
+      } else if (result.type === 'platform/createPlatform/rejected') {
+        // Handle specific error cases
+        const errorMessage = result.payload || result.error?.message || 'Failed to create platform admin';
+        
+        console.error('❌ [CreateAdmin] Error:', errorMessage);
+        
+        // Show specific error messages based on error content
+        if (errorMessage.toLowerCase().includes('phone') && errorMessage.toLowerCase().includes('already')) {
+          message.error('This phone number is already registered. Please use a different phone number.');
+        } else if (errorMessage.toLowerCase().includes('email') && errorMessage.toLowerCase().includes('already')) {
+          message.error('This email address is already registered. Please use a different email address.');
+        } else if (errorMessage.toLowerCase().includes('duplicate') || errorMessage.toLowerCase().includes('already exists')) {
+          message.error('A platform admin with these details already exists. Please check your information.');
+        } else if (errorMessage.toLowerCase().includes('validation')) {
+          message.error('Please check your input data and try again.');
+        } else {
+          message.error(errorMessage);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [CreateAdmin] Unexpected error:', error);
+      message.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -123,15 +154,37 @@ export default function SuperAdminAdminsList() {
   };
 
   const handleUpdateTenant = async (values) => {
-    const result = await dispatch(updatePlatform({ id: editingTenant._id, ...values }));
-    if (result.type === 'platform/updatePlatform/fulfilled') {
-      message.success('Platform updated successfully');
-      editForm.resetFields();
-      setEditModalOpen(false);
-      setEditingTenant(null);
-      await fetchAdmins();
-    } else {
-      message.error('Failed to update platform');
+    setUpdateLoading(true);
+    try {
+      const result = await dispatch(updatePlatform({ id: editingTenant._id, ...values }));
+      
+      if (result.type === 'platform/updatePlatform/fulfilled') {
+        message.success('Platform updated successfully!');
+        editForm.resetFields();
+        setEditModalOpen(false);
+        setEditingTenant(null);
+        await fetchAdmins();
+      } else if (result.type === 'platform/updatePlatform/rejected') {
+        const errorMessage = result.payload || result.error?.message || 'Failed to update platform';
+        
+        console.error('❌ [UpdateAdmin] Error:', errorMessage);
+        
+        // Show specific error messages
+        if (errorMessage.toLowerCase().includes('phone') && errorMessage.toLowerCase().includes('already')) {
+          message.error('This phone number is already registered by another admin. Please use a different phone number.');
+        } else if (errorMessage.toLowerCase().includes('email') && errorMessage.toLowerCase().includes('already')) {
+          message.error('This email address is already registered by another admin. Please use a different email address.');
+        } else if (errorMessage.toLowerCase().includes('duplicate') || errorMessage.toLowerCase().includes('already exists')) {
+          message.error('Another platform admin with these details already exists.');
+        } else {
+          message.error(errorMessage);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [UpdateAdmin] Unexpected error:', error);
+      message.error('An unexpected error occurred while updating. Please try again.');
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
@@ -700,6 +753,7 @@ export default function SuperAdminAdminsList() {
             <Button
               type="primary"
               htmlType="submit"
+              loading={createLoading}
               block
               size="large"
               style={{
@@ -710,7 +764,7 @@ export default function SuperAdminAdminsList() {
                 fontWeight: 500,
               }}
             >
-              Create Workspace
+              {createLoading ? 'Creating Workspace...' : 'Create Workspace'}
             </Button>
           </Form.Item>
         </Form>
@@ -789,6 +843,7 @@ export default function SuperAdminAdminsList() {
             <Button
               type="primary"
               htmlType="submit"
+              loading={updateLoading}
               block
               size="large"
               style={{
@@ -799,7 +854,7 @@ export default function SuperAdminAdminsList() {
                 fontWeight: 500,
               }}
             >
-              Update Workspace
+              {updateLoading ? 'Updating Workspace...' : 'Update Workspace'}
             </Button>
           </Form.Item>
         </Form>
