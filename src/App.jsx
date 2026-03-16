@@ -66,11 +66,26 @@ function AppContent() {
     }
   }, [callState.isInCall, callState.isIncoming, callState.callStatus]);
 
-  // Initial auth check
+  // Handle root path redirect immediately if needed
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    const hasSearch = window.location.search;
+    
+    console.log('🔄 [App] Path check:', { currentPath, hasSearch, initialized, hasToken: !!token, hasUser: !!user });
+    
+    // If on root path and initialized but no user/token, force redirect to login
+    if (currentPath === '/' && initialized && !token && !user && !hasSearch) {
+      console.log('🔄 [App] Force redirecting to login from root');
+      window.location.replace('/login');
+    }
+  }, [initialized, token, user]);
+
+  // Initial auth check with immediate redirect for unauthenticated users
   useEffect(() => {
     console.log('🔐 [App] Initial auth check effect running', {
       hasToken: !!token,
       initialized,
+      currentPath: window.location.pathname
     });
 
     if (token && !initialized) {
@@ -87,6 +102,19 @@ function AppContent() {
       console.log('🔐 [App] No token and not initialized, calling setInitialized');
       // No token, mark as initialized
       dispatch(setInitialized());
+      
+      // If on root path and no platform parameters, redirect to login immediately
+      if (window.location.pathname === '/') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
+        const hasPlatformParam = urlParams.get('platform');
+        const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
+        
+        if (!hasApiKey && !hasPlatformParam && !hasUserData) {
+          console.log('🔄 [App] No platform params, redirecting to login');
+          window.location.href = '/login';
+        }
+      }
     } else {
       console.log('🔐 [App] Already initialized or token check skipped');
     }

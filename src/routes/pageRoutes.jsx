@@ -5,7 +5,8 @@ import UserChatLayout from "../layouts/UserLayout";
 import PublicChatLayout from "../layouts/PublicChatLayout";
 import SharedLayout from "../layouts/SharedLayout";
 import PlatformAwareRoute from "./PlatformAwareRoute";
-import { Navigate } from "react-router-dom";
+import RootRedirect from "../components/routing/RootRedirect";
+// import SimpleLoginRedirect from "../components/routing/SimpleLoginRedirect";
 
 // Auth Pages
 import LoginPage from "../pages/auth/LoginPage";
@@ -114,11 +115,12 @@ export const pageRoutes = [
         ],
     },
 
-    // Public error pages
+    // Public error pages and default redirect
     {
         layout: null,
         routes: [
-            { path: "/", element: () => <Navigate to="/login" replace /> },
+            { path: "/", element: RootRedirect },
+            // { path: "/home", element: SimpleLoginRedirect }, // Fallback route
             { path: "/unauthorized", element: Unauthorized },
             { path: "*", element: NotFound },
         ],

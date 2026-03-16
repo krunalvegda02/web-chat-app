@@ -61,7 +61,8 @@ export const usePlatformDetection = () => {
     const hasAutoLogin = platformParams.autoLogin;
     const isFromExternalDomain = document.referrer && !document.referrer.includes(window.location.hostname);
 
-    const isDetected = hasApiKey || hasPlatformParam || (hasUserData && (hasAutoLogin || isFromExternalDomain));
+    // Only detect platform if we have explicit platform indicators
+    const isDetected = hasApiKey || hasPlatformParam || (hasUserData && hasAutoLogin);
 
     console.log('🔍 [PlatformDetection] Detection analysis:', {
       hasApiKey,

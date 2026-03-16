@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 /**
  * Platform-aware route wrapper
  * Prevents rendering content until platform authentication is complete
+ * Only applies to platform-specific routes
  */
 export default function PlatformAwareRoute({ children }) {
   const { user, initialized } = useSelector(state => state.auth);
@@ -23,6 +24,12 @@ export default function PlatformAwareRoute({ children }) {
     return <LoadingSpinner fullScreen />;
   }
 
+  // If no platform is detected, render children immediately (normal routing)
+  if (!isDetected) {
+    console.log('✅ [PlatformAwareRoute] No platform detected, rendering children');
+    return children;
+  }
+
   // If platform is detected and still processing, show loading
   if (isDetected && isProcessing && !user) {
     console.log('⏳ [PlatformAwareRoute] Platform processing, showing loading');
@@ -35,9 +42,15 @@ export default function PlatformAwareRoute({ children }) {
     return <LoadingSpinner fullScreen />;
   }
 
-  // If user is authenticated or no platform detected, render children
-  if (user || !isDetected) {
-    console.log('✅ [PlatformAwareRoute] Rendering children');
+  // If user is authenticated, render children
+  if (user) {
+    console.log('✅ [PlatformAwareRoute] User authenticated, rendering children');
+    return children;
+  }
+
+  // If there's an error, render children (let error handling happen elsewhere)
+  if (error) {
+    console.log('❌ [PlatformAwareRoute] Platform error, rendering children');
     return children;
   }
 
