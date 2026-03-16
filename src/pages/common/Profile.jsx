@@ -518,8 +518,8 @@ export default function Profile() {
                       <div className="text-right flex-shrink-0">
                         <p className="font-medium text-xs sm:text-sm truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{user?.email}</p>
                         <div className="flex items-center gap-1 justify-end">
-                          <CheckCircleOutlined className="text-xs" style={{ color: theme.accentColor || '#52c41a' }} />
-                          <span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Verified</span>
+                          {/* <CheckCircleOutlined className="text-xs" style={{ color: theme.accentColor || '#52c41a' }} /> */}
+                          {/* <span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Verified</span> */}
                         </div>
                       </div>
                       <button
@@ -548,7 +548,7 @@ export default function Profile() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="font-medium text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>{phone ? formatPhoneNumber(phone) : 'Not provided'}</p>
-                        {phone && (
+                        {/* {phone && (
                           <div className="flex items-center gap-1 justify-end">
                             <span 
                               className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -560,7 +560,7 @@ export default function Profile() {
                               {user?.phoneVerified ? '✓ Verified' : '✗ Not Verified'}
                             </span>
                           </div>
-                        )}
+                        )} */}
                       </div>
                       {phone && (
                         <button

@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState, useCallback } from 'react';
 import { fetchRooms, setActiveRoom } from '../../redux/slices/chatSlice';
-import { Input, List, Badge, Empty, Button, Spin, Dropdown, Modal, message, App } from 'antd';
+import { Input, List, Empty, Button, Spin, Dropdown, Modal, message, App } from 'antd';
 import { SearchOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import Avatar from '../common/Avatar';
 import OnlineStatus from './OnlineStatus';
@@ -432,21 +432,11 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                     <List.Item.Meta
                       avatar={
                         <div style={{ position: 'relative' }}>
-                          <Badge
-                            count={unreadCount}
-                            offset={[-10, 10]}
-                            style={{
-                              backgroundColor: theme?.unreadBadgeColor || '#25D366',
-                              fontSize: '10px',
-                              minWidth: '20px',
-                            }}
-                          >
-                            <Avatar
-                              name={getRoomDisplayName(room)}
-                              size={44}
-                              src={getParticipantAvatar(room)}
-                            />
-                          </Badge>
+                          <Avatar
+                            name={getRoomDisplayName(room)}
+                            size={44}
+                            src={getParticipantAvatar(room)}
+                          />
 
                           {room.type === 'ADMIN_CHAT' && (
                             <div
@@ -479,7 +469,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div
                               style={{
-                                fontWeight: '500',
+                                fontWeight: unreadCount > 0 ? '600' : '500',
                                 color: theme?.sidebarTextColor || '#111B21',
                                 fontSize: '16px',
                                 overflow: 'hidden',
@@ -504,16 +494,38 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                               </div>
                             )}
                           </div>
-                          <span
-                            style={{
-                              fontSize: '12px',
-                              color: theme?.timestampColor || '#667781',
-                              marginLeft: '8px',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {formatMessageTime(room.lastMessageTime)}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                color: unreadCount > 0 ? (theme?.primaryColor || '#00A884') : (theme?.timestampColor || '#667781'),
+                                fontWeight: unreadCount > 0 ? '500' : '400',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {formatMessageTime(room.lastMessageTime)}
+                            </span>
+                            {unreadCount > 0 && (
+                              <div
+                                style={{
+                                  backgroundColor: theme?.primaryColor || '#00A884',
+                                  color: '#FFFFFF',
+                                  borderRadius: '12px',
+                                  minWidth: '20px',
+                                  height: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  padding: '0 6px',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                }}
+                              >
+                                {unreadCount > 99 ? '99+' : unreadCount}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       }
                       description={
@@ -522,6 +534,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            marginTop: '2px',
                           }}
                         >
                           <span
@@ -532,7 +545,8 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              fontWeight: unreadCount > 0 ? 500 : 400,
+                              fontWeight: unreadCount > 0 ? '500' : '400',
+                              marginRight: '8px',
                             }}
                           >
                             {getLastMessageText(room)}
