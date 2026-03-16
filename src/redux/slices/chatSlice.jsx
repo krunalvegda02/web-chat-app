@@ -279,37 +279,29 @@ const chatSlice = createSlice({
 
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map((m) => {
         if (m.optimistic && !replacedOptimistic) {
-          // ✅ Match by real ID OR tempId
-          const isIdMatch = m._id === message._id || (message.tempId && m._id === message.tempId);
-          console.log(`🔍 [REDUX] Comparing m._id (${m._id}) with server info. Match: ${!!isIdMatch}`);
+          // ✅ Robust matching: Match by real ID OR tempId OR content/media type
+          const messageIdStr = message._id?.toString();
+          const tempIdStr = message.tempId?.toString();
 
+          const isIdMatch = m._id === messageIdStr || (tempIdStr && m._id === tempIdStr);
           const mSenderId = m.senderId?.toString();
-          const messageSenderId = (message.senderId?._id || message.senderId)?.toString();
 
-          // Fallback Match by sender and either:
-          // 1. Same content (for text messages)
-          // 2. Same media type and similar timestamp (for media messages)
-          const contentMatch = m.content === message.content;
+          // Fallback Match by sender and content/media
+          const contentMatch = m.content === message.content && m.content !== '';
           const mediaMatch = m.media?.length > 0 && message.media?.length > 0 &&
-            m.type === message.type &&
-            Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000;
+            m.type === message.type;
 
           if (isIdMatch || (mSenderId === messageSenderId && (contentMatch || mediaMatch))) {
-            console.log(`🔄 [REDUX] Replacing optimistic message ${m._id} with real message ${message._id}`);
+            console.log(`🔄 [REDUX] Reconciling message. Replaced ${m._id} with ${message._id}`);
             replacedOptimistic = true;
 
-            finalMessage = {
+            return {
               ...message,
-              sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
-              senderId: message.senderId?._id || message.senderId,
+              senderId: messageSenderId,
               status: message.status || 'sent',
               optimistic: false,
-              media: Array.isArray(message.media) ? message.media : [],
-              type: message.type || (message.media && message.media.length > 0 ? (message.media[0].type || 'image') : 'text'),
               _updatedAt: Date.now(),
             };
-
-            return finalMessage;
           }
         }
         return m;
@@ -319,8 +311,8 @@ const chatSlice = createSlice({
       if (!replacedOptimistic) {
         finalMessage = {
           ...message,
-          sender: message.sender || (message.senderId && typeof message.senderId === 'object' ? message.senderId : null),
-          senderId: message.senderId?._id || message.senderId,
+          sender: message.sender || (typeof message.senderId === 'object' ? message.senderId : null),
+          senderId: messageSenderId,
           status: message.status || 'sent',
           optimistic: false,
           media: Array.isArray(message.media) ? message.media : [],
@@ -330,14 +322,17 @@ const chatSlice = createSlice({
 
         console.log('✅ [REDUX] Adding new message:', { _id: finalMessage._id, sender: finalMessage.sender?.name, status: finalMessage.status });
         state.messagesByRoom[roomId].push(finalMessage);
+      } else {
+        // Find the message we just reconciled to update the room preview
+        finalMessage = state.messagesByRoom[roomId].find(m => m._id === (message._id || message.tempId));
       }
 
-      const afterCount = state.messagesByRoom[roomId].length;
-      console.log(`📊 [REDUX] Messages: ${beforeCount} → ${afterCount}`);
-
-      console.log('🔵 [REDUX] Total messages in room after add:', state.messagesByRoom[roomId].length);
-
-      state.pendingMessageIds = state.pendingMessageIds.filter(id => !id.startsWith('temp-'));
+      // ✅ FIX: Only filter out the specific ID that was reconciled, not all temp messages
+      if (replacedOptimistic) {
+        state.pendingMessageIds = state.pendingMessageIds.filter(id =>
+          id !== message._id && id !== message.tempId
+        );
+      }
 
       // Update room list only if finalMessage exists
       if (finalMessage) {
@@ -768,6 +763,40 @@ const chatSlice = createSlice({
         const roomId = action.meta.arg.roomId;
         state.loadingMessages[roomId] = false;
         state.error = action.payload;
+      })
+
+      // ✅ Handle manual API message sending fulfillment
+      .addCase(sendMessageAPI.fulfilled, (state, action) => {
+        const message = action.payload?.data?.message || action.payload?.message;
+        const roomId = message?.roomId;
+        const tempId = message?.tempId;
+
+        if (roomId && state.messagesByRoom[roomId]) {
+          console.log(`📡 [REDUX] sendMessageAPI.fulfilled: Reconciling ${tempId} -> ${message._id}`);
+
+          let found = false;
+          state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(m => {
+            if (m._id === tempId || (m.optimistic && m.content === message.content && m.type === message.type)) {
+              found = true;
+              return {
+                ...m,
+                ...message,
+                status: message.status || 'sent',
+                optimistic: false,
+                _updatedAt: Date.now()
+              };
+            }
+            return m;
+          });
+
+          if (tempId) {
+            state.pendingMessageIds = state.pendingMessageIds.filter(id => id !== tempId);
+          }
+
+          if (found) {
+            console.log(`✅ [REDUX] Reconciled message ${tempId} via API response`);
+          }
+        }
       });
   },
 });

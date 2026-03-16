@@ -137,19 +137,21 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     setCurrentSearchIndex(0);
   };
 
-  // ✅ Auto-scroll to bottom
+  // ✅ Auto-scroll to bottom (which is top in reverse layout)
   const scrollToBottom = useCallback((force = false) => {
-    if (force) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
-
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-    if (isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (force) {
+      // In reverse layout, "bottom" is scrollTop = 0
+      container.scrollTop = 0;
+      return;
+    }
+
+    // Check if user is near the "bottom" (scrollTop near 0 in reverse layout)
+    const isNearBottom = container.scrollTop < 150;
+    if (isNearBottom) {
+      container.scrollTop = 0;
     }
   }, []);
 
@@ -547,7 +549,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
             <>
               <div
                 style={{ position: 'relative', flexShrink: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
-                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
+                // onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <Avatar src={otherParticipant.avatar} size={40} name={displayName} />
                 {isOtherUserOnline && (
@@ -567,7 +569,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
               </div>
               <div
                 style={{ flex: 1, minWidth: 0, cursor: isPlatformUser ? 'default' : 'pointer' }}
-                onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
+                // onClick={() => !isPlatformUser && navigate(`/profile/${otherParticipant._id}`)}
               >
                 <div style={{ fontWeight: 600, color: theme?.headerTextColor || '#FFFFFF', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {displayName}
@@ -686,13 +688,15 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           overflowX: 'hidden',
           padding: '20px',
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: 'column-reverse', // This makes messages start from bottom
           background: theme?.chatBackgroundColor || '#E5DDD5',
           backgroundImage: theme?.chatBackgroundImage ? `url(${theme.chatBackgroundImage})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       >
+        {/* Auto-scroll anchor at top for reverse layout */}
+        <div ref={messagesEndRef} />
         <MessageList
           messages={messages}
           roomId={activeRoomId}
@@ -700,8 +704,6 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           searchResults={searchResults}
           currentSearchIndex={currentSearchIndex}
         />
-        {/* Auto-scroll anchor moved to parent container */}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Typing Indicator - Fixed */}

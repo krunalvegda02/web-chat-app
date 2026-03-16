@@ -143,13 +143,15 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
     setHasMore(true);
   }, [activeRoomId]);
 
-  // Load more messages on scroll to top
+  // Load more messages on scroll to bottom (which is top in reverse layout)
   const handleScroll = useCallback(async () => {
     const container = messagesContainerRef.current?.parentElement;
     if (!container || loadingMore || !hasMore) return;
 
-    // Only load when scrolled to top (within 100px)
-    if (container.scrollTop < 100) {
+    // In reverse layout, scroll to "bottom" means scrollTop is at maximum
+    const isAtBottom = container.scrollTop >= (container.scrollHeight - container.clientHeight - 100);
+    
+    if (isAtBottom) {
       setLoadingMore(true);
       previousScrollHeight.current = container.scrollHeight;
 
@@ -163,11 +165,12 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
 
         if (newMessages.length > 0) {
           setPage(prev => prev + 1);
-          // Maintain scroll position
+          // Maintain scroll position for reverse layout
           setTimeout(() => {
             const container = messagesContainerRef.current?.parentElement;
             if (container) {
               const newScrollHeight = container.scrollHeight;
+              // In reverse layout, maintain position from bottom
               container.scrollTop = newScrollHeight - previousScrollHeight.current;
             }
           }, 0);
@@ -295,49 +298,22 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
       ref={messagesContainerRef}
       style={{
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'column-reverse', // Reverse to work with parent's column-reverse
         gap: '8px',
         padding: '12px 8px',
       }}
     >
-      {/* Loading more indicator */}
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '10px' }}>
-          <Spin size="small" />
-        </div>
-      )}
-
+      {/* Messages in reverse order (newest first for reverse layout) */}
       {Object.keys(groupedMessages)
-        .sort()
+        .sort((a, b) => new Date(b) - new Date(a)) // Sort dates in descending order
         .map((dateKey) => (
           <div key={dateKey}>
-            {/* WhatsApp-style Date Label */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                margin: '12px 0',
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: '#667781',
-                  fontWeight: 500,
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                }}
-              >
-                {/* Fixed the date key usage */}
-                {formatDateLabel(new Date(dateKey + 'T00:00:00'))}
-              </div>
-            </div>
-
-            {/* Messages for this date */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {groupedMessages[dateKey].map((message, msgIdx) => {
+            {/* Messages for this date in reverse order */}
+            <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: '4px' }}>
+              {groupedMessages[dateKey]
+                .slice() // Create a copy to avoid mutating original
+                .reverse() // Reverse messages within the day
+                .map((message, msgIdx) => {
                 // Check if this message is a search result
                 const isSearchResult = searchResults.some(r => r.msg._id === message._id);
                 const isCurrentSearchResult = searchResults[currentSearchIndex]?.msg._id === message._id;
@@ -383,8 +359,38 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
                 );
               })}
             </div>
+
+            {/* WhatsApp-style Date Label */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                margin: '12px 0',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#667781',
+                  fontWeight: 500,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                }}
+              >
+                {formatDateLabel(new Date(dateKey + 'T00:00:00'))}
+              </div>
+            </div>
           </div>
         ))}
+
+      {/* Loading more indicator at bottom (top in reverse layout) */}
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '10px' }}>
+          <Spin size="small" />
+        </div>
+      )}
     </div>
   );
 });
