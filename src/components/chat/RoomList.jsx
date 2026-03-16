@@ -429,44 +429,39 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                       e.currentTarget.style.backgroundColor = isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF');
                     }}
                   >
-                    <List.Item.Meta
-                      avatar={
-                        <div style={{ position: 'relative' }}>
-                          <Avatar
-                            name={getRoomDisplayName(room)}
-                            size={44}
-                            src={getParticipantAvatar(room)}
-                          />
+                    {/* Custom layout instead of List.Item.Meta */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', width: '100%' }}>
+                      {/* Avatar Section */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <Avatar
+                          name={getRoomDisplayName(room)}
+                          size={44}
+                          src={getParticipantAvatar(room)}
+                        />
+                        {room.type === 'ADMIN_CHAT' && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              right: 0,
+                            }}
+                          >
+                            <OnlineStatus
+                              userId={
+                                room.participants?.find(
+                                  (p) => p.userId?._id !== user?._id
+                                )?.userId?._id
+                              }
+                              size="sm"
+                            />
+                          </div>
+                        )}
+                      </div>
 
-                          {room.type === 'ADMIN_CHAT' && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: 0,
-                                right: 0,
-                              }}
-                            >
-                              <OnlineStatus
-                                userId={
-                                  room.participants?.find(
-                                    (p) => p.userId?._id !== user?._id
-                                  )?.userId?._id
-                                }
-                                size="sm"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      }
-                      title={
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: 'space-between',
-                            gap: '8px',
-                          }}
-                        >
+                      {/* Content Section */}
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {/* Top Row: Name and Time */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div
                               style={{
@@ -476,7 +471,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
-                                marginBottom: '2px',
+                                lineHeight: '1.2',
                               }}
                             >
                               {getRoomDisplayName(room)}
@@ -489,30 +484,48 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
+                                  lineHeight: '1.1',
+                                  marginTop: '1px',
                                 }}
                               >
                                 {room.displayPhone}
                               </div>
                             )}
                           </div>
-                          <div style={{ 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            alignItems: 'flex-end', 
-                            gap: '2px',
-                            flexShrink: 0,
-                            minWidth: 'fit-content'
-                          }}>
+                          <div style={{ flexShrink: 0, textAlign: 'right' }}>
                             <span
                               style={{
                                 fontSize: '12px',
                                 color: unreadCount > 0 ? (theme?.primaryColor || '#00A884') : (theme?.timestampColor || '#667781'),
                                 fontWeight: unreadCount > 0 ? '500' : '400',
                                 whiteSpace: 'nowrap',
+                                lineHeight: '1',
                               }}
                             >
                               {formatMessageTime(room.lastMessageTime)}
                             </span>
+                          </div>
+                        </div>
+
+                        {/* Bottom Row: Message and Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: '14px',
+                                color: unreadCount > 0 ? '#111B21' : '#667781',
+                                fontWeight: unreadCount > 0 ? '500' : '400',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                lineHeight: '1.2',
+                                display: 'block',
+                              }}
+                            >
+                              {getLastMessageText(room)}
+                            </span>
+                          </div>
+                          <div style={{ flexShrink: 0 }}>
                             {unreadCount > 0 && (
                               <div
                                 style={{
@@ -528,7 +541,6 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                                   fontWeight: '600',
                                   padding: '0 4px',
                                   boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                  alignSelf: 'flex-end',
                                 }}
                               >
                                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -536,33 +548,8 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                             )}
                           </div>
                         </div>
-                      }
-                      description={
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '8px',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: '14px',
-                              color: unreadCount > 0 ? '#111B21' : '#667781',
-                              flex: 1,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              fontWeight: unreadCount > 0 ? '500' : '400',
-                              lineHeight: '1.2',
-                            }}
-                          >
-                            {getLastMessageText(room)}
-                          </span>
-                        </div>
-                      }
-                    />
+                      </div>
+                    </div>
                   </List.Item>
                 </Dropdown>
               );
