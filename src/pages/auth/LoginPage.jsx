@@ -8,6 +8,7 @@ import { login, clearError } from '../../redux/slices/authSlice.jsx';
 import { useTheme } from '../../hooks/useTheme';
 import { usePlatformIntegration } from '../../hooks/usePlatformIntegration';
 import { securityUtils } from '../../helper/secureApiClient';
+import UnifiedLoader from '../../components/common/UnifiedLoader';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -23,9 +24,8 @@ export default function LoginPage() {
   const [requiresPhoneVerification, setRequiresPhoneVerification] = useState(false);
   const [userId, setUserId] = useState(null);
   const [lastPhone, setLastPhone] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [usePlatformAuth, setUsePlatformAuth] = useState(false);
-  
-  // Platform integration setup
   const apiKey = searchParams.get('apiKey') || import.meta.env.VITE_PLATFORM_API_KEY;
   const isPlatformMode = !!apiKey || searchParams.has('platform');
   const {
@@ -336,7 +336,7 @@ export default function LoginPage() {
                   size="large"
                   prefix={<UserOutlined />}
                   placeholder="Enter your full name"
-                  disabled={loading || platformLoading}
+                  disabled={loading || platformLoading || isProcessing}
                 />
               </Form.Item>
               
@@ -352,7 +352,7 @@ export default function LoginPage() {
                   size="large"
                   prefix={<UserOutlined />}
                   placeholder="Enter your email"
-                  disabled={loading || platformLoading}
+                  disabled={loading || platformLoading || isProcessing}
                 />
               </Form.Item>
               
@@ -375,7 +375,7 @@ export default function LoginPage() {
                   size="large"
                   prefix={<UserOutlined />}
                   placeholder="Enter your phone number"
-                  disabled={loading || platformLoading}
+                  disabled={loading || platformLoading || isProcessing}
                 />
               </Form.Item>
             </>
@@ -393,7 +393,7 @@ export default function LoginPage() {
                 size="large"
                 prefix={<UserOutlined />}
                 placeholder="Email or phone number"
-                disabled={loading || platformLoading}
+                disabled={loading || platformLoading || isProcessing}
               />
             </Form.Item>
           )}
@@ -406,7 +406,7 @@ export default function LoginPage() {
               size="large"
               prefix={<LockOutlined />}
               placeholder="Enter password (optional for platform login)"
-              disabled={loading || platformLoading}
+              disabled={loading || platformLoading || isProcessing}
             />
           </Form.Item>
 
@@ -424,12 +424,12 @@ export default function LoginPage() {
               type="primary"
               size="large"
               htmlType="submit"
-              loading={loading || platformLoading}
+              loading={loading || platformLoading || isProcessing}
               disabled={isPlatformMode && !isValidApiKey}
               block
               style={{ backgroundColor: theme?.primaryColor || '#008069', borderColor: theme?.primaryColor || '#008069' }}
             >
-              {(loading || platformLoading) ? 'Signing In...' : (usePlatformAuth ? 'Secure Platform Login' : 'Sign In')}
+              {(loading || platformLoading || isProcessing) ? 'Signing In...' : (usePlatformAuth ? 'Secure Platform Login' : 'Sign In')}
             </Button>
           </Form.Item>
         </Form>

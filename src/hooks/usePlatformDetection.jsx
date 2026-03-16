@@ -21,7 +21,9 @@ export const usePlatformDetection = () => {
     isProcessing: false,
     error: null,
     userData: null,
-    shouldAutoLogin: false
+    shouldAutoLogin: false,
+    retryCount: 0,
+    maxRetries: 3
   });
 
   // Extract platform parameters from URL (memoized to prevent re-renders)
@@ -87,7 +89,7 @@ export const usePlatformDetection = () => {
     };
   }, [platformParams, isValidApiKey]);
 
-  // Auto-login function
+  // Auto-login function with retry logic
   const performAutoLogin = useCallback(async (userData) => {
     if (!userData || !isValidApiKey) {
       console.warn('⚠️ [PlatformDetection] Cannot auto-login: missing data or invalid API key');
@@ -127,7 +129,8 @@ export const usePlatformDetection = () => {
         setPlatformState(prev => ({
           ...prev,
           isProcessing: false,
-          userData: result.data.user
+          userData: result.data.user,
+          retryCount: 0
         }));
 
         return true;
@@ -136,14 +139,34 @@ export const usePlatformDetection = () => {
       }
     } catch (error) {
       console.error('❌ [PlatformDetection] Auto-login failed:', error);
+      
+      const newRetryCount = platformState.retryCount + 1;
+      
+      // Auto-retry if under max retries
+      if (newRetryCount < platformState.maxRetries) {
+        console.log(`🔄 [PlatformDetection] Auto-retry ${newRetryCount}/${platformState.maxRetries} in 3 seconds...`);
+        setPlatformState(prev => ({
+          ...prev,
+          retryCount: newRetryCount,
+          error: null // Clear error during retry
+        }));
+        
+        setTimeout(() => {
+          performAutoLogin(userData);
+        }, 3000);
+        
+        return false;
+      }
+      
       setPlatformState(prev => ({
         ...prev,
         isProcessing: false,
-        error: error.message
+        error: error.message,
+        retryCount: newRetryCount
       }));
       return false;
     }
-  }, [platformChatLogin, isValidApiKey, platformParams.roomId, dispatch, navigate]);
+  }, [platformChatLogin, isValidApiKey, platformParams.roomId, dispatch, navigate, platformState.retryCount, platformState.maxRetries]);
 
   // Update platform state when detection changes
   useEffect(() => {
@@ -227,7 +250,7 @@ export const usePlatformDetection = () => {
     return false;
   }, [location.pathname, platformState.isDetected, platformState.userData, user, performAutoLogin]);
 
-  // Manual login trigger for platform users
+  // Manual login trigger for platform users with retry reset
   const triggerPlatformLogin = useCallback(async (customUserData = null) => {
     const userData = customUserData || platformState.userData;
     if (!userData) {
@@ -235,7 +258,17 @@ export const usePlatformDetection = () => {
       return false;
     }
 
-    return await performAutoLogin(userData);
+    // Reset retry count and set processing state immediately for consistent loading
+    setPlatformState(prev => ({ ...prev, isProcessing: true, error: null, retryCount: 0 }));
+    
+    const result = await performAutoLogin(userData);
+    
+    // Reset processing state after completion only if failed
+    if (!result) {
+      setPlatformState(prev => ({ ...prev, isProcessing: false }));
+    }
+    
+    return result;
   }, [platformState.userData, performAutoLogin]);
 
   // Check if current page should be bypassed for platform users
@@ -258,6 +291,7 @@ export const usePlatformDetection = () => {
     error: platformState.error || platformError,
     userData: platformState.userData || detectionResult.userData,
     shouldAutoLogin: detectionResult.shouldAutoLogin,
+    retryCount: platformState.retryCount,
 
     // Platform parameters
     platformParams,

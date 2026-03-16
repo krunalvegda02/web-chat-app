@@ -9,6 +9,7 @@ import { InboxOutlined } from '@ant-design/icons';
 import { deleteMessage, editMessage, fetchMessages } from '../../redux/slices/chatSlice';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useTheme } from '../../hooks/useTheme';
+import UnifiedLoader from '../common/UnifiedLoader';
 
 
 const MessageList = memo(function MessageList({ messages = [], searchQuery = '', searchResults = [], currentSearchIndex = 0 }) {
@@ -242,17 +243,11 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
   // ✅ Show loading state - ONLY for initial load
   if (loadingMessages[activeRoomId] && !validMessages.length) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          backgroundColor: theme.backgroundColor,
-        }}
-      >
-        <Spin tip="Loading messages..." />
-      </div>
+      <UnifiedLoader 
+        tip="Loading messages..." 
+        fullScreen={false}
+        size="large"
+      />
     );
   }
 

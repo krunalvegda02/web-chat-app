@@ -8,6 +8,7 @@ import { setActiveRoom } from "./redux/slices/chatSlice";
 import { pageRoutes } from "./routes/pageRoutes";
 import ProtectedRoute from "./routes/protectedRoutes";
 import LoadingSpinner from "./components/common/LoadingSpinner";
+import UnifiedLoader from "./components/common/UnifiedLoader";
 import AudioCallWindow from "./components/call/AudioCallWindow";
 import IncomingCallNotification from "./components/call/IncomingCallNotification";
 import ActiveCallBanner from "./components/call/ActiveCallBanner";
@@ -70,22 +71,46 @@ function AppContent() {
   useEffect(() => {
     const currentPath = window.location.pathname;
     const hasSearch = window.location.search;
+    const urlParams = new URLSearchParams(hasSearch);
+    const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
+    const hasPlatformParam = urlParams.get('platform');
+    const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
+    const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData;
     
-    console.log('🔄 [App] Path check:', { currentPath, hasSearch, initialized, hasToken: !!token, hasUser: !!user });
+    console.log('🔄 [App] Path check:', { currentPath, hasSearch, initialized, hasToken: !!token, hasUser: !!user, isPlatformRequest });
     
-    // If on root path and initialized but no user/token, force redirect to login
-    if (currentPath === '/' && initialized && !token && !user && !hasSearch) {
-      console.log('🔄 [App] Force redirecting to login from root');
-      window.location.replace('/login');
+    // If on root path and initialized but no user/token
+    if (currentPath === '/' && initialized && !token && !user) {
+      if (isPlatformRequest) {
+        console.log('🔄 [App] Platform request detected, staying on root for platform gateway');
+        // Don't redirect - let PlatformGateway handle it
+        return;
+      } else if (!hasSearch) {
+        console.log('🔄 [App] Force redirecting to login from root');
+        window.location.replace('/login');
+      }
+    }
+    
+    // If on login page but platform request detected, redirect to root for platform handling
+    if (currentPath === '/login' && isPlatformRequest && initialized) {
+      console.log('🔄 [App] Platform request on login page, redirecting to root');
+      window.location.replace('/' + hasSearch);
     }
   }, [initialized, token, user]);
 
-  // Initial auth check with immediate redirect for unauthenticated users
+  // Initial auth check with platform-aware redirect logic
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
+    const hasPlatformParam = urlParams.get('platform');
+    const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
+    const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData;
+    
     console.log('🔐 [App] Initial auth check effect running', {
       hasToken: !!token,
       initialized,
-      currentPath: window.location.pathname
+      currentPath: window.location.pathname,
+      isPlatformRequest
     });
 
     if (token && !initialized) {
@@ -105,14 +130,11 @@ function AppContent() {
       
       // If on root path and no platform parameters, redirect to login immediately
       if (window.location.pathname === '/') {
-        const urlParams = new URLSearchParams(window.location.search);
-        const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
-        const hasPlatformParam = urlParams.get('platform');
-        const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
-        
-        if (!hasApiKey && !hasPlatformParam && !hasUserData) {
+        if (!isPlatformRequest) {
           console.log('🔄 [App] No platform params, redirecting to login');
           window.location.href = '/login';
+        } else {
+          console.log('🔄 [App] Platform request detected, staying on root');
         }
       }
     } else {
@@ -121,8 +143,8 @@ function AppContent() {
   }, [dispatch, token, initialized]);
 
   if (!initialized) {
-    console.log('⏳ [App] Not initialized, showing spinner');
-    return <LoadingSpinner fullScreen />;
+    console.log('⏳ [App] Not initialized, showing unified loader');
+    return <UnifiedLoader tip="Starting application..." />;
   }
 
   console.log('✅ [App] Initialized, rendering routes');

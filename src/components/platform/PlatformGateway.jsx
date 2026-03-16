@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Spin, Result, Button, Card, Typography, Alert } from 'antd';
-import { 
-  LoadingOutlined, 
-  ArrowRightOutlined
-} from '@ant-design/icons';
+import { Result, Button, Card, Alert } from 'antd';
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { usePlatformDetection } from '../../hooks/usePlatformDetection';
 import { useTheme } from '../../hooks/useTheme';
-
-const { Text } = Typography;
+import UnifiedLoader from '../common/UnifiedLoader';
 
 /**
  * Platform Gateway Component
@@ -29,6 +25,7 @@ export default function PlatformGateway({ children }) {
     userData,
     isValidApiKey,
     triggerPlatformLogin,
+    retryCount,
   } = usePlatformDetection();
   
   const [showManualLogin, setShowManualLogin] = useState(false);
@@ -40,13 +37,9 @@ export default function PlatformGateway({ children }) {
     }
   }, [error]);
   
-  // Wait for initialization
+  // Wait for initialization - show unified loading
   if (!initialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Spin size="large" />
-      </div>
-    );
+    return <UnifiedLoader tip="Initializing..." />;
   }
   
   console.log('🔍 [PlatformGateway] State:', {
@@ -69,8 +62,20 @@ export default function PlatformGateway({ children }) {
     return children;
   }
   
-  // If there's an error or manual login is needed
+  // If there's an error or manual login is needed - show unified loading instead of error screen
   if (error || showManualLogin) {
+    // For platform users, show loading and auto-retry instead of error screen
+    if (isDetected && userData) {
+      console.log('🔄 [PlatformGateway] Auto-retrying platform login...');
+      setTimeout(() => {
+        setShowManualLogin(false);
+        triggerPlatformLogin();
+      }, 1500); // Retry after 1.5 seconds
+      
+      return <UnifiedLoader tip="Connecting to platform..." retryCount={retryCount || 0} />;
+    }
+    
+    // Only show error screen for non-platform users or when no user data
     return (
       <div 
         className="min-h-screen flex items-center justify-center"
@@ -134,7 +139,13 @@ export default function PlatformGateway({ children }) {
     );
   }
   
-  // Platform detected and processing - render children and let them handle loading
-  console.log('🔍 [PlatformGateway] Platform processing, rendering children');
+  // Platform detected and processing - show unified loading with retry info
+  if (isProcessing) {
+    console.log('🔍 [PlatformGateway] Platform processing, showing unified loading');
+    return <UnifiedLoader tip="Connecting to platform..." retryCount={retryCount || 0} />;
+  }
+  
+  // Platform detected but not processing - render children
+  console.log('🔍 [PlatformGateway] Platform ready, rendering children');
   return children;
 }
