@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Card, Input, Form, message, Spin, Alert } from 'antd';
 import { WhatsAppOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons';
 import { useTheme } from '../../hooks/useTheme';
+import { copyToClipboardWithMessage } from '../../utils/clipboardUtils';
 
 export default function WhatsAppTestPage() {
   const { theme } = useTheme();
@@ -71,10 +72,18 @@ export default function WhatsAppTestPage() {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyToClipboard = async (text) => {
+    const success = await copyToClipboardWithMessage(
+      text,
+      message,
+      'Copied to clipboard',
+      'Failed to copy to clipboard'
+    );
+    
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

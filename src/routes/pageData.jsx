@@ -4,7 +4,6 @@ import {
   UsergroupAddOutlined,
   AreaChartOutlined,
   DashboardOutlined,
-  PhoneOutlined,
   ContactsOutlined,
   EyeOutlined,
   TeamOutlined,
@@ -30,12 +29,6 @@ export const getMenuItems = (role, navigate) => {
         icon: <SolutionOutlined className="text-[22px]" />,
         label: 'Contacts',
         path: '/contacts',
-      },
-      {
-        key: '/admin/calls',
-        icon: <PhoneOutlined className="text-[22px]" />,
-        label: 'Calls',
-        path: '/calls',
       },
       {
         key: '/admin/platform-clients',
@@ -72,12 +65,6 @@ export const getMenuItems = (role, navigate) => {
         icon: <SolutionOutlined className="text-[22px]" />,
         label: 'Contacts',
         path: '/contacts',
-      },
-      {
-        key: '/admin/calls',
-        icon: <PhoneOutlined className="text-[22px]" />,
-        label: 'Calls',
-        path: '/calls',
       },
       {
         key: '/admin/users',
@@ -121,12 +108,6 @@ export const getMenuItems = (role, navigate) => {
         label: 'Admin Management',
         path: '/super-admin/admins',
       },
-      {
-        key: '/super-admin/calls',
-        icon: <PhoneOutlined className="text-[22px]" />,
-        label: 'Calls',
-        path: '/calls',
-      },
     ],
 
     /* ============================
@@ -144,12 +125,6 @@ export const getMenuItems = (role, navigate) => {
         icon: <ContactsOutlined className="text-[22px]" />,
         label: 'Contacts',
         path: '/contacts',
-      },
-      {
-        key: '/user/calls',
-        icon: <PhoneOutlined className="text-[22px]" />,
-        label: 'Calls',
-        path: '/calls',
       },
     ],
   };

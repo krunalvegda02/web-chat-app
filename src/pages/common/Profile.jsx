@@ -35,6 +35,7 @@ import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/common/Avatar';
 import { updateProfile } from '../../redux/slices/authSlice';
 import { updateProfileWithAvatar } from '../../redux/slices/userSlice';
+import { copyToClipboardWithMessage } from '../../utils/clipboardUtils';
 
 export default function Profile() {
   const { theme } = useTheme();
@@ -185,11 +186,18 @@ export default function Profile() {
     return phoneRegex.test(phone.replace(/\s/g, ''));
   };
 
-  const copyToClipboard = (text, type) => {
-    navigator.clipboard.writeText(text);
-    setCopied(type);
-    antMessage.success('Copied to clipboard');
-    setTimeout(() => setCopied(null), 2000);
+  const copyToClipboard = async (text, type) => {
+    const success = await copyToClipboardWithMessage(
+      text, 
+      antMessage, 
+      'Copied to clipboard',
+      'Failed to copy to clipboard'
+    );
+    
+    if (success) {
+      setCopied(type);
+      setTimeout(() => setCopied(null), 2000);
+    }
   };
 
   const memberSince = new Date(user?.createdAt).toLocaleDateString('en-US', { 

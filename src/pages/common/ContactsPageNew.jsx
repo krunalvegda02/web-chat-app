@@ -6,6 +6,7 @@ import { Input, message, Spin, Empty, Avatar, Modal, Button } from 'antd';
 import { UserAddOutlined, SearchOutlined, ArrowLeftOutlined, MessageOutlined, DeleteOutlined, ShareAltOutlined, CheckCircleOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { createOrGetRoom } from '../../redux/slices/chatSlice';
+import { shareOrCopy } from '../../utils/clipboardUtils';
 
 export default function ContactsPage() {
   const { theme } = useTheme();
@@ -129,14 +130,15 @@ export default function ContactsPage() {
     }
   };
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     const inviteText = `Join me on our chat platform!`;
-    if (navigator.share) {
-      navigator.share({ text: inviteText });
-    } else {
-      navigator.clipboard.writeText(inviteText);
-      message.success('Invite link copied to clipboard');
-    }
+    await shareOrCopy(
+      inviteText,
+      'Join our chat platform',
+      '',
+      message,
+      'Invite link copied to clipboard'
+    );
   };
 
   const filteredContacts = (contacts || []).filter(contact => {
@@ -345,7 +347,7 @@ export default function ContactsPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button
+                  {/* <button
                     onClick={() => handleStartChat(contactUser._id)}
                     disabled={creatingChat === contactUser._id}
                     className="w-9 h-9 flex items-center justify-center rounded-full transition-all hover:scale-110"
@@ -355,7 +357,7 @@ export default function ContactsPage() {
                     }}
                   >
                     {creatingChat === contactUser._id ? <Spin size="small" /> : <MessageOutlined style={{ color: '#FFFFFF', fontSize: '16px' }} />}
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => handleEditContact(contact)}
                     className="w-9 h-9 flex items-center justify-center rounded-full transition-all hover:scale-110"
