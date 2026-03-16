@@ -495,7 +495,7 @@ const chatSlice = createSlice({
       let updatedCount = 0;
       const messageIdStrings = messageIds.map(id => id.toString());
       console.log(`🔵 [REDUX] Looking for message IDs:`, messageIdStrings);
-      
+
       const updateTimestamp = Date.now();
       const updateId = Math.random();
 
@@ -534,9 +534,29 @@ const chatSlice = createSlice({
 
       console.log(`👁️ [REDUX] Marked ${updatedCount}/${messageIds.length} messages as read in room ${roomId}`);
       console.log(`🔵 [REDUX] Messages in room after update:`, state.messagesByRoom[roomId].map(m => ({ id: m._id, status: m.status })));
-      
+
       // Force a state change notification
       state._lastReadUpdate = updateTimestamp;
+    },
+
+
+    // ✅ Update message with translation data
+    updateMessageTranslation(state, action) {
+      const { roomId, messageId, translation } = action.payload;
+      console.log(`🌐 [REDUX] updateMessageTranslation:`, { roomId, messageId, translation });
+
+      if (!state.messagesByRoom[roomId]) return;
+
+      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
+        if (message._id === messageId || message._id?.toString() === messageId?.toString()) {
+          return {
+            ...message,
+            translation: { ...translation },
+            _updatedAt: Date.now(),
+          };
+        }
+        return message;
+      });
     },
 
 
@@ -766,6 +786,7 @@ export const {
   setOnlineUsers,
   setUserOnlineStatus,
   updateMessagesReadStatus,
+  updateMessageTranslation,
   editMessage,
   deleteMessage,
   deleteMessageForMe,

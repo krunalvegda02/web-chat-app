@@ -9,6 +9,7 @@ import {
   setOnlineUsers,
   updateMessageStatus,
   updateMessagesReadStatus,
+  updateMessageTranslation,
   updateRoomUnreadCount,
   editMessage,
   deleteMessage,
@@ -84,8 +85,8 @@ export const useSocket = () => {
               // 3. Document/tab is visible (user is actually looking at it)
               // 4. NOT in read-only mode (like admin monitoring)
               const shouldAutoMarkRead = (
-                activeRoomId === data.roomId && 
-                senderId !== currentUserId && 
+                activeRoomId === data.roomId &&
+                senderId !== currentUserId &&
                 !document.hidden &&
                 user?.role !== 'PLATFORM_ADMIN' // Platform admins shouldn't auto-mark as read
               );
@@ -114,7 +115,7 @@ export const useSocket = () => {
                 status: data.status || 'sent',
                 newId: data.messageId // ✅ Pass the permanent ID
               }));
-              
+
               // Force immediate UI update
               setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('message_status_updated', {
@@ -134,7 +135,7 @@ export const useSocket = () => {
                 messageId: data.messageId,
                 status: 'delivered'
               }));
-              
+
               // Force immediate UI update
               setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('message_status_updated', {
@@ -167,7 +168,7 @@ export const useSocket = () => {
                 const currentState = window.__REDUX_STORE__?.getState();
                 const messages = currentState?.chat?.messagesByRoom[data.roomId] || [];
                 console.log(`👁️ [SOCKET] Post-update verification - ${messages.filter(m => data.messageIds.includes(m._id) && m.status === 'read').length}/${data.messageIds.length} messages now marked as read`);
-                
+
                 // Trigger a custom event to force UI refresh if needed
                 window.dispatchEvent(new CustomEvent('messages_read_updated', {
                   detail: { roomId: data.roomId, messageIds: data.messageIds }
@@ -289,6 +290,18 @@ export const useSocket = () => {
                 messageId: data.messageId,
                 content: data.content,
                 editedAt: data.editedAt
+              }));
+            }
+          });
+
+          // ✅ Message translated (async translation complete)
+          chatSocketClient.on('message_translated', (data) => {
+            console.log('🌐 [SOCKET] message_translated:', data);
+            if (data && data.messageId && data.roomId && data.translation) {
+              dispatch(updateMessageTranslation({
+                roomId: data.roomId,
+                messageId: data.messageId,
+                translation: data.translation,
               }));
             }
           });

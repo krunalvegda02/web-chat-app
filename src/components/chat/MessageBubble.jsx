@@ -51,6 +51,10 @@ export default function MessageBubble({
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const [audioStates, setAudioStates] = useState({});
   const audioRefs = useRef({});
+  const [showOriginal, setShowOriginal] = useState(false);
+
+  // Check if current user is PLATFORM_ADMIN (sees translations)
+  const isPlatformAdmin = currentUser?.role === 'PLATFORM_ADMIN';
 
   // Check if user is a platform user
   const isPlatformUser = useMemo(() => {
@@ -565,7 +569,7 @@ export default function MessageBubble({
       : 'max-w-[75%] sm:max-w-[60%]';
 
   return (
-    <div 
+    <div
       className={`flex mb-3 gap-2 items-end group ${isMine ? 'justify-end' : 'justify-start'}`}
       data-message-id={message._id}
       data-message-status={message.status}
@@ -956,6 +960,28 @@ export default function MessageBubble({
                     {highlightText(message.content)}
                   </div>
                 )}
+
+                {/* ✅ TRANSLATED VOICE: Show Hindi audio for PLATFORM_ADMIN */}
+                {isPlatformAdmin && message.translation?.isTranslated && message.translation?.translatedAudioUrl && (
+                  <div className="mt-2 pt-2 border-t mx-3 mb-1" style={{ borderColor: 'rgba(0,0,0,0.1)' }}>
+                    <div className="flex items-center gap-1 text-[11px] mb-1.5" style={{ color: '#008069' }}>
+                      <span>🌐</span>
+                      <span className="font-medium">Hindi Translation</span>
+                    </div>
+                    <audio
+                      controls
+                      src={message.translation.translatedAudioUrl}
+                      className="w-full h-8"
+                      style={{ filter: 'sepia(20%) saturate(70%) grayscale(1) contrast(99%) invert(12%)' }}
+                      preload="metadata"
+                    />
+                    {message.translation.translatedTranscription && (
+                      <div className="text-xs mt-1 opacity-80 italic" style={{ color: '#667781' }}>
+                        "{message.translation.translatedTranscription}"
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1105,7 +1131,22 @@ export default function MessageBubble({
                   </div>
                 )}
                 <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '22px', minWidth: '120px', paddingTop: message.isForwarded ? '0' : '8px' }}>
-                  {highlightText(message.content)}
+                  {/* ✅ TRANSLATION: Show translated text for PLATFORM_ADMIN */}
+                  {isPlatformAdmin && message.translation?.isTranslated && message.translation?.translatedContent ? (
+                    <div>
+                      <div>{showOriginal ? highlightText(message.content) : highlightText(message.translation.translatedContent)}</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowOriginal(!showOriginal); }}
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer hover:underline"
+                        style={{ color: '#008069', background: 'none', border: 'none', padding: 0 }}
+                      >
+                        <span>🌐</span>
+                        <span>{showOriginal ? 'Show translation' : `View original (${message.translation.originalLanguage?.toUpperCase() || '?'})`}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    highlightText(message.content)
+                  )}
                 </div>
               </div>
             )}
