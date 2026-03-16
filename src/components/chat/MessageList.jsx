@@ -150,7 +150,7 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
 
     // In reverse layout, scroll to "bottom" means scrollTop is at maximum
     const isAtBottom = container.scrollTop >= (container.scrollHeight - container.clientHeight - 100);
-    
+
     if (isAtBottom) {
       setLoadingMore(true);
       previousScrollHeight.current = container.scrollHeight;
@@ -308,58 +308,6 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
         .sort((a, b) => new Date(b) - new Date(a)) // Sort dates in descending order
         .map((dateKey) => (
           <div key={dateKey}>
-            {/* Messages for this date in reverse order */}
-            <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: '4px' }}>
-              {groupedMessages[dateKey]
-                .slice() // Create a copy to avoid mutating original
-                .reverse() // Reverse messages within the day
-                .map((message, msgIdx) => {
-                // Check if this message is a search result
-                const isSearchResult = searchResults.some(r => r.msg._id === message._id);
-                const isCurrentSearchResult = searchResults[currentSearchIndex]?.msg._id === message._id;
-
-                // Check if this is a call log
-                if (message.type === 'call' && message.callLog) {
-                  return (
-                    <CallLogBubble
-                      key={message._id}
-                      callLog={message.callLog}
-                      timestamp={message.createdAt}
-                      currentUser={user}
-                      senderId={message.senderId}
-                    />
-                  );
-                }
-
-                // Regular message with search highlight
-                return (
-                  <div
-                    key={message._id}
-                    id={`msg-${message._id}`}
-                    style={{
-                      backgroundColor: isCurrentSearchResult
-                        ? 'rgba(255, 235, 59, 0.5)'
-                        : isSearchResult
-                          ? 'rgba(255, 235, 59, 0.2)'
-                          : 'transparent',
-                      borderRadius: '8px',
-                      padding: isSearchResult ? '4px' : '0',
-                      transition: 'background-color 0.3s ease',
-                    }}
-                  >
-                    <MessageBubble
-                      message={message}
-                      currentUser={user}
-                      showAvatar={false}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      searchQuery={searchQuery}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
             {/* WhatsApp-style Date Label */}
             <div
               style={{
@@ -381,6 +329,58 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
               >
                 {formatDateLabel(new Date(dateKey + 'T00:00:00'))}
               </div>
+            </div>
+
+            {/* Messages for this date in reverse order */}
+            <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: '4px' }}>
+              {groupedMessages[dateKey]
+                .slice() // Create a copy to avoid mutating original
+                .reverse() // Reverse messages within the day
+                .map((message, msgIdx) => {
+                  // Check if this message is a search result
+                  const isSearchResult = searchResults.some(r => r.msg._id === message._id);
+                  const isCurrentSearchResult = searchResults[currentSearchIndex]?.msg._id === message._id;
+
+                  // Check if this is a call log
+                  if (message.type === 'call' && message.callLog) {
+                    return (
+                      <CallLogBubble
+                        key={message._id}
+                        callLog={message.callLog}
+                        timestamp={message.createdAt}
+                        currentUser={user}
+                        senderId={message.senderId}
+                      />
+                    );
+                  }
+
+                  // Regular message with search highlight
+                  return (
+                    <div
+                      key={message._id}
+                      id={`msg-${message._id}`}
+                      style={{
+                        backgroundColor: isCurrentSearchResult
+                          ? 'rgba(255, 235, 59, 0.5)'
+                          : isSearchResult
+                            ? 'rgba(255, 235, 59, 0.2)'
+                            : 'transparent',
+                        borderRadius: '8px',
+                        padding: isSearchResult ? '4px' : '0',
+                        transition: 'background-color 0.3s ease',
+                      }}
+                    >
+                      <MessageBubble
+                        message={message}
+                        currentUser={user}
+                        showAvatar={false}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        searchQuery={searchQuery}
+                      />
+                    </div>
+                  );
+                })}
             </div>
           </div>
         ))}
