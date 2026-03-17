@@ -1,6 +1,7 @@
 import axios from "axios";
 import store from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
+import { forceLogout } from '../utils/authUtils';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL + "/v1/";
 
@@ -43,10 +44,9 @@ apiClient.interceptors.response.use(
         if (error.response?.status === 401 || error.response?.status === 403) {
             const currentPath = window.location.pathname;
             if (!currentPath.includes('/login') && !currentPath.includes('/register') && !currentPath.includes('/join') && !currentPath.includes('/reset-password')) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
+                const errorMessage = error.response?.data?.message || 'Session expired';
                 store.dispatch(logout());
-                window.location.href = '/login';
+                forceLogout(errorMessage);
             }
         }
         return Promise.reject(error);

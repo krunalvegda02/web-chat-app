@@ -316,7 +316,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       {/* Search Bar */}
       <div style={{ padding: '12px', backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF', borderBottom: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}` }}>
         <Input
-          placeholder="Search or start new chat"
+          placeholder="Search Chats"
           prefix={<SearchOutlined style={{ color: theme?.headerText || '#667781' }} />}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}

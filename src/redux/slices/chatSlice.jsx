@@ -74,23 +74,24 @@ export const uploadChatMedia = createAsyncThunkHandler(
 
 export const editMessageAPI = createAsyncThunkHandler(
   'chat/editMessage',
-  (payload) => _post(payload, `${API.CHAT.EDIT_MESSAGE}/${payload.messageId}`),
-  null
+  _post,
+  (payload) => `${API.CHAT.EDIT_MESSAGE}/${payload.messageId}`
 );
 
 
 export const deleteMessageAPI = createAsyncThunkHandler(
   'chat/deleteMessage',
-  (payload) => _post(payload, `${API.CHAT.DELETE_MESSAGE}/${payload.messageId}`),
-  null
-);
-
-
-export const forwardMessageAPI = createAsyncThunkHandler(
-  'chat/forwardMessage',
   _post,
-  '/chat/forward-message'
+  (payload) => `${API.CHAT.DELETE_MESSAGE}/${payload.messageId}`
 );
+
+
+// Forward message functionality will be implemented when backend supports it
+// export const forwardMessageAPI = createAsyncThunkHandler(
+//   'chat/forwardMessage',
+//   _post,
+//   API.CHAT.FORWARD_MESSAGE
+// );
 
 
 export const markMessagesDelivered = createAsyncThunkHandler(
@@ -572,35 +573,28 @@ const chatSlice = createSlice({
     },
 
 
-    // ✅ Delete message (soft delete)
+    // ✅ Delete message (soft delete) - Unified handler
     deleteMessage(state, action) {
-      const { messageId, deletedAt } = action.payload;
+      const { messageId, deletedAt, userId } = action.payload;
 
       for (const roomId in state.messagesByRoom) {
         const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
         if (message) {
-          message.isDeleted = true;
-          message.deletedAt = deletedAt || new Date().toISOString();
-          console.log(`🗑️ [REDUX] Message marked as deleted: ${messageId}`);
-          return;
-        }
-      }
-    },
-
-    // ✅ Delete message for current user only
-    deleteMessageForMe(state, action) {
-      const { messageId, userId } = action.payload;
-
-      for (const roomId in state.messagesByRoom) {
-        const message = state.messagesByRoom[roomId].find(m => m._id === messageId);
-        if (message) {
-          if (!message.deletedForUsers) {
-            message.deletedForUsers = [];
+          if (userId) {
+            // Delete for specific user only
+            if (!message.deletedForUsers) {
+              message.deletedForUsers = [];
+            }
+            if (!message.deletedForUsers.includes(userId)) {
+              message.deletedForUsers.push(userId);
+            }
+            console.log(`🗑️ [REDUX] Message deleted for user ${userId}: ${messageId}`);
+          } else {
+            // Delete for everyone
+            message.isDeleted = true;
+            message.deletedAt = deletedAt || new Date().toISOString();
+            console.log(`🗑️ [REDUX] Message marked as deleted for everyone: ${messageId}`);
           }
-          if (!message.deletedForUsers.includes(userId)) {
-            message.deletedForUsers.push(userId);
-          }
-          console.log(`🗑️ [REDUX] Message deleted for user ${userId}: ${messageId}`);
           return;
         }
       }
@@ -818,7 +812,6 @@ export const {
   updateMessageTranslation,
   editMessage,
   deleteMessage,
-  deleteMessageForMe,
   addReaction,
   removeReaction,
   updateRoomUnreadCount,

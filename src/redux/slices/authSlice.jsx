@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { createAsyncThunkHandler } from '../../helper/createAsyncThunkHandler';
 import { _post, _get, _put } from '../../helper/apiClient';
 import { updateProfileWithAvatar } from './userSlice';
+import { clearAllAuthTokens, saveAuthTokens } from '../../utils/authUtils';
 
 export const login = createAsyncThunkHandler(
   'auth/login',
@@ -64,6 +65,16 @@ export const updateProfile = createAsyncThunkHandler(
   '/users/profile'
 );
 
+// Helper function to clear all auth tokens from localStorage
+const clearAuthTokens = () => {
+  clearAllAuthTokens();
+};
+
+// Helper function to save auth tokens to localStorage  
+const saveTokens = (user, token, refreshToken) => {
+  saveAuthTokens(user, token, refreshToken);
+};
+
 const initialState = {
   user: null,
   loading: false,
@@ -89,27 +100,26 @@ const authSlice = createSlice({
     },
     setPlatformAuth(state, action) {
       const { user, token, refreshToken } = action.payload;
+      // Clear any existing tokens first
+      clearAuthTokens();
+      
       state.user = user;
       state.token = token;
       state.refreshToken = refreshToken;
       state.initialized = true;
       state.loading = false;
       state.error = null;
-    },
-    setPlatformAuth(state, action) {
-      const { user, token, refreshToken } = action.payload;
-      state.user = user;
-      state.token = token;
-      state.refreshToken = refreshToken;
-      state.initialized = true;
-      state.loading = false;
-      state.error = null;
+      
+      // Save new tokens to localStorage
+      saveTokens(user, token, refreshToken);
     },
     clearAuth(state) {
       state.user = null;
       state.token = null;
       state.refreshToken = null;
       state.initialized = true;
+      // Clear localStorage tokens
+      clearAuthTokens();
     },
     setInitialized(state) {
       state.initialized = true;
@@ -125,12 +135,19 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
         console.log('Login fulfilled, full payload:', action.payload);
+        // Clear any existing tokens first
+        clearAuthTokens();
+        
         // action.payload is { success, data: { user, accessToken, refreshToken }, message }
         const { user, accessToken, refreshToken } = action.payload.data || {};
         state.user = user;
         state.token = accessToken;
         state.refreshToken = refreshToken;
         state.initialized = true;
+        
+        // Save new tokens to localStorage
+        saveTokens(user, accessToken, refreshToken);
+        
         console.log('Auth state after login:', { user: state.user, token: state.token });
       })
       .addCase(login.rejected, (state, action) => {
@@ -146,11 +163,17 @@ const authSlice = createSlice({
       })
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
+        // Clear any existing tokens first
+        clearAuthTokens();
+        
         const { user, accessToken, refreshToken } = action.payload.data || {};
         state.user = user;
         state.token = accessToken;
         state.refreshToken = refreshToken;
         state.initialized = true;
+        
+        // Save new tokens to localStorage
+        saveTokens(user, accessToken, refreshToken);
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -182,6 +205,8 @@ const authSlice = createSlice({
         state.refreshToken = null;
         state.initialized = true;
         state.loading = false;
+        // Clear localStorage tokens
+        clearAuthTokens();
       })
       .addCase(logout.rejected, (state) => {
         // Even if logout fails, clear local auth state
@@ -190,6 +215,8 @@ const authSlice = createSlice({
         state.refreshToken = null;
         state.initialized = true;
         state.loading = false;
+        // Clear localStorage tokens
+        clearAuthTokens();
       })
 
       // Fetch Invite Info
@@ -213,11 +240,17 @@ const authSlice = createSlice({
       })
       .addCase(registerWithInvite.fulfilled, (state, action) => {
         state.loading = false;
+        // Clear any existing tokens first
+        clearAuthTokens();
+        
         const { user, accessToken, refreshToken } = action.payload.data || {};
         state.user = user;
         state.token = accessToken;
         state.refreshToken = refreshToken;
         state.initialized = true;
+        
+        // Save new tokens to localStorage
+        saveTokens(user, accessToken, refreshToken);
       })
       .addCase(registerWithInvite.rejected, (state, action) => {
         state.loading = false;

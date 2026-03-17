@@ -56,12 +56,14 @@ export default function MessageBubble({
   // Check if current user is PLATFORM_ADMIN (sees translations)
   const isPlatformAdmin = currentUser?.role === 'PLATFORM_ADMIN';
 
-  // Check if user is a platform user
+  // Check if user is a platform user (but not platform admin)
   const isPlatformUser = useMemo(() => {
     const hasExternalId = !!currentUser?.externalUserId;
     const hasPlatformId = !!currentUser?.platformId;
     const isUserRole = currentUser?.role === 'USER';
-    return isUserRole && (hasExternalId || hasPlatformId);
+    const isPlatformAdmin = currentUser?.role === 'PLATFORM_ADMIN';
+    // Platform admins should have full functionality, only regular platform users are restricted
+    return isUserRole && (hasExternalId || hasPlatformId) && !isPlatformAdmin;
   }, [currentUser]);
 
   // Highlight search text
@@ -353,7 +355,12 @@ export default function MessageBubble({
     );
   }
 
-  // ✅ Handle deleted messages
+  // ✅ Handle messages deleted for me (should not be rendered)
+  if (message.deletedForUsers && (message.deletedForUsers.includes(currentUser?._id) || message.deletedForUsers.includes(currentUser?._id?.toString()))) {
+    return null;
+  }
+
+  // ✅ Handle messages deleted for everyone (show placeholder)
   if (message.deletedAt || message.isDeleted) {
     return (
       <div className={`flex mb-3 ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -401,8 +408,14 @@ export default function MessageBubble({
     antMessage.success('Message edited');
   };
 
-  // ✅ Handle delete message - WhatsApp style
+  // ✅ Handle delete message - WhatsApp style with proper delete for me vs delete for everyone
   const handleDelete = () => {
+    if (!message?._id || !currentUser?._id) {
+      console.error('❌ [MessageBubble] Cannot delete message - missing message ID or user ID');
+      antMessage.error('Unable to delete message');
+      return;
+    }
+
     Modal.confirm({
       title: null,
       icon: null,
@@ -497,20 +510,41 @@ export default function MessageBubble({
         </div>
       ),
       onOk: () => {
-        chatSocketClient.emit('delete_message', { messageId: message._id, deleteType: 'forEveryone' });
-        dispatch(deleteMessage({ messageId: message._id }));
-        antMessage.success('Message deleted for everyone');
+        try {
+          // Delete for everyone
+          console.log('🗑️ [MessageBubble] Deleting message for everyone:', message._id);
+          chatSocketClient.emit('delete_message', { messageId: message._id, deleteType: 'forEveryone' });
+          dispatch(deleteMessage({ messageId: message._id }));
+          antMessage.success('Message deleted for everyone');
+        } catch (error) {
+          console.error('❌ [MessageBubble] Error deleting message for everyone:', error);
+          antMessage.error('Failed to delete message');
+        }
       },
       onCancel: () => {
-        chatSocketClient.emit('delete_message', { messageId: message._id, deleteType: 'forMe' });
-        dispatch(deleteMessage({ messageId: message._id }));
-        antMessage.success('Message deleted for you');
+        try {
+          // Delete for me only
+          console.log('🗑️ [MessageBubble] Deleting message for user:', { messageId: message._id, userId: currentUser._id });
+          chatSocketClient.emit('delete_message', { messageId: message._id, deleteType: 'forMe', userId: currentUser._id });
+          dispatch(deleteMessage({ messageId: message._id, userId: currentUser._id }));
+          antMessage.success('Message deleted for you');
+        } catch (error) {
+          console.error('❌ [MessageBubble] Error deleting message for user:', error);
+          antMessage.error('Failed to delete message');
+        }
       },
     });
   };
 
   // ✅ Handle forward message
   const handleForward = () => {
+    if (!message?._id) {
+      console.error('❌ [MessageBubble] Cannot forward message - missing message ID');
+      antMessage.error('Unable to forward message');
+      return;
+    }
+
+    console.log('🚀 [MessageBubble] Opening forward modal for message:', message._id);
     setIsForwardModalOpen(true);
   };
 
@@ -619,8 +653,8 @@ export default function MessageBubble({
             {/* ✅ IMAGE MESSAGES - WhatsApp Style */}
             {message.type === 'image' && message.media && message.media.length > 0 && (
               <div className="relative">
-                {message.isForwarded && (
-                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                {(message.isForwarded || message.forwarded) && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', marginBottom: '2px' }}>
                     <ShareAltOutlined style={{ fontSize: '10px' }} />
                     <span>Forwarded</span>
                   </div>
@@ -774,8 +808,8 @@ export default function MessageBubble({
             {/* ✅ VIDEO MESSAGES - WhatsApp Style */}
             {message.type === 'video' && message.media && message.media.length > 0 && (
               <div>
-                {message.isForwarded && (
-                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                {(message.isForwarded || message.forwarded) && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', marginBottom: '2px' }}>
                     <ShareAltOutlined style={{ fontSize: '10px' }} />
                     <span>Forwarded</span>
                   </div>
@@ -823,8 +857,8 @@ export default function MessageBubble({
             {/* ✅ AUDIO/VOICE MESSAGES - WhatsApp Style */}
             {(message.type === 'audio' || message.type === 'voice') && message.media && message.media.length > 0 && (
               <div className="py-2 px-3">
-                {message.isForwarded && (
-                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                {(message.isForwarded || message.forwarded) && (
+                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', padding: '4px 8px', borderRadius: '4px', marginBottom: '8px' }}>
                     <ShareAltOutlined style={{ fontSize: '10px' }} />
                     <span>Forwarded</span>
                   </div>
@@ -988,8 +1022,8 @@ export default function MessageBubble({
             {/* ✅ FILE MESSAGES */}
             {message.type === 'file' && message.media && message.media.length > 0 && (
               <div className="p-3 pb-4">
-                {message.isForwarded && (
-                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                {(message.isForwarded || message.forwarded) && (
+                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', padding: '4px 8px', borderRadius: '4px', marginBottom: '8px' }}>
                     <ShareAltOutlined style={{ fontSize: '10px' }} />
                     <span>Forwarded</span>
                   </div>
@@ -1043,6 +1077,12 @@ export default function MessageBubble({
             {/* ✅ TEXT MESSAGES WITH MEDIA (Mixed) - WhatsApp Style */}
             {message.type === 'text' && message.media && message.media.length > 0 && (
               <div className="pt-2 px-3 pb-2">
+                {(message.isForwarded || message.forwarded) && (
+                  <div className="pb-2 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', padding: '4px 8px', borderRadius: '4px', marginBottom: '8px' }}>
+                    <ShareAltOutlined style={{ fontSize: '10px' }} />
+                    <span>Forwarded</span>
+                  </div>
+                )}
                 <div className={`flex flex-wrap gap-1 ${message.content ? 'mb-2' : ''}`}>
                   {message.media.map((m, i) => (
                     <div key={i}>
@@ -1124,13 +1164,13 @@ export default function MessageBubble({
             {/* ✅ PURE TEXT MESSAGES */}
             {message.type === 'text' && (!message.media || message.media.length === 0) && message.content && (
               <div>
-                {message.isForwarded && (
-                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781' }}>
+                {(message.isForwarded || message.forwarded) && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', marginBottom: '2px' }}>
                     <ShareAltOutlined style={{ fontSize: '10px' }} />
                     <span>Forwarded</span>
                   </div>
                 )}
-                <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '22px', minWidth: '120px', paddingTop: message.isForwarded ? '0' : '8px' }}>
+                <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '22px', minWidth: '120px', paddingTop: (message.isForwarded || message.forwarded) ? '0' : '8px' }}>
                   {/* ✅ TRANSLATION: Show translated text for PLATFORM_ADMIN */}
                   {isPlatformAdmin && message.translation?.isTranslated && message.translation?.translatedContent ? (
                     <div>

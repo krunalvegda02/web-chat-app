@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { chatSocketClient } from '../sockets/chatSocketClient';
+import { forceLogout } from '../utils/authUtils';
 import {
   socketMessageReceived,
   addTypingUser,
@@ -13,7 +14,6 @@ import {
   updateRoomUnreadCount,
   editMessage,
   deleteMessage,
-  deleteMessageForMe,
 } from '../redux/slices/chatSlice';
 
 let globalListenersInitialized = false;
@@ -312,21 +312,30 @@ export const useSocket = () => {
             if (data && data.messageId) {
               dispatch(deleteMessage({
                 messageId: data.messageId,
-                deletedAt: data.deletedAt
+                deletedAt: data.deletedAt,
+                userId: data.deleteType === 'forMe' ? data.userId : null
               }));
             }
           });
 
-          // ✅ Message deleted for me
-          chatSocketClient.on('message_deleted_for_me', (data) => {
-            console.log('🗑️ [SOCKET] message_deleted_for_me:', data);
-            if (data && data.messageId && data.userId) {
-              dispatch(deleteMessageForMe({
-                messageId: data.messageId,
-                userId: data.userId
-              }));
+          // ✅ Force disconnect (account deactivated)
+          chatSocketClient.on('force_disconnect', (data) => {
+            console.log('🔌 [SOCKET] force_disconnect:', data);
+            const reason = data.reason || 'Your account has been deactivated. You will be logged out.';
+            forceLogout(reason);
+          });
+
+          // ✅ Auth error (token invalid/expired)
+          chatSocketClient.on('auth_error', (data) => {
+            console.log('❌ [SOCKET] auth_error:', data);
+            
+            // Only show alert if it's not a normal token expiry
+            if (data.message && data.message.includes('deactivated')) {
+              forceLogout(data.message);
             }
           });
+
+
 
           globalListenersInitialized = true;
           console.log('✅ [SOCKET] Listeners initialized successfully');

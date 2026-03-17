@@ -3,7 +3,7 @@ import { Modal, Input, Button, message as antMessage, Checkbox } from 'antd';
 import { SearchOutlined, ShareAltOutlined, CheckOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useTheme } from '../../hooks/useTheme';
 import { useDispatch, useSelector } from 'react-redux';
-import { forwardMessageAPI, fetchRooms } from '../../redux/slices/chatSlice';
+import { sendMessageAPI, fetchRooms } from '../../redux/slices/chatSlice';
 import { _get } from '../../helper/apiClient';
 import Avatar from '../common/Avatar';
 
@@ -22,13 +22,21 @@ export default function ForwardMessageModal({ open, onCancel, message }) {
   const [hasMore, setHasMore] = useState(true);
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN';
+  const isAdmin = isSuperAdmin || isPlatformAdmin;
 
-  // Fetch recent chats for Super Admin
+  // Safety check - don't render if message is missing
+  if (!message || !message._id) {
+    console.warn('⚠️ [ForwardMessageModal] Message is missing or invalid:', message);
+    return null;
+  }
+
+  // Fetch recent chats for Super Admin and Platform Admin
   useEffect(() => {
-    if (open && isSuperAdmin) {
+    if (open && isAdmin) {
       fetchRecentChats(1);
     }
-  }, [open, isSuperAdmin]);
+  }, [open, isAdmin]);
 
   const fetchRecentChats = async (pageNum) => {
     if (chatsLoading) return;
@@ -67,22 +75,68 @@ export default function ForwardMessageModal({ open, onCancel, message }) {
       return;
     }
 
+    if (!message?._id) {
+      antMessage.error('Invalid message to forward');
+      return;
+    }
+
     setForwardLoading(true);
     try {
-      await dispatch(forwardMessageAPI({ messageId: message._id, roomIds: selectedRooms })).unwrap();
-      antMessage.success(`Forwarded to ${selectedRooms.length} chat(s)`);
-      onCancel();
-      setSelectedRooms([]);
-      dispatch(fetchRooms());
+      console.log('🚀 [ForwardMessage] Forwarding message as new messages:', {
+        messageId: message._id,
+        roomIds: selectedRooms,
+        selectedCount: selectedRooms.length,
+        messageType: message.type,
+        hasContent: !!message.content,
+        hasMedia: message.media?.length > 0
+      });
+      
+      // Since backend doesn't have forward endpoint, we'll send new messages to each room
+      const forwardPromises = selectedRooms.map(async (roomId) => {
+        const forwardData = {
+          roomId,
+          content: message.content || '',
+          type: message.type || 'text',
+          media: message.media || [],
+          // Mark as forwarded message
+          isForwarded: true,
+          forwarded: true
+        };
+        
+        // Use the existing sendMessageAPI endpoint
+        return dispatch(sendMessageAPI(forwardData));
+      });
+      
+      const results = await Promise.allSettled(forwardPromises);
+      
+      // Check results
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.type?.includes('fulfilled')).length;
+      const failed = results.length - successful;
+      
+      if (successful > 0) {
+        if (failed === 0) {
+          antMessage.success(`Message forwarded to ${successful} chat(s)`);
+        } else {
+          antMessage.warning(`Message forwarded to ${successful} chat(s), ${failed} failed`);
+        }
+        onCancel();
+        setSelectedRooms([]);
+        // Refresh rooms to show updated last messages
+        dispatch(fetchRooms());
+      } else {
+        antMessage.error('Failed to forward message to any chat');
+      }
+      
     } catch (error) {
-      antMessage.error('Failed to forward message');
+      console.error('❌ [ForwardMessage] Unexpected error:', error);
+      antMessage.error('An unexpected error occurred while forwarding');
     } finally {
       setForwardLoading(false);
     }
   };
 
   // Get chat list based on user role
-  const chatList = isSuperAdmin ? recentChats : (Array.isArray(rooms) ? rooms : []);
+  const chatList = isAdmin ? recentChats : (Array.isArray(rooms) ? rooms : []);
 
   // Filter chats by search query
   const filteredChats = chatList.filter(room => {
@@ -132,7 +186,7 @@ export default function ForwardMessageModal({ open, onCancel, message }) {
         <div 
           className="flex-1 overflow-y-auto" 
           style={{ maxHeight: '360px' }}
-          onScroll={isSuperAdmin ? handleScroll : undefined}
+          onScroll={isAdmin ? handleScroll : undefined}
         >
           {filteredChats.map((room) => {
             const otherParticipant = room.participants?.find(p => p.userId?._id !== user?._id);
