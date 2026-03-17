@@ -42,12 +42,12 @@ export const getMenuItems = (role, navigate) => {
       //   label: 'User Chats',
       //   path: '/admin/user-chat',
       // },
-      {
-        key: '/admin/appearance',
-        icon: <BgColorsOutlined className="text-[22px]" />,
-        label: 'Appearance',
-        path: '/admin/theme',
-      },
+      // {
+      //   key: '/admin/appearance',
+      //   icon: <BgColorsOutlined className="text-[22px]" />,
+      //   label: 'Appearance',
+      //   path: '/admin/theme',
+      // },
     ],
 
     /* ============================

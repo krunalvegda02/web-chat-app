@@ -460,14 +460,14 @@ export default function Profile() {
                   </div>
 
                   {/* Stats on Right - Desktop Only */}
-                  {!editing && windowWidth >= 1024 && (
+                  {/* {!editing && windowWidth >= 1024 && (
                     <div className="hidden lg:flex flex-col gap-3 pl-6" style={{ borderLeft: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` }}>
                       <div className="text-center">
                         <div className="text-2xl font-bold" style={{ color: theme.sendButtonColor || '#10b981' }}>{user?.contacts?.length || 0}</div>
                         <div className="text-xs font-medium" style={{ color: theme.timestampColor || '#667781' }}>Contacts</div>
                       </div>
                     </div>
-                  )}
+                  )} */}
                 </div>
               </div>
             </Card>
@@ -476,13 +476,13 @@ export default function Profile() {
           {/* Stats Grid - Tablet & Mobile - Fully Responsive */}
           {!editing && windowWidth < 1024 && (
             <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
-              <Card className="shadow-sm w-full" bodyStyle={{ padding: windowWidth < 640 ? '10px' : '12px' }} style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
+              {/* <Card className="shadow-sm w-full" bodyStyle={{ padding: windowWidth < 640 ? '10px' : '12px' }} style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
                 <Statistic
                   title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Contacts</span>}
                   value={user?.contacts?.length || 0}
                   valueStyle={{ color: theme.accentColor || '#10b981', fontSize: windowWidth < 640 ? '16px' : '18px' }}
                 />
-              </Card>
+              </Card> */}
               <Card className="shadow-sm w-full" bodyStyle={{ padding: windowWidth < 640 ? '10px' : '12px' }} style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
                 <Statistic
                   title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Member Since</span>}

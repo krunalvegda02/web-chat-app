@@ -21,11 +21,14 @@ export default function PlatformClients() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+
   useEffect(() => {
-    if (user?.platformId) {
+    if (user?.platformId && !hasInitialLoad) {
       fetchUsers();
+      setHasInitialLoad(true);
     }
-  }, [user]);
+  }, [user?.platformId, hasInitialLoad]);
 
   const fetchUsers = async () => {
     if (user?.platformId) {
@@ -37,14 +40,15 @@ export default function PlatformClients() {
   };
 
   useEffect(() => {
+    // Only run search effect after initial load and when search text changes
+    if (!hasInitialLoad || !user?.platformId) return;
+    
     const delayDebounceFn = setTimeout(() => {
-      if (user?.platformId) {
-        fetchUsers();
-      }
+      fetchUsers();
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchText]);
+  }, [searchText, hasInitialLoad]);
 
   const handleChat = (chatUser) => {
     navigate(`/admin/user-chat?userId=${chatUser._id}&platformId=${chatUser.platformId}`);
