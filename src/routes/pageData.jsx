@@ -24,24 +24,24 @@ export const getMenuItems = (role, navigate) => {
         label: 'Messages',
         path: '/admin',
       },
-      {
-        key: '/admin/contacts',
-        icon: <SolutionOutlined className="text-[22px]" />,
-        label: 'Contacts',
-        path: '/contacts',
-      },
+      // {
+      //   key: '/admin/contacts',
+      //   icon: <SolutionOutlined className="text-[22px]" />,
+      //   label: 'Contacts',
+      //   path: '/contacts',
+      // },
       {
         key: '/admin/platform-clients',
         icon: <TeamOutlined className="text-[22px]" />,
         label: 'Platform Users',
         path: '/admin/platform-clients',
       },
-      {
-        key: '/admin/user-chat',
-        icon: <CommentOutlined className="text-[22px]" />,
-        label: 'User Chats',
-        path: '/admin/user-chat',
-      },
+      // {
+      //   key: '/admin/user-chat',
+      //   icon: <CommentOutlined className="text-[22px]" />,
+      //   label: 'User Chats',
+      //   path: '/admin/user-chat',
+      // },
       {
         key: '/admin/appearance',
         icon: <BgColorsOutlined className="text-[22px]" />,
@@ -60,24 +60,24 @@ export const getMenuItems = (role, navigate) => {
         label: 'Messages',
         path: '/admin',
       },
-      {
-        key: '/admin/contacts',
-        icon: <SolutionOutlined className="text-[22px]" />,
-        label: 'Contacts',
-        path: '/contacts',
-      },
+      // {
+      //   key: '/admin/contacts',
+      //   icon: <SolutionOutlined className="text-[22px]" />,
+      //   label: 'Contacts',
+      //   path: '/contacts',
+      // },
       {
         key: '/admin/users',
         icon: <TeamOutlined className="text-[22px]" />,
         label: 'User Management',
         path: '/admin/users',
       },
-      {
-        key: '/admin/user-chat',
-        icon: <CommentOutlined className="text-[22px]" />,
-        label: 'Member Chats',
-        path: '/admin/user-chat',
-      },
+      // {
+      //   key: '/admin/user-chat',
+      //   icon: <CommentOutlined className="text-[22px]" />,
+      //   label: 'Member Chats',
+      //   path: '/admin/user-chat',
+      // },
       {
         key: '/admin/appearance',
         icon: <BgColorsOutlined className="text-[22px]" />,

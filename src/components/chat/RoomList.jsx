@@ -411,7 +411,9 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                   key={`${room._id}-${room.lastMessageTime || ''}-${room.unreadCount || 0}`}
                 >
                   <List.Item
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      // Prevent double-click requirement by using mousedown
+                      e.preventDefault();
                       dispatch(setActiveRoom(room._id));
                       if (onRoomClick) onRoomClick(room._id);
                     }}

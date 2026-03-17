@@ -78,7 +78,10 @@ export default function WhatsAppNotification({ notification, onClose, onReply })
       {/* Header */}
       <div
         className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
-        onClick={handleOpen}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          handleOpen();
+        }}
       >
         <Avatar
           size={48}
@@ -141,8 +144,9 @@ export default function WhatsAppNotification({ notification, onClose, onReply })
           </button>
           <div style={{ width: '1px', background: '#e5e7eb' }}></div>
           <button
-            onClick={(e) => {
+            onMouseDown={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               handleOpen();
             }}
             className="flex-1 py-3 text-[#25D366] font-medium hover:bg-gray-50 transition-colors"
