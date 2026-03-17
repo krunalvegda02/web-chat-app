@@ -32,10 +32,44 @@ export const fetchTenantTheme = createAsyncThunk(
   }
 );
 
+export const fetchPlatformTheme = createAsyncThunk(
+  'theme/fetchPlatformTheme',
+  async (platformId, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const token = state.auth.token;
+      
+      const response = await _get(API.PLATFORM.GET_THEME.replace(':platformId', platformId), {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  },
+  {
+    condition: (platformId, { getState }) => {
+      const state = getState();
+      return !state.theme.loading;
+    }
+  }
+);
+
 export const updateTenantTheme = createAsyncThunkHandler(
   'theme/updateTenantTheme',
   _put,
   (payload) => API.TENANT.UPDATE_THEME.replace(':tenantId', payload.tenantId)
+);
+
+export const updatePlatformTheme = createAsyncThunkHandler(
+  'theme/updatePlatformTheme',
+  _put,
+  (payload) => API.PLATFORM.UPDATE_THEME.replace(':platformId', payload.platformId)
 );
 
 export const uploadThemeImage = createAsyncThunk(
@@ -73,11 +107,13 @@ export const uploadThemeImage = createAsyncThunk(
 const initialState = {
   theme: {},
   tenantTheme: {},
+  platformTheme: {},
   loading: false,
   updating: false,
   uploading: false,
   error: null,
   fetchedTenantIds: [],
+  fetchedPlatformIds: [],
 };
 
 const themeSlice = createSlice({
@@ -108,6 +144,24 @@ const themeSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      .addCase(fetchPlatformTheme.pending, (state, action) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPlatformTheme.fulfilled, (state, action) => {
+        state.loading = false;
+        const themeData = action.payload?.data?.theme || action.payload?.theme || {};
+        state.theme = themeData;
+        state.platformTheme = themeData;
+        const platformId = action.meta.arg;
+        if (!state.fetchedPlatformIds?.includes(platformId)) {
+          state.fetchedPlatformIds = [...(state.fetchedPlatformIds || []), platformId];
+        }
+      })
+      .addCase(fetchPlatformTheme.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
       .addCase(updateTenantTheme.pending, (state) => {
         state.updating = true;
         state.error = null;
@@ -119,6 +173,20 @@ const themeSlice = createSlice({
         state.tenantTheme = themeData;
       })
       .addCase(updateTenantTheme.rejected, (state, action) => {
+        state.updating = false;
+        state.error = action.payload;
+      })
+      .addCase(updatePlatformTheme.pending, (state) => {
+        state.updating = true;
+        state.error = null;
+      })
+      .addCase(updatePlatformTheme.fulfilled, (state, action) => {
+        state.updating = false;
+        const themeData = action.payload?.data?.theme || action.payload?.theme || {};
+        state.theme = themeData;
+        state.platformTheme = themeData;
+      })
+      .addCase(updatePlatformTheme.rejected, (state, action) => {
         state.updating = false;
         state.error = action.payload;
       })

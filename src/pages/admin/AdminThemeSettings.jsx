@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchTenantTheme, updateTenantTheme, uploadThemeImage } from '../../redux/slices/themeSlice';
+import { fetchTenantTheme, updateTenantTheme, fetchPlatformTheme, updatePlatformTheme, uploadThemeImage } from '../../redux/slices/themeSlice';
 import {
   Form, Input, Button, Row, Col, Spin, Upload, Tabs, Slider, message as antMessage, Avatar, Card, Badge,
 } from 'antd';
@@ -57,15 +57,27 @@ export default function ThemeCustomization() {
   };
 
   useEffect(() => {
-    if (user?.tenantId) dispatch(fetchTenantTheme(user.tenantId));
-  }, [dispatch, user?.tenantId]);
+    // Determine if user is platform admin or tenant admin
+    if (user?.role === 'PLATFORM_ADMIN' && user?.platformId) {
+      dispatch(fetchPlatformTheme(user.platformId));
+    } else if (user?.tenantId) {
+      dispatch(fetchTenantTheme(user.tenantId));
+    }
+  }, [dispatch, user?.tenantId, user?.platformId, user?.role]);
 
   useEffect(() => {
     if (theme && Object.keys(theme).length > 0) form.setFieldsValue(theme);
   }, [theme, form]);
 
   const handleFinish = useCallback(async (formValues) => {
-    if (!user?.tenantId) return antMessage.error('Tenant ID not found');
+    // Check if user is platform admin or tenant admin
+    const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN' && user?.platformId;
+    const isTenantAdmin = user?.tenantId;
+    
+    if (!isPlatformAdmin && !isTenantAdmin) {
+      return antMessage.error('User ID not found - please ensure you are logged in as a platform or tenant admin');
+    }
+    
     setSaving(true);
     try {
       let finalValues = { ...formValues };
@@ -77,7 +89,14 @@ export default function ThemeCustomization() {
         const bgResult = await dispatch(uploadThemeImage({ file: bgFile, type: 'background', oldUrl: theme.chatBackgroundImage })).unwrap();
         finalValues.chatBackgroundImage = bgResult.url;
       }
-      await dispatch(updateTenantTheme({ tenantId: user.tenantId, ...finalValues })).unwrap();
+      
+      // Use appropriate update function based on user type
+      if (isPlatformAdmin) {
+        await dispatch(updatePlatformTheme({ platformId: user.platformId, ...finalValues })).unwrap();
+      } else {
+        await dispatch(updateTenantTheme({ tenantId: user.tenantId, ...finalValues })).unwrap();
+      }
+      
       antMessage.success('✅ Theme updated successfully');
       setChanged(false);
       setLogoFile(null);
@@ -90,10 +109,23 @@ export default function ThemeCustomization() {
   }, [dispatch, user, logoFile, bgFile, theme]);
 
   const handleReset = useCallback(async () => {
-    if (!user?.tenantId) return antMessage.error('Tenant ID not found');
+    // Check if user is platform admin or tenant admin
+    const isPlatformAdmin = user?.role === 'PLATFORM_ADMIN' && user?.platformId;
+    const isTenantAdmin = user?.tenantId;
+    
+    if (!isPlatformAdmin && !isTenantAdmin) {
+      return antMessage.error('User ID not found - please ensure you are logged in as a platform or tenant admin');
+    }
+    
     setSaving(true);
     try {
-      await dispatch(updateTenantTheme({ tenantId: user.tenantId, ...defaultTheme })).unwrap();
+      // Use appropriate update function based on user type
+      if (isPlatformAdmin) {
+        await dispatch(updatePlatformTheme({ platformId: user.platformId, ...defaultTheme })).unwrap();
+      } else {
+        await dispatch(updateTenantTheme({ tenantId: user.tenantId, ...defaultTheme })).unwrap();
+      }
+      
       form.setFieldsValue(defaultTheme);
       setChanged(false);
       setLogoFile(null);

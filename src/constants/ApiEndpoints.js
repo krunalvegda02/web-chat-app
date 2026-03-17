@@ -41,6 +41,10 @@ const API = {
         UPDATE_THEME: '/tenants/:tenantId/theme',
         ADMIN_USERS: '/tenants/admin-users',
     },
+    PLATFORM: {
+        GET_THEME: '/platforms/:platformId/theme',
+        UPDATE_THEME: '/platforms/:platformId/theme',
+    },
     UPLOAD: {
         THEME_IMAGE: '/upload/theme-image',
         CHAT_MEDIA: '/upload/chat-media',
