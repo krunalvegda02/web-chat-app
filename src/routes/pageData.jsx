@@ -93,19 +93,19 @@ export const getMenuItems = (role, navigate) => {
       {
         key: '/super-admin/chats',
         icon: <MessageOutlined className="text-[22px]" />,
-        label: 'Admin Messages',
+        label: 'Chats',
         path: '/super-admin/chats',
       },
       {
         key: '/super-admin/monitoring',
         icon: <EyeOutlined className="text-[22px]" />,
-        label: 'Chat Monitoring',
+        label: 'Chat Monitor',
         path: '/super-admin/admin-chats',
       },
       {
         key: '/super-admin/admins',
         icon: <TeamOutlined className="text-[22px]" />,
-        label: 'Admin Management',
+        label: 'Admins',
         path: '/super-admin/admins',
       },
     ],

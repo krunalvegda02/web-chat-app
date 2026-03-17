@@ -454,7 +454,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
                 <UserAddOutlined style={{ color: primaryColor, fontSize: '18px' }} />
               </div>
               <span style={{ fontSize: '16px', fontWeight: 600 }}>
-                {isSuperAdmin ? 'Search Users' : 'My Contacts'}
+                {isSuperAdmin ? 'Search Users' : 'My Users'}
               </span>
             </div>
           }
@@ -555,7 +555,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
               <UserAddOutlined style={{ color: primaryColor, fontSize: '18px' }} />
             </div>
             <span style={{ fontSize: '16px', fontWeight: 600 }}>
-              {isSuperAdmin ? 'Search Users' : 'My Contacts'}
+              {isSuperAdmin ? 'Search Users' : 'My Users'}
             </span>
           </div>
         }

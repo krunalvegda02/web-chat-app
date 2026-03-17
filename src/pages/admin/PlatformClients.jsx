@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Tag, message, Avatar, Space, Card, Empty, Spin } from 'antd';
+import { Table, Button, Input, Tag, message, Avatar, Space, Card, Empty, Spin, Pagination } from 'antd';
 import { SearchOutlined, MessageOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -8,10 +8,12 @@ import { useTheme } from '../../hooks/useTheme';
 
 export default function PlatformClients() {
   const { user } = useSelector((s) => s.auth);
-  const { platformUsers, loading } = useSelector((s) => s.platform);
+  const { platformUsers, loading, pagination } = useSelector((s) => s.platform);
   const { theme } = useTheme();
   const dispatch = useDispatch();
   const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -25,30 +27,41 @@ export default function PlatformClients() {
 
   useEffect(() => {
     if (user?.platformId && !hasInitialLoad) {
-      fetchUsers();
+      fetchUsers(1, pageSize, '');
       setHasInitialLoad(true);
     }
-  }, [user?.platformId, hasInitialLoad]);
+  }, [user?.platformId]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = currentPage, limit = pageSize, search = searchText) => {
     if (user?.platformId) {
       await dispatch(getPlatformUsers({ 
         platformId: user.platformId,
-        search: searchText 
+        page,
+        limit,
+        search 
       }));
     }
   };
 
   useEffect(() => {
     // Only run search effect after initial load and when search text changes
-    if (!hasInitialLoad || !user?.platformId) return;
+    if (!hasInitialLoad || !user?.platformId || !searchText.trim()) return;
     
     const delayDebounceFn = setTimeout(() => {
-      fetchUsers();
+      setCurrentPage(1); // Reset to first page on search
+      fetchUsers(1, pageSize, searchText);
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchText, hasInitialLoad]);
+  }, [searchText]);
+
+  const handlePageChange = (page, size) => {
+    setCurrentPage(page);
+    if (size !== pageSize) {
+      setPageSize(size);
+    }
+    fetchUsers(page, size || pageSize, searchText);
+  };
 
   const handleChat = (chatUser) => {
     navigate(`/admin/user-chat?userId=${chatUser._id}&platformId=${chatUser.platformId}`);
@@ -161,56 +174,76 @@ export default function PlatformClients() {
               <Empty description="No users found" />
             </div>
           ) : (
-            <div className="p-3 space-y-3">
-              {platformUsers.map((user) => (
-                <Card
-                  key={user._id}
-                  className="border-0 shadow-sm"
-                  style={{ borderRadius: '12px' }}
-                  bodyStyle={{ padding: '12px' }}
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar
-                      src={user.avatar}
-                      size={48}
-                      style={{ backgroundColor: theme.avatarBackgroundColor || '#008069', flexShrink: 0 }}
-                    >
-                      {user.name?.[0]?.toUpperCase()}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>
-                        {user.name}
-                      </p>
-                      <p className="text-xs truncate mt-1" style={{ color: theme.timestampColor || '#667781' }}>
-                        {user.email}
-                      </p>
-                      {user.phone && (
-                        <p className="text-xs truncate mt-1" style={{ color: theme.timestampColor || '#667781' }}>
-                          {user.phone}
+            <>
+              <div className="p-3 space-y-3">
+                {platformUsers.map((user) => (
+                  <Card
+                    key={user._id}
+                    className="border-0 shadow-sm"
+                    style={{ borderRadius: '12px' }}
+                    bodyStyle={{ padding: '12px' }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar
+                        src={user.avatar}
+                        size={48}
+                        style={{ backgroundColor: theme.avatarBackgroundColor || '#008069', flexShrink: 0 }}
+                      >
+                        {user.name?.[0]?.toUpperCase()}
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>
+                          {user.name}
                         </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <Tag color={user.status === 'ACTIVE' ? 'green' : user.status === 'INACTIVE' ? 'orange' : 'red'} className="text-xs">
-                          {user.status}
-                        </Tag>
-                        <span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </span>
+                        <p className="text-xs truncate mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+                          {user.email}
+                        </p>
+                        {user.phone && (
+                          <p className="text-xs truncate mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+                            {user.phone}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Tag color={user.status === 'ACTIVE' ? 'green' : user.status === 'INACTIVE' ? 'orange' : 'red'} className="text-xs">
+                            {user.status}
+                          </Tag>
+                          <span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>
+                            {new Date(user.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<MessageOutlined />}
+                        onClick={() => handleChat(user)}
+                        style={{ flexShrink: 0 }}
+                      >
+                        Chat
+                      </Button>
                     </div>
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<MessageOutlined />}
-                      onClick={() => handleChat(user)}
-                      style={{ flexShrink: 0 }}
-                    >
-                      Chat
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Mobile Pagination */}
+              {pagination?.total > 0 && (
+                <div className="p-4 border-t" style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
+                  <Pagination
+                    current={currentPage}
+                    total={pagination.total}
+                    pageSize={pageSize}
+                    onChange={handlePageChange}
+                    onShowSizeChange={handlePageChange}
+                    showSizeChanger
+                    showQuickJumper
+                    showTotal={(total, range) => `${range[0]}-${range[1]} of ${total} users`}
+                    size="small"
+                    responsive
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -252,7 +285,18 @@ export default function PlatformClients() {
           dataSource={platformUsers}
           loading={loading}
           rowKey="_id"
-          pagination={{ pageSize: 20, responsive: true }}
+          pagination={{
+            current: currentPage,
+            total: pagination?.total || 0,
+            pageSize: pageSize,
+            onChange: handlePageChange,
+            onShowSizeChange: handlePageChange,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users`,
+            responsive: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+          }}
           scroll={{ x: 800 }}
           size="middle"
         />

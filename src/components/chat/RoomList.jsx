@@ -8,7 +8,7 @@ import OnlineStatus from './OnlineStatus';
 import { format, isToday, isYesterday } from 'date-fns';
 import { useTheme } from '../../hooks/useTheme';
 import API from '../../constants/ApiEndpoints';
-import { _delete } from '../../helper/apiClient';
+import { _delete, _get, _post } from '../../helper/apiClient';
 
 export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null, onRoomClick = null, roomFilter = null }) {
   const dispatch = useDispatch();
@@ -17,7 +17,153 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
   const { user, token } = useSelector((s) => s.auth);
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenuRoom, setContextMenuRoom] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false);
   const { modal, message: messageApi } = App.useApp();
+
+  // Contact search functionality
+  const handleContactSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearchMode(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    setIsSearchMode(true);
+    try {
+      const response = await _get('/contacts/search-user', {
+        query: query.trim()
+      });
+
+      if (response.data.success) {
+        setSearchResults(response.data.data.users || []);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+      if (error.response?.status !== 404) {
+        messageApi.error('Failed to search contacts');
+      }
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Create chat with contact
+  const handleCreateChat = async (contact) => {
+    try {
+      const response = await _post('/chat/create-or-get-room', {
+        participantId: contact._id,
+        type: 'DIRECT'
+      });
+
+      if (response.data.success) {
+        const room = response.data.data.room;
+        dispatch(setActiveRoom(room._id));
+        
+        if (onRoomClick) {
+          onRoomClick(room._id);
+        }
+        
+        // Refresh rooms list
+        if (fetchRoomsAction) {
+          dispatch(fetchRoomsAction());
+        } else {
+          dispatch(fetchRooms());
+        }
+        
+        messageApi.success(`Chat opened with ${contact.name}`);
+        setSearchTerm('');
+        setSearchResults([]);
+        setIsSearchMode(false);
+      }
+    } catch (error) {
+      console.error('Create chat error:', error);
+      messageApi.error(error.response?.data?.message || 'Failed to create chat');
+    }
+  };
+
+  // Handle phone number chat
+  const handlePhoneNumberChat = (phoneNumber) => {
+    const formatPhoneNumber = (phone) => {
+      const cleaned = phone.replace(/\D/g, '');
+      if (cleaned.length === 10) {
+        return `+1${cleaned}`;
+      } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+        return `+${cleaned}`;
+      }
+      return `+${cleaned}`;
+    };
+
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    
+    modal.confirm({
+      title: 'Start Chat with Phone Number',
+      content: (
+        <div>
+          <p>No contact found for this number.</p>
+          <p>Do you want to start a chat with <strong>{formattedPhone}</strong>?</p>
+        </div>
+      ),
+      okText: 'Start Chat',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          const response = await _post('/chat/create-or-get-room', {
+            phone: formattedPhone,
+            type: 'DIRECT'
+          });
+
+          if (response.data.success) {
+            const room = response.data.data.room;
+            dispatch(setActiveRoom(room._id));
+            
+            if (onRoomClick) {
+              onRoomClick(room._id);
+            }
+            
+            if (fetchRoomsAction) {
+              dispatch(fetchRoomsAction());
+            } else {
+              dispatch(fetchRooms());
+            }
+
+            messageApi.success(`Chat created for ${formattedPhone}`);
+            setSearchTerm('');
+            setSearchResults([]);
+            setIsSearchMode(false);
+          }
+        } catch (error) {
+          console.error('Phone chat error:', error);
+          messageApi.error(error.response?.data?.message || 'Failed to create chat with phone number');
+        }
+      }
+    });
+  };
+
+  // Check if query is phone number
+  const isPhoneNumber = (query) => {
+    return /^[\d\s\-\+\(\)]+$/.test(query.trim()) && query.trim().replace(/\D/g, '').length >= 10;
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      setIsSearchMode(false);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(() => {
+      handleContactSearch(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   // ✅ Delete room with WhatsApp-style confirmation
   const showDeleteConfirm = useCallback((room) => {
@@ -170,7 +316,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       type: r.type,
       unreadCount: r.unreadCount
     })));
-    if (roomFilter) {
+    if (roomFilter) { 
       console.log(`🔍 [ROOMLIST] Filtered by type ${roomFilter}:`, filteredByType.length, 'rooms');
     }
   }, [roomsArray, roomFilter, filteredByType.length]);
@@ -316,7 +462,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       {/* Search Bar */}
       <div style={{ padding: '12px', backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF', borderBottom: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}` }}>
         <Input
-          placeholder="Search Chats"
+          placeholder={isSearchMode ? "Search contacts by name, phone, or email" : "Search Chats"}
           prefix={<SearchOutlined style={{ color: theme?.headerText || '#667781' }} />}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
