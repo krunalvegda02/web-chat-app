@@ -18,6 +18,7 @@ import {
   Select,
   Pagination,
   App,
+  message,
 } from 'antd';
 import {
   UserOutlined,
@@ -46,7 +47,7 @@ export default function SuperAdminAdminsList() {
   const { theme } = useTheme();
   const dispatch = useDispatch();
   const { platforms, loading } = useSelector((state) => state.platform);
-  const { message } = App.useApp(); // Use App.useApp() for better message handling
+  // Use message directly from antd import
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -75,6 +76,13 @@ export default function SuperAdminAdminsList() {
   const filteredPlatforms = useMemo(() => {
     let filtered = platformsArray;
     
+    console.log('🔍 [Filter] Filtering platforms:', {
+      totalPlatforms: platformsArray.length,
+      searchQuery: searchQuery.trim(),
+      statusFilter,
+      platformsArray: platformsArray.map(p => ({ id: p._id, name: p.name, email: p.admin?.email }))
+    });
+    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(p => 
@@ -82,12 +90,15 @@ export default function SuperAdminAdminsList() {
         p.admin?.email?.toLowerCase().includes(query) ||
         p.admin?.phone?.includes(query)
       );
+      console.log('🔍 [Filter] After search filter:', filtered.length, 'platforms');
     }
     
     if (statusFilter !== 'all') {
       filtered = filtered.filter(p => p.status === statusFilter);
+      console.log('🔍 [Filter] After status filter:', filtered.length, 'platforms');
     }
     
+    console.log('🔍 [Filter] Final filtered platforms:', filtered.length);
     return filtered;
   }, [platformsArray, searchQuery, statusFilter]);
 
@@ -105,6 +116,10 @@ export default function SuperAdminAdminsList() {
         message.success('Platform admin created successfully!');
         form.resetFields();
         setModalOpen(false);
+        // Clear search query to show all platforms
+        setSearchQuery('');
+        setStatusFilter('all');
+        setCurrentPage(1);
         await fetchAdmins();
       } else if (result.type === 'platform/createPlatform/rejected') {
         // Handle specific error cases
@@ -380,16 +395,25 @@ export default function SuperAdminAdminsList() {
             prefix={<SearchOutlined style={{ color: '#008069' }} />}
             value={searchQuery}
             onChange={(e) => {
-              setSearchQuery(e.target.value);
+              const value = e.target.value;
+              console.log('🔍 [Search] Input changed:', value);
+              setSearchQuery(value);
               setCurrentPage(1);
             }}
             allowClear
+            onClear={() => {
+              console.log('🔍 [Search] Input cleared');
+              setSearchQuery('');
+              setCurrentPage(1);
+            }}
             size="large"
             style={{ borderRadius: '8px' }}
+            autoComplete="off"
           />
           <Select
             value={statusFilter}
             onChange={(value) => {
+              console.log('🔍 [Filter] Status changed:', value);
               setStatusFilter(value);
               setCurrentPage(1);
             }}

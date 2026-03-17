@@ -55,9 +55,9 @@ export default function UserChat() {
       console.log('🔄 [UserChatPage] Platform user detected without roomId, fetching rooms to redirect...');
 
       // Fetch rooms to get the platform user's room
-      dispatch(fetchRooms()).then((result) => {
-        if (result.payload?.data?.rooms?.length > 0) {
-          const firstRoom = result.payload.data.rooms[0];
+      dispatch(fetchRooms()).unwrap().then((result) => {
+        if (result?.data?.rooms?.length > 0) {
+          const firstRoom = result.data.rooms[0];
           console.log('🔄 [UserChatPage] Redirecting platform user to room:', firstRoom._id);
 
           // Set active room and navigate immediately
