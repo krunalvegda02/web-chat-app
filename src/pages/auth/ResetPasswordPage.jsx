@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Form, Input, Button, Card, Typography, Alert, Divider, Steps, message, Tabs } from 'antd';
-import { LockOutlined, MailOutlined, PhoneOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { LockOutlined, MailOutlined, PhoneOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { forgotPassword, verifyResetOTP, resetPassword } from '../../redux/slices/authSlice';
 import { useTheme } from '../../hooks/useTheme';
 import OTPInput from '../../components/common/OTPInput';
@@ -24,6 +24,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [resendTimer, setResendTimer] = useState(0);
+  const [passwordValue, setPasswordValue] = useState('');
 
   const tokenFromURL = searchParams.get('token');
   const primaryColor = theme?.primaryColor || '#008069';
@@ -182,29 +183,29 @@ export default function ResetPasswordPage() {
               </Form.Item>
             )
           },
-          {
-            key: 'phone',
-            label: <span><PhoneOutlined /> Phone</span>,
-            children: (
-              <Form.Item
-                name="phone"
-                rules={[
-                  { required: true, message: 'Phone is required' },
-                  {
-                    pattern: /^[\\d\\s\\-\\+\\(\\)]{10,15}$/,
-                    message: 'Invalid phone format'
-                  }
-                ]}
-              >
-                <Input
-                  size="large"
-                  placeholder="+1 (555) 000-0000"
-                  prefix={<PhoneOutlined />}
-                  disabled={loading}
-                />
-              </Form.Item>
-            )
-          }
+          // {
+          //   key: 'phone',
+          //   label: <span><PhoneOutlined /> Phone</span>,
+          //   children: (
+          //     <Form.Item
+          //       name="phone"
+          //       rules={[
+          //         { required: true, message: 'Phone is required' },
+          //         {
+          //           pattern: /^[\\d\\s\\-\\+\\(\\)]{10,15}$/,
+          //           message: 'Invalid phone format'
+          //         }
+          //       ]}
+          //     >
+          //       <Input
+          //         size="large"
+          //         placeholder="+1 (555) 000-0000"
+          //         prefix={<PhoneOutlined />}
+          //         disabled={loading}
+          //       />
+          //     </Form.Item>
+          //   )
+          // }
         ]}
       />
 
@@ -270,6 +271,14 @@ export default function ResetPasswordPage() {
     </div>
   );
 
+  const passwordRules = [
+    { label: 'At least 8 characters', test: (v) => v.length >= 8 },
+    { label: 'Uppercase letter (A-Z)', test: (v) => /[A-Z]/.test(v) },
+    { label: 'Lowercase letter (a-z)', test: (v) => /[a-z]/.test(v) },
+    { label: 'Number (0-9)', test: (v) => /[0-9]/.test(v) },
+    { label: 'Special character (!@#$%^&*)', test: (v) => /[!@#$%^&*]/.test(v) },
+  ];
+
   // ✅ Step 2: Reset Password
   const ResetPasswordForm = (
     <Form
@@ -280,17 +289,34 @@ export default function ResetPasswordPage() {
     >
       <Form.Item
         name="password"
-        rules={[
-          { validator: validatePasswordStrength }
-        ]}
+        rules={[{ validator: validatePasswordStrength }]}
       >
         <Input.Password
           size="large"
           prefix={<LockOutlined />}
           placeholder="New Password"
           disabled={loading}
+          onChange={(e) => setPasswordValue(e.target.value)}
         />
       </Form.Item>
+
+      <div style={{ marginBottom: 16, padding: '10px 12px', backgroundColor: '#F8F9FA', borderRadius: 8, border: '1px solid #E9EDEF' }}>
+        {passwordRules.map(({ label, test }) => {
+          const passed = passwordValue.length > 0 && test(passwordValue);
+          const failed = passwordValue.length > 0 && !test(passwordValue);
+          return (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              {passed
+                ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 13 }} />
+                : failed
+                  ? <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 13 }} />
+                  : <CloseCircleOutlined style={{ color: '#d9d9d9', fontSize: 13 }} />
+              }
+              <span style={{ fontSize: 12, color: passed ? '#52c41a' : failed ? '#ff4d4f' : '#999' }}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
 
       <Form.Item
         name="confirmPassword"
@@ -313,14 +339,6 @@ export default function ResetPasswordPage() {
           disabled={loading}
         />
       </Form.Item>
-
-      <div style={{ marginBottom: 16, fontSize: 12, color: '#999' }}>
-        <Text type="secondary">
-          ✓ At least 8 characters<br/>
-          ✓ Uppercase & lowercase<br/>
-          ✓ Number & special character
-        </Text>
-      </div>
 
       <Form.Item>
         <Button type="primary" size="large" htmlType="submit" loading={loading} block style={{ backgroundColor: primaryColor, borderColor: primaryColor }}>

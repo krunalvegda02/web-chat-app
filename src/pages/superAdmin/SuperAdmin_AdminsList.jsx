@@ -389,7 +389,7 @@ export default function SuperAdminAdminsList() {
         </div>
 
         {/* Search and Filter */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-2">
           <Input
             placeholder="Search by name, email, or phone..."
             prefix={<SearchOutlined style={{ color: '#008069' }} />}
@@ -426,6 +426,9 @@ export default function SuperAdminAdminsList() {
             <Select.Option value="INACTIVE">Inactive</Select.Option>
           </Select>
         </div>
+        <Text style={{ color: '#667781', fontSize: '13px' }}>
+          Showing <span style={{ color: '#008069', fontWeight: 600 }}>{filteredPlatforms.length}</span> of <span style={{ color: '#008069', fontWeight: 600 }}>{platformsArray.length}</span> admin{platformsArray.length !== 1 ? 's' : ''}
+        </Text>
       </div>
 
       {/* Table - Desktop */}

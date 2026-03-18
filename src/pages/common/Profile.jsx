@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../../hooks/useTheme';
 import { 
   Input, Button, message as antMessage, Divider, Spin, Modal, Tooltip, 
-  Card, Segmented, Space, Badge, Progress, Statistic, Empty, Collapse
+  Card, Segmented, Space, Badge, Progress, Statistic, Empty, Collapse, Form, Alert, Steps
 } from 'antd';
 import { 
   ArrowLeftOutlined, 
@@ -29,12 +29,14 @@ import {
   EyeInvisibleOutlined,
   SafetyCertificateOutlined,
   CameraFilled,
-  UploadOutlined
+  UploadOutlined,
+  KeyOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/common/Avatar';
-import { updateProfile } from '../../redux/slices/authSlice';
+import { updateProfile, forgotPassword, verifyResetOTP, resetPassword } from '../../redux/slices/authSlice';
 import { updateProfileWithAvatar } from '../../redux/slices/userSlice';
+import OTPInput from '../../components/common/OTPInput';
 import { copyToClipboardWithMessage } from '../../utils/clipboardUtils';
 
 export default function Profile() {
@@ -54,12 +56,101 @@ export default function Profile() {
   const fileInputRef = useRef(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
+  // Reset password modal state
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetStep, setResetStep] = useState(0);
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState(null);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [resetForm] = Form.useForm();
+
   // Handle window resize
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const t = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [resendTimer]);
+
+  const openResetModal = () => {
+    setResetStep(0);
+    setResetOtp('');
+    setResetError(null);
+    resetForm.resetFields();
+    setResetModalOpen(true);
+  };
+
+  const closeResetModal = () => {
+    setResetModalOpen(false);
+    setResetStep(0);
+    setResetOtp('');
+    setResetError(null);
+    resetForm.resetFields();
+  };
+
+  const handleSendOtp = async () => {
+    try {
+      setResetLoading(true);
+      setResetError(null);
+      await dispatch(forgotPassword({ email: user?.email })).unwrap();
+      setResetStep(1);
+      setResendTimer(30);
+      antMessage.success('OTP sent to your email');
+    } catch (err) {
+      setResetError(err || 'Failed to send OTP');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (resetOtp.length !== 6) {
+      antMessage.error('Please enter the 6-digit OTP');
+      return;
+    }
+    try {
+      setResetLoading(true);
+      setResetError(null);
+      await dispatch(verifyResetOTP({ email: user?.email, otp: resetOtp })).unwrap();
+      setResetStep(2);
+      antMessage.success('OTP verified!');
+    } catch (err) {
+      setResetError(err || 'Invalid or expired OTP');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleSetNewPassword = async (values) => {
+    try {
+      setResetLoading(true);
+      setResetError(null);
+      await dispatch(resetPassword({ email: user?.email, otp: resetOtp, password: values.password, confirmPassword: values.confirmPassword })).unwrap();
+      setResetStep(3);
+      antMessage.success('Password reset successfully!');
+    } catch (err) {
+      setResetError(err || 'Failed to reset password');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const validatePasswordStrength = (_, value) => {
+    if (!value) return Promise.reject(new Error('Password is required'));
+    if (value.length < 8) return Promise.reject(new Error('At least 8 characters'));
+    if (!/[A-Z]/.test(value)) return Promise.reject(new Error('Include an uppercase letter'));
+    if (!/[a-z]/.test(value)) return Promise.reject(new Error('Include a lowercase letter'));
+    if (!/[0-9]/.test(value)) return Promise.reject(new Error('Include a number'));
+    if (!/[!@#$%^&*]/.test(value)) return Promise.reject(new Error('Include a special character (!@#$%^&*)'));
+    return Promise.resolve();
+  };
 
   // Update local state when user changes
   useEffect(() => {
@@ -131,16 +222,10 @@ export default function Profile() {
       return;
     }
 
-    if (phone && !isPhoneValid(phone)) {
-      antMessage.error('Please enter a valid phone number');
-      return;
-    }
-
     setSaving(true);
     try {
       const result = await dispatch(updateProfile({ 
         name: name.trim(), 
-        phone: phone.trim(), 
         avatar,
         bio: bio.trim()
       }));
@@ -261,7 +346,7 @@ export default function Profile() {
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !name.trim() || (phone && !isPhoneValid(phone))}
+              disabled={saving || !name.trim()}
               className="p-1.5 sm:p-2 hover:bg-white/20 rounded-full transition-colors disabled:opacity-50"
             >
               {saving ? (
@@ -377,11 +462,11 @@ export default function Profile() {
                           </div>
                         </div>
                         
-                        {bio && (
+                        {/* {bio && (
                           <p className="text-xs sm:text-sm md:text-base leading-relaxed max-w-xl break-words" style={{ color: theme.sidebarTextColor || '#111B21' }}>
                             {bio}
                           </p>
-                        )}
+                        )} */}
                         
                         {/* Desktop: Badges */}
                         <div className="hidden sm:flex flex-wrap gap-1 sm:gap-2 pt-1 sm:pt-2">
@@ -433,7 +518,7 @@ export default function Profile() {
                           />
                         </div>
 
-                        <div>
+                        {/* <div>
                           <label className="block text-xs sm:text-sm font-semibold mb-1.5 sm:mb-2" style={{ color: theme.modalTextColor || '#111B21' }}>
                             Bio / About
                           </label>
@@ -454,7 +539,7 @@ export default function Profile() {
                           <p className="text-xs mt-1.5 sm:mt-2" style={{ color: theme.timestampColor || '#667781' }}>
                             Keep it brief (max 160 characters)
                           </p>
-                        </div>
+                        </div> */}
                       </div>
                     )}
                   </div>
@@ -487,6 +572,7 @@ export default function Profile() {
                 <Statistic
                   title={<span className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Member Since</span>}
                   value={new Date(user?.createdAt).getFullYear()}
+                  formatter={(val) => val}
                   valueStyle={{ color: theme.avatarBackgroundColor || '#8b5cf6', fontSize: windowWidth < 640 ? '16px' : '18px' }}
                 />
               </Card>
@@ -494,8 +580,7 @@ export default function Profile() {
           )}
 
           {/* Account Information Section - Fully Responsive */}
-          {!editing && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
               
               {/* Main Info Card - Fully Responsive */}
               <div className="lg:col-span-2 w-full">
@@ -555,37 +640,24 @@ export default function Profile() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="font-medium text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>{phone ? formatPhoneNumber(phone) : 'Not provided'}</p>
-                        {/* {phone && (
-                          <div className="flex items-center gap-1 justify-end">
-                            <span 
-                              className="text-xs px-2 py-0.5 rounded-full font-medium"
-                              style={{ 
-                                backgroundColor: user?.phoneVerified ? (theme.accentColor || '#52c41a') + '20' : (theme.errorColor || '#ff4d4f') + '20',
-                                color: user?.phoneVerified ? theme.accentColor || '#52c41a' : theme.errorColor || '#ff4d4f'
-                              }}
-                            >
-                              {user?.phoneVerified ? '✓ Verified' : '✗ Not Verified'}
-                            </span>
-                          </div>
-                        )} */}
+                        <p className="font-medium text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>{user?.phone ? formatPhoneNumber(user.phone) : 'Not provided'}</p>
                       </div>
-                      {phone && (
+                      {user?.phone && (
                         <button
-                          onClick={() => copyToClipboard(phone, 'phone')}
+                          onClick={() => copyToClipboard(user.phone, 'phone')}
                           className="p-1.5 sm:p-2 rounded-lg transition-colors flex-shrink-0"
                           style={{ backgroundColor: 'transparent' }}
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#E9EDEF'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                          <CopyOutlined className={`text-xs sm:text-sm`} style={{ color: copied === 'phone' ? theme.accentColor || '#52c41a' : theme.timestampColor || '#667781' }} />
+                          <CopyOutlined className="text-xs sm:text-sm" style={{ color: copied === 'phone' ? theme.accentColor || '#52c41a' : theme.timestampColor || '#667781' }} />
                         </button>
                       )}
                     </div>
                   </div>
 
                   {/* Account Type - Responsive */}
-                  <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                  <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b transition-colors" style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
                       <div className="flex items-center gap-2 sm:gap-3 flex-1">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}>
@@ -602,6 +674,34 @@ export default function Profile() {
                           text={<span className="font-semibold text-xs sm:text-sm capitalize" style={{ color: theme.sidebarTextColor || '#111B21' }}>{user?.role?.replace('_', ' ') || 'User'}</span>}
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Reset Password Row */}
+                  <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                    <div className="flex items-center justify-between gap-2 sm:gap-4">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-1">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}>
+                          <KeyOutlined className="text-sm sm:text-lg" style={{ color: theme.sendButtonColor || '#3b82f6' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>Password</p>
+                          <p className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Change your password</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="small"
+                        icon={<KeyOutlined />}
+                        onClick={openResetModal}
+                        style={{
+                          borderColor: theme.sidebarHeaderColor || '#008069',
+                          color: theme.sidebarHeaderColor || '#008069',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        Reset
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -643,43 +743,6 @@ export default function Profile() {
                 </Card>
               </div>
             </div>
-          )}
-
-          {/* Edit Phone Section - Fully Responsive */}
-          {editing && (
-            <Card className="shadow-sm mb-6 w-full" style={{ backgroundColor: theme.modalBackgroundColor || '#FFFFFF' }}>
-              <div className="space-y-3 sm:space-y-4">
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold mb-1.5 sm:mb-2" style={{ color: theme.modalTextColor || '#111B21' }}>
-                    Phone Number
-                  </label>
-                  <Input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (234) 567-8900"
-                    size={windowWidth < 640 ? 'middle' : 'large'}
-                    prefix={<PhoneOutlined style={{ color: theme.timestampColor || '#667781' }} />}
-                    status={phone && !isPhoneValid(phone) ? 'error' : ''}
-                    className="rounded-lg text-xs sm:text-sm"
-                    style={{
-                      backgroundColor: theme.inputBackgroundColor || '#F8F9FA',
-                      color: theme.inputTextColor || '#111B21',
-                      borderColor: theme.sidebarBorderColor || '#E9EDEF',
-                    }}
-                  />
-                  {phone && !isPhoneValid(phone) && (
-                    <p className="text-xs mt-1.5 sm:mt-2 flex items-center gap-1" style={{ color: theme.errorColor || '#ff4d4f' }}>
-                      <InfoCircleOutlined />
-                      Please enter a valid phone number
-                    </p>
-                  )}
-                  <p className="text-xs mt-1.5 sm:mt-2" style={{ color: theme.timestampColor || '#667781' }}>
-                    Enter a valid international phone number (optional)
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
         </div>
       </div>
 
@@ -710,7 +773,7 @@ export default function Profile() {
               icon={saving ? <LoadingOutlined /> : <SaveOutlined />}
               onClick={handleSave}
               loading={saving}
-              disabled={!name.trim() || (phone && !isPhoneValid(phone))}
+              disabled={!name.trim()}
               className="w-full"
               style={{
                 backgroundColor: theme.sendButtonColor || '#008069',
@@ -727,6 +790,159 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Reset Password Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <KeyOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />
+            <span style={{ color: theme.modalTextColor || '#111B21' }}>Reset Password</span>
+          </div>
+        }
+        open={resetModalOpen}
+        onCancel={closeResetModal}
+        footer={null}
+        centered
+        width={440}
+        styles={{
+          content: { backgroundColor: theme.modalBackgroundColor || '#FFFFFF' },
+          header: { backgroundColor: theme.modalBackgroundColor || '#FFFFFF', borderBottom: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` },
+        }}
+      >
+        <Steps
+          current={resetStep}
+          size="small"
+          items={[{ title: 'Send OTP' }, { title: 'Verify' }, { title: 'New Password' }, { title: 'Done' }]}
+          style={{ marginBottom: 24, marginTop: 8 }}
+        />
+
+        {resetError && (
+          <Alert message={resetError} type="error" showIcon closable onClose={() => setResetError(null)} style={{ marginBottom: 16 }} />
+        )}
+
+        {/* Step 0: Send OTP */}
+        {resetStep === 0 && (
+          <div className="text-center">
+            <p className="text-sm mb-1" style={{ color: theme.modalTextColor || '#111B21' }}>We'll send a 6-digit OTP to:</p>
+            <p className="font-semibold mb-6" style={{ color: theme.sidebarHeaderColor || '#008069' }}>{user?.email}</p>
+            <Button
+              type="primary"
+              block
+              size="large"
+              loading={resetLoading}
+              onClick={handleSendOtp}
+              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
+            >
+              Send OTP
+            </Button>
+          </div>
+        )}
+
+        {/* Step 1: Verify OTP */}
+        {resetStep === 1 && (
+          <div>
+            <p className="text-sm text-center mb-4" style={{ color: theme.timestampColor || '#667781' }}>Enter the 6-digit code sent to your email</p>
+            <div className="flex justify-center mb-4">
+              <OTPInput value={resetOtp} onChange={setResetOtp} disabled={resetLoading} />
+            </div>
+            <Button
+              type="primary"
+              block
+              size="large"
+              loading={resetLoading}
+              onClick={handleVerifyOtp}
+              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px', marginBottom: 8 }}
+            >
+              Verify OTP
+            </Button>
+            <div className="text-center">
+              <Button
+                type="link"
+                disabled={resendTimer > 0 || resetLoading}
+                style={{ color: resendTimer > 0 ? '#999' : theme.sidebarHeaderColor || '#008069' }}
+                onClick={async () => {
+                  setResetOtp('');
+                  try {
+                    setResetLoading(true);
+                    await dispatch(forgotPassword({ email: user?.email })).unwrap();
+                    setResendTimer(30);
+                    antMessage.success('OTP resent');
+                  } catch (err) {
+                    setResetError(err || 'Failed to resend OTP');
+                  } finally {
+                    setResetLoading(false);
+                  }
+                }}
+              >
+                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: New Password */}
+        {resetStep === 2 && (
+          <Form form={resetForm} layout="vertical" onFinish={handleSetNewPassword} autoComplete="off">
+            <Form.Item name="password" rules={[{ validator: validatePasswordStrength }]}>
+              <Input.Password
+                size="large"
+                prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
+                placeholder="New password"
+                disabled={resetLoading}
+                style={{ borderRadius: '8px' }}
+              />
+            </Form.Item>
+            <Form.Item
+              name="confirmPassword"
+              rules={[
+                { required: true, message: 'Please confirm your password' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('password') === value) return Promise.resolve();
+                    return Promise.reject(new Error('Passwords do not match'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password
+                size="large"
+                prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
+                placeholder="Confirm new password"
+                disabled={resetLoading}
+                style={{ borderRadius: '8px' }}
+              />
+            </Form.Item>
+            <p className="text-xs mb-4" style={{ color: theme.timestampColor || '#667781' }}>Min 8 chars · uppercase · lowercase · number · special char</p>
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              size="large"
+              loading={resetLoading}
+              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
+            >
+              Set New Password
+            </Button>
+          </Form>
+        )}
+
+        {/* Step 3: Success */}
+        {resetStep === 3 && (
+          <div className="text-center py-4">
+            <CheckCircleOutlined style={{ fontSize: 52, color: theme.sidebarHeaderColor || '#008069', marginBottom: 12 }} />
+            <p className="font-semibold text-base" style={{ color: theme.modalTextColor || '#111B21' }}>Password changed successfully!</p>
+            <Button
+              type="primary"
+              block
+              size="large"
+              onClick={closeResetModal}
+              style={{ marginTop: 20, backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
+            >
+              Done
+            </Button>
+          </div>
+        )}
+      </Modal>
 
       {/* Remove Avatar Modal - Responsive */}
       <Modal
