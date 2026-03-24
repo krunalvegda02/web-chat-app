@@ -75,7 +75,9 @@ function AppContent() {
     const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
     const hasPlatformParam = urlParams.get('platform');
     const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
-    const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData;
+    // Also check storage — index.html strips params from URL before React loads
+    const storedParams = (() => { try { return localStorage.getItem('__platformParams') || sessionStorage.getItem('__platformParams'); } catch(e) { return null; } })();
+    const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData || !!storedParams;
     
     console.log('🔄 [App] Path check:', { currentPath, hasSearch, initialized, hasToken: !!token, hasUser: !!user, isPlatformRequest });
     
@@ -104,7 +106,9 @@ function AppContent() {
     const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
     const hasPlatformParam = urlParams.get('platform');
     const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
-    const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData;
+    // Also check storage — index.html strips params from URL before React loads
+    const storedParams = (() => { try { return localStorage.getItem('__platformParams') || sessionStorage.getItem('__platformParams'); } catch(e) { return null; } })();
+    const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData || !!storedParams;
     
     console.log('🔐 [App] Initial auth check effect running', {
       hasToken: !!token,
