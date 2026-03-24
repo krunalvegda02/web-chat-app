@@ -27,19 +27,33 @@ export const usePlatformDetection = () => {
   });
 
   // Extract platform parameters from URL (memoized to prevent re-renders)
-  const platformParams = useMemo(() => (
-    {
-      apiKey: searchParams.get('apiKey') || searchParams.get('key'),
-      name: searchParams.get('name'),
-      email: searchParams.get('email'),
-      phone: searchParams.get('phone'),
-      externalUserId: searchParams.get('userId') || searchParams.get('externalUserId'),
-      roomId: searchParams.get('roomId') || searchParams.get('room'),
-      autoLogin: searchParams.get('autoLogin') === 'true' || searchParams.get('auto') === 'true',
-      redirect: searchParams.get('redirect'),
-      platform: searchParams.get('platform')
+  // Handle HTML-encoded URLs by decoding them first
+  const platformParams = useMemo(() => {
+    // Get the raw search string and decode HTML entities
+    let searchString = location.search;
+    if (searchString.includes('&amp;')) {
+      console.log('🔧 [PlatformDetection] Detected HTML-encoded URL, fixing...');
+      searchString = searchString.replace(/&amp;/g, '&');
+      console.log('🔧 [PlatformDetection] Fixed URL:', searchString);
     }
-  ), [searchParams]);
+    
+    const params = new URLSearchParams(searchString);
+    
+    const result = {
+      apiKey: params.get('apiKey') || params.get('key'),
+      name: params.get('name'),
+      email: params.get('email'),
+      phone: params.get('phone'),
+      externalUserId: params.get('userId') || params.get('externalUserId'),
+      roomId: params.get('roomId') || params.get('room'),
+      autoLogin: params.get('autoLogin') === 'true' || params.get('auto') === 'true',
+      redirect: params.get('redirect'),
+      platform: params.get('platform')
+    };
+    
+    console.log('🔍 [PlatformDetection] Extracted parameters:', result);
+    return result;
+  }, [location.search]);
 
   // Platform integration hook
   const {
