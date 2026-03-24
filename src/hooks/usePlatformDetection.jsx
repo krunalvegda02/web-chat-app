@@ -91,7 +91,15 @@ export const usePlatformDetection = () => {
     };
     
     console.log('🔍 [PlatformDetection] Extracted parameters:', result);
-    console.log('🔍 [PlatformDetection] All URL params:', Object.fromEntries(params.entries()));
+    
+    // Strip sensitive params from URL bar immediately after reading them
+    // This prevents apiKey/user data from appearing in browser history/logs
+    if (result.apiKey || result.sessionToken || result.name || result.email || result.phone) {
+      const url = new URL(window.location.href);
+      ['apiKey', 'key', 'api_key', 'name', 'email', 'phone', 'autoLogin', 'auto', 'platform', 'userId', 'sessionToken', 'st'].forEach(p => url.searchParams.delete(p));
+      const cleanUrl = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '');
+      window.history.replaceState(window.history.state, document.title, cleanUrl);
+    }
     
     return result;
   }, [location.search]);
