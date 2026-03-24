@@ -29,15 +29,25 @@ export const usePlatformDetection = () => {
   // Extract platform parameters from URL (memoized to prevent re-renders)
   // Read platform params from sessionStorage (stripped from URL in main.jsx before React renders)
   const platformParams = useMemo(() => {
-    const stored = sessionStorage.getItem('__platformParams');
+    // Try sessionStorage first, fall back to localStorage (iOS Safari sessionStorage is unreliable)
+    let stored = null;
+    try { stored = sessionStorage.getItem('__platformParams'); } catch(e) {}
+    if (!stored) { try { stored = localStorage.getItem('__platformParams'); } catch(e) {} }
+
     let captured = {};
     if (stored) {
       try {
-        captured = JSON.parse(stored);
-        // Clear immediately after reading — single use
-        sessionStorage.removeItem('__platformParams');
+        const parsed = JSON.parse(stored);
+        // Enforce 5-minute TTL
+        if (!parsed.__ts || (Date.now() - parsed.__ts) < 5 * 60 * 1000) {
+          captured = parsed;
+        }
+        // Clear after reading — single use
+        try { sessionStorage.removeItem('__platformParams'); } catch(e) {}
+        try { localStorage.removeItem('__platformParams'); } catch(e) {}
       } catch (e) {
-        sessionStorage.removeItem('__platformParams');
+        try { sessionStorage.removeItem('__platformParams'); } catch(e) {}
+        try { localStorage.removeItem('__platformParams'); } catch(e) {}
       }
     }
 

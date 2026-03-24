@@ -22,7 +22,10 @@
           }
         });
         if (changed) {
-          sessionStorage.setItem('__platformParams', JSON.stringify(captured));
+          // Use localStorage with TTL — sessionStorage is unreliable on iOS Safari
+          captured.__ts = Date.now();
+          try { localStorage.setItem('__platformParams', JSON.stringify(captured)); } catch(e) {}
+          try { sessionStorage.setItem('__platformParams', JSON.stringify(captured)); } catch(e) {}
           var clean = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '');
           window.history.replaceState(null, '', clean);
         }
