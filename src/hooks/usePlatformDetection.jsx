@@ -27,31 +27,71 @@ export const usePlatformDetection = () => {
   });
 
   // Extract platform parameters from URL (memoized to prevent re-renders)
-  // Handle HTML-encoded URLs by decoding them first
+  // Handle HTML-encoded URLs and various URL formats
   const platformParams = useMemo(() => {
     // Get the raw search string and decode HTML entities
     let searchString = location.search;
+    
+    // Handle HTML-encoded URLs
     if (searchString.includes('&amp;')) {
       console.log('🔧 [PlatformDetection] Detected HTML-encoded URL, fixing...');
       searchString = searchString.replace(/&amp;/g, '&');
-      console.log('🔧 [PlatformDetection] Fixed URL:', searchString);
     }
+    
+    // Also handle other common HTML entities
+    searchString = searchString
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    
+    console.log('🔧 [PlatformDetection] Processing URL:', searchString);
     
     const params = new URLSearchParams(searchString);
     
+    // Manual fallback parsing if URLSearchParams fails
+    const manualParse = (searchStr) => {
+      const result = {};
+      if (searchStr.startsWith('?')) searchStr = searchStr.substring(1);
+      
+      const pairs = searchStr.split('&');
+      for (const pair of pairs) {
+        const [key, value] = pair.split('=');
+        if (key && value) {
+          result[key] = decodeURIComponent(value);
+        }
+      }
+      return result;
+    };
+    
+    const manualParams = manualParse(searchString);
+    console.log('🔍 [PlatformDetection] Manual parsed params:', manualParams);
+    
+    // Helper function to get parameter with fallbacks
+    const getParam = (...keys) => {
+      for (const key of keys) {
+        const value = params.get(key) || manualParams[key];
+        if (value) return value;
+      }
+      return null;
+    };
+    
+    // Extract all possible parameter variations
     const result = {
-      apiKey: params.get('apiKey') || params.get('key'),
-      name: params.get('name'),
-      email: params.get('email'),
-      phone: params.get('phone'),
-      externalUserId: params.get('userId') || params.get('externalUserId'),
-      roomId: params.get('roomId') || params.get('room'),
-      autoLogin: params.get('autoLogin') === 'true' || params.get('auto') === 'true',
-      redirect: params.get('redirect'),
-      platform: params.get('platform')
+      apiKey: getParam('apiKey', 'key', 'api_key'),
+      name: getParam('name', 'username', 'user_name'),
+      email: getParam('email', 'userEmail', 'user_email'),
+      phone: getParam('phone', 'phoneNumber', 'phone_number'),
+      externalUserId: getParam('userId', 'externalUserId', 'user_id', 'external_user_id'),
+      roomId: getParam('roomId', 'room', 'room_id'),
+      autoLogin: getParam('autoLogin', 'auto', 'auto_login') === 'true',
+      redirect: getParam('redirect', 'redirectUrl', 'redirect_url'),
+      platform: getParam('platform', 'platformName', 'platform_name')
     };
     
     console.log('🔍 [PlatformDetection] Extracted parameters:', result);
+    console.log('🔍 [PlatformDetection] All URL params:', Object.fromEntries(params.entries()));
+    
     return result;
   }, [location.search]);
 
