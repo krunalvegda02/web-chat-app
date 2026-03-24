@@ -155,7 +155,7 @@ export const usePlatformDetection = () => {
     try {
       console.log('🔐 [PlatformDetection] Performing auto-login for platform user...', userData);
 
-      const result = await platformChatLogin(userData);
+      const result = await platformChatLogin(userData, platformParams.platform);
 
       if (result.success) {
         console.log('✅ [PlatformDetection] Auto-login successful');
