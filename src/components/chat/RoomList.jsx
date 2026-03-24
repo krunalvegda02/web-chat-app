@@ -550,16 +550,16 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                 },
               ];
 
+              const isTouchDevice = 'ontouchstart' in window;
+
               return (
                 <Dropdown
                   menu={{ items: menuItems }}
-                  trigger={['contextMenu']}
+                  trigger={isTouchDevice ? [] : ['contextMenu']}
                   key={`${room._id}-${room.lastMessageTime || ''}-${room.unreadCount || 0}`}
                 >
                   <List.Item
-                    onMouseDown={(e) => {
-                      // Prevent double-click requirement by using mousedown
-                      e.preventDefault();
+                    onClick={() => {
                       dispatch(setActiveRoom(room._id));
                       if (onRoomClick) onRoomClick(room._id);
                     }}
@@ -569,12 +569,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                       padding: '12px 16px',
                       cursor: 'pointer',
                       transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) e.currentTarget.style.backgroundColor = theme?.sidebarHoverColor || '#F5F6F6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = isActive ? (theme?.sidebarActiveColor || '#F0F2F5') : (theme?.sidebarBackgroundColor || '#FFFFFF');
+                      WebkitTapHighlightColor: 'transparent',
                     }}
                   >
                     {/* Custom layout instead of List.Item.Meta */}
