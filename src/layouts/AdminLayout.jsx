@@ -2,25 +2,17 @@ import ThemeProvider from '../components/common/ThemeProvider';
 import LayoutWrapper from '../layouts/LayoutWrapper';
 import { LayoutProvider } from '../hooks/useLayout';
 import { useAuthGuard } from '../hooks/useAuthGuard';
-
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function AdminLayout() {
-  const { user, isAuthorized } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
+  const { user, isAuthorized, isInitialized } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
 
-  console.log('🏢 [AdminLayout] Rendered', {
-    hasUser: !!user,
-    userRole: user?.role,
-    isAuthorized,
-  });
-
-  // Show nothing while loading
-  if (!user) {
-    console.log('🏢 [AdminLayout] No user, returning null');
-    return null;
+  // Wait for auth to initialize — prevents white screen on iPhone during rehydration
+  if (!isInitialized) {
+    return <LoadingSpinner fullScreen />;
   }
 
-  if (!isAuthorized) {
-    console.log('🏢 [AdminLayout] User not authorized, returning null');
+  if (!user || !isAuthorized) {
     return null;
   }
 
