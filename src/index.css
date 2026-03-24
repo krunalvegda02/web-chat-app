@@ -7,6 +7,28 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+/* Fix iPhone Safari viewport height — 100vh includes the browser toolbar */
+:root {
+  --app-height: 100vh;
+}
+
+/* Use dvh (dynamic viewport height) where supported, fallback to 100vh */
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
+.chat-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--app-height);
+  overflow: hidden;
+}
+
 
 /* e.g. in index.css or a module imported in this page */
 .glass-table .ant-table {

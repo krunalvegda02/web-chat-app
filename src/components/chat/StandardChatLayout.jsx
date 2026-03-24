@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSocket } from '../../hooks/useSocket';
@@ -30,6 +30,18 @@ import { _get, _post } from '../../helper/apiClient';
 
 const { Text } = Typography;
 
+function useIsMobile() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia('(max-width: 767px)');
+      mq.addEventListener('change', cb);
+      return () => mq.removeEventListener('change', cb);
+    },
+    () => window.matchMedia('(max-width: 767px)').matches,
+    () => false
+  );
+}
+
 export default function StandardChatLayout({ roomFilter = null }) {
   const { theme } = useTheme();
   const dispatch = useDispatch();
@@ -37,6 +49,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [chatOpened, setChatOpened] = useState(false);
+  const isMobile = useIsMobile();
 
   const { user } = useSelector((s) => s.auth);
   const { activeRoomId } = useSelector((s) => s.chat);
@@ -401,12 +414,12 @@ export default function StandardChatLayout({ roomFilter = null }) {
     </div>
   );
 
-  if (window.innerWidth < 768) {
+  if (isMobile) {
     if (shouldShowChatOnMobile) {
       return (
         <>
           <style>{`body { overflow: hidden !important; }`}</style>
-          <div className="fixed inset-0 flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
+          <div className="chat-fullscreen flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
             <ChatWindow
               showMobileHeader={true}
               onBack={() => {
@@ -429,7 +442,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
       return (
         <>
           <style>{`body { overflow: hidden !important; }`}</style>
-          <div className="fixed top-0 left-0 right-0 bottom-14 flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
+          <div className="chat-fullscreen flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
             <div className="flex-1 flex items-center justify-center">
               <Spin size="large" tip="Loading chat..." />
             </div>
@@ -441,7 +454,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
     return (
       <>
         <style>{`body { overflow: hidden !important; }`}</style>
-        <div className="fixed top-0 left-0 right-0 bottom-14 flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
+        <div className="chat-fullscreen flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
           <div className="flex-1 overflow-hidden">
             <RoomList onCreateRoom={handlePlusClick} onRoomClick={() => setChatOpened(true)} roomFilter={roomFilter} />
           </div>
@@ -522,7 +535,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
   return (
     <>
       <style>{`body { overflow: hidden !important; }`}</style>
-      <div className="fixed top-0 right-0 bottom-0 left-0 md:left-20 flex" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
+      <div className="chat-fullscreen md:left-20 flex" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
         <div className="hidden md:flex w-96 flex-col" style={{ borderRight: `1px solid ${theme?.sidebarBorderColor || '#E9EDEF'}` }}>
           <RoomList onCreateRoom={handlePlusClick} roomFilter={roomFilter} />
         </div>
