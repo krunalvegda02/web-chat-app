@@ -8,6 +8,21 @@ import './index.css'
 import App from './App.jsx'
 import LoadingSpinner from './components/common/LoadingSpinner'
 
+// Strip sensitive URL params immediately — before React renders anything.
+// Values are already captured by the browser for this page load;
+// this only removes them from the visible URL bar and browser history.
+;(function stripSensitiveParams() {
+  const SENSITIVE = ['apiKey', 'key', 'api_key', 'name', 'email', 'phone',
+                     'autoLogin', 'auto', 'platform', 'userId', 'sessionToken', 'st'];
+  const url = new URL(window.location.href);
+  let changed = false;
+  SENSITIVE.forEach(p => { if (url.searchParams.has(p)) { url.searchParams.delete(p); changed = true; } });
+  if (changed) {
+    const clean = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '');
+    window.history.replaceState(window.history.state, '', clean);
+  }
+})();
+
 createRoot(document.getElementById('root')).render(
   // <StrictMode>
     <Provider store={store}>
