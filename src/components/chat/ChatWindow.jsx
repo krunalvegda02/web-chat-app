@@ -27,6 +27,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useCall } from '../../contexts/CallContext';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
+import Avatar from '../common/Avatar';
 
 export default function ChatWindow({ isMobile = false, showMobileHeader = false, onBack, readOnly = false }) {
   const dispatch = useDispatch();

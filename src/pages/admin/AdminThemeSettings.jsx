@@ -392,7 +392,7 @@ function WhatsAppPreview({ theme }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 relative" style={{ backgroundColor: theme.chatBackgroundColor, backgroundImage: theme.chatBackgroundImage ? `url(${theme.chatBackgroundImage})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div className="flex-1 overflow-y-auto p-4 relative" style={{ backgroundColor: theme.chatBackgroundColor }}>
           <div className="flex flex-col gap-3">
             <div className="flex justify-start">
               <div className="px-3 py-2 max-w-xs shadow-sm" style={{ backgroundColor: theme.receiverBubbleColor, color: theme.receiverTextColor, borderRadius: `${theme.receiverBubbleRadius}px` }}>

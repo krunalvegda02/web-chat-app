@@ -33,16 +33,7 @@ export default function ThemeProvider({ children }) {
         },
       }}
     >
-      <div
-        className="min-h-screen bg-slate-950"
-        style={{
-          backgroundImage: theme.backgroundImage
-            ? `url(${theme.backgroundImage})`
-            : 'none',
-          backgroundSize: 'cover',
-          backgroundAttachment: 'fixed',
-        }}
-      >
+      <div className="min-h-screen bg-slate-950">
         {children}
       </div>
     </ConfigProvider>
