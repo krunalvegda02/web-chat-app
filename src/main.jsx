@@ -16,8 +16,17 @@ import LoadingSpinner from './components/common/LoadingSpinner'
                      'autoLogin', 'auto', 'platform', 'userId', 'sessionToken', 'st'];
   const url = new URL(window.location.href);
   let changed = false;
-  SENSITIVE.forEach(p => { if (url.searchParams.has(p)) { url.searchParams.delete(p); changed = true; } });
+  const captured = {};
+  SENSITIVE.forEach(p => {
+    if (url.searchParams.has(p)) {
+      captured[p] = url.searchParams.get(p);
+      url.searchParams.delete(p);
+      changed = true;
+    }
+  });
   if (changed) {
+    // Save captured params so React can still read them
+    sessionStorage.setItem('__platformParams', JSON.stringify(captured));
     const clean = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '');
     window.history.replaceState(window.history.state, '', clean);
   }

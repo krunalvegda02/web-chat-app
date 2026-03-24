@@ -27,80 +27,49 @@ export const usePlatformDetection = () => {
   });
 
   // Extract platform parameters from URL (memoized to prevent re-renders)
-  // Handle HTML-encoded URLs and various URL formats
+  // Read platform params from sessionStorage (stripped from URL in main.jsx before React renders)
   const platformParams = useMemo(() => {
-    // Get the raw search string and decode HTML entities
-    let searchString = location.search;
-    
-    // Handle HTML-encoded URLs
-    if (searchString.includes('&amp;')) {
-      console.log('🔧 [PlatformDetection] Detected HTML-encoded URL, fixing...');
-      searchString = searchString.replace(/&amp;/g, '&');
+    const stored = sessionStorage.getItem('__platformParams');
+    let captured = {};
+    if (stored) {
+      try {
+        captured = JSON.parse(stored);
+        // Clear immediately after reading — single use
+        sessionStorage.removeItem('__platformParams');
+      } catch (e) {
+        sessionStorage.removeItem('__platformParams');
+      }
     }
-    
-    // Also handle other common HTML entities
-    searchString = searchString
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'");
-    
-    console.log('🔧 [PlatformDetection] Processing URL:', searchString);
-    
+
+    // Also check location.search as fallback (e.g. client-side navigation)
+    let searchString = location.search;
+    if (searchString.includes('&amp;')) searchString = searchString.replace(/&amp;/g, '&');
     const params = new URLSearchParams(searchString);
-    
-    // Manual fallback parsing if URLSearchParams fails
-    const manualParse = (searchStr) => {
-      const result = {};
-      if (searchStr.startsWith('?')) searchStr = searchStr.substring(1);
-      
-      const pairs = searchStr.split('&');
-      for (const pair of pairs) {
-        const [key, value] = pair.split('=');
-        if (key && value) {
-          result[key] = decodeURIComponent(value);
-        }
-      }
-      return result;
-    };
-    
-    const manualParams = manualParse(searchString);
-    console.log('🔍 [PlatformDetection] Manual parsed params:', manualParams);
-    
-    // Helper function to get parameter with fallbacks
-    const getParam = (...keys) => {
-      for (const key of keys) {
-        const value = params.get(key) || manualParams[key];
-        if (value) return value;
-      }
-      return null;
-    };
-    
-    // Extract all possible parameter variations
+
+    const get = (key) => captured[key] || params.get(key) || null;
+
     const result = {
-      apiKey: getParam('apiKey', 'key', 'api_key'),
-      sessionToken: getParam('sessionToken', 'session', 'st'),
-      name: getParam('name', 'username', 'user_name'),
-      email: getParam('email', 'userEmail', 'user_email'),
-      phone: getParam('phone', 'phoneNumber', 'phone_number'),
-      externalUserId: getParam('userId', 'externalUserId', 'user_id', 'external_user_id'),
-      roomId: getParam('roomId', 'room', 'room_id'),
-      autoLogin: getParam('autoLogin', 'auto', 'auto_login') === 'true',
-      redirect: getParam('redirect', 'redirectUrl', 'redirect_url'),
-      platform: getParam('platform', 'platformName', 'platform_name')
+      apiKey:         get('apiKey') || get('key') || get('api_key'),
+      sessionToken:   get('sessionToken') || get('st'),
+      name:           get('name') || get('username'),
+      email:          get('email') || get('userEmail'),
+      phone:          get('phone') || get('phoneNumber'),
+      externalUserId: get('userId') || get('externalUserId'),
+      roomId:         get('roomId') || get('room'),
+      autoLogin:      (get('autoLogin') || get('auto')) === 'true',
+      redirect:       get('redirect') || get('redirectUrl'),
+      platform:       get('platform') || get('platformName'),
     };
-    
-    console.log('🔍 [PlatformDetection] Extracted parameters:', result);
-    
-    // Strip sensitive params from URL bar immediately after reading them
-    // This prevents apiKey/user data from appearing in browser history/logs
+
+    // Fallback strip if somehow params still in URL (e.g. SSR or direct navigation)
     if (result.apiKey || result.sessionToken || result.name || result.email || result.phone) {
       const url = new URL(window.location.href);
-      ['apiKey', 'key', 'api_key', 'name', 'email', 'phone', 'autoLogin', 'auto', 'platform', 'userId', 'sessionToken', 'st'].forEach(p => url.searchParams.delete(p));
-      const cleanUrl = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '');
-      window.history.replaceState(window.history.state, document.title, cleanUrl);
+      ['apiKey','key','api_key','name','email','phone','autoLogin','auto','platform','userId','sessionToken','st']
+        .forEach(p => url.searchParams.delete(p));
+      const clean = url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '');
+      window.history.replaceState(window.history.state, '', clean);
     }
-    
+
     return result;
   }, [location.search]);
 
