@@ -35,7 +35,7 @@ export const usePlatformIntegration = (apiKey = null) => {
   }, []);
 
   // Secure platform chat login
-  const platformChatLogin = useCallback(async (userData) => {
+  const platformChatLogin = useCallback(async (userData, platformName = null) => {
     if (!isValidApiKey) {
       setError('Valid API key is required');
       return { success: false, error: 'Valid API key is required' };
@@ -45,6 +45,12 @@ export const usePlatformIntegration = (apiKey = null) => {
     if (!userData.email || !userData.phone) {
       setError('Email and phone are required');
       return { success: false, error: 'Email and phone are required' };
+    }
+
+    // For test API key, platform name is required
+    if (apiKey === 'test-api-key' && !platformName) {
+      setError('Platform name is required when using test API key');
+      return { success: false, error: 'Platform name is required when using test API key' };
     }
 
     // Validate email format
@@ -71,6 +77,11 @@ export const usePlatformIntegration = (apiKey = null) => {
         password: userData.password,
         externalUserId: userData.externalUserId ? securityUtils.sanitizeInput(userData.externalUserId) : undefined
       };
+
+      // Add platform name if provided (for test API key)
+      if (platformName) {
+        sanitizedData.platformName = securityUtils.sanitizeInput(platformName);
+      }
 
       console.log('🔐 [PlatformIntegration] Initiating secure login...');
       
