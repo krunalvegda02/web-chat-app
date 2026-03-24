@@ -5,13 +5,13 @@ import { registerFCMToken, setFCMToken, setPermission } from '../redux/slices/no
 class NotificationService {
   constructor() {
     this.token = null;
-    this.permission = Notification.permission;
-    this.isSupported = 'Notification' in window && 'serviceWorker' in navigator;
+    this.isSupported = typeof Notification !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+    this.permission = this.isSupported ? Notification.permission : 'denied';
   }
 
   async requestPermission(onNotification) {
     if (!this.isSupported) {
-      console.warn('Notifications not supported');
+      console.warn('Notifications not supported on this device');
       return false;
     }
 

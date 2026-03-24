@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -11,14 +10,41 @@ const firebaseConfig = {
 };
 
 let app;
-let messaging;
+let messaging = null;
 
 try {
   app = initializeApp(firebaseConfig);
-  messaging = getMessaging(app);
 } catch (error) {
   console.error('Firebase initialization error:', error);
 }
 
-export { messaging, getToken, onMessage };
+// Firebase Messaging is not supported on iOS Safari (requires PWA + iOS 16.4+)
+// Lazy-load it only when supported to prevent white screen crash
+const isMessagingSupported = () => {
+  try {
+    return typeof window !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      'PushManager' in window &&
+      'Notification' in window;
+  } catch (e) {
+    return false;
+  }
+};
+
+let _getToken = async () => null;
+let _onMessage = () => () => {};
+
+if (isMessagingSupported()) {
+  import('firebase/messaging').then(({ getMessaging, getToken, onMessage }) => {
+    try {
+      messaging = getMessaging(app);
+      _getToken = getToken;
+      _onMessage = onMessage;
+    } catch (e) {
+      console.warn('Firebase messaging init failed:', e);
+    }
+  }).catch(e => console.warn('Firebase messaging load failed:', e));
+}
+
+export { messaging, _getToken as getToken, _onMessage as onMessage };
 export default app;
