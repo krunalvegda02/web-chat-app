@@ -20,7 +20,7 @@ export const useAppNotifications = () => {
     notificationIdsRef.current.add(notifId);
     
     // Show browser notification if tab is hidden
-    if (document.hidden && Notification.permission === 'granted') {
+    if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
         registration.showNotification(notification.senderName || notification.title, {
           body: notification.body,
