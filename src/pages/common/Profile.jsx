@@ -60,6 +60,7 @@ export default function Profile() {
 
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
 
   // Reset password modal state
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -294,7 +295,7 @@ export default function Profile() {
     if (!user?.platformId) return;
     setApiKeyLoading(true);
     try {
-      await dispatch(getApiKey(user.platformId));
+      await dispatch(getApiKey(user.platformId.toString()));
     } finally {
       setApiKeyLoading(false);
     }
@@ -755,9 +756,29 @@ export default function Profile() {
                             className="flex items-center gap-2 p-2 rounded-lg"
                             style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5', border: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` }}
                           >
-                            {platformApiKey === 'exists' ? (
-                              <span className="flex-1 text-xs" style={{ color: theme.timestampColor || '#667781' }}>
-                                ✅ API key is active. The plain key was shown once at creation — contact your super admin to regenerate if needed.
+                            {platformApiKey && platformApiKey !== 'legacy' ? (
+                              <>
+                                <code className="flex-1 text-xs break-all select-all" style={{ color: '#111B21', fontFamily: 'monospace' }}>
+                                  {platformApiKey}
+                                </code>
+                                <Tooltip title={apiKeyCopied ? 'Copied!' : 'Copy'}>
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<CopyOutlined />}
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(platformApiKey);
+                                      setApiKeyCopied(true);
+                                      antMessage.success('API key copied!');
+                                      setTimeout(() => setApiKeyCopied(false), 2000);
+                                    }}
+                                    style={{ color: apiKeyCopied ? '#10B981' : '#f59e0b', flexShrink: 0 }}
+                                  />
+                                </Tooltip>
+                              </>
+                            ) : platformApiKey === 'legacy' ? (
+                              <span className="flex-1 text-xs" style={{ color: '#f59e0b' }}>
+                                ⚠️ Legacy key detected. Please regenerate from Super Admin panel to view it.
                               </span>
                             ) : (
                               <span className="flex-1 text-xs" style={{ color: '#ef4444' }}>

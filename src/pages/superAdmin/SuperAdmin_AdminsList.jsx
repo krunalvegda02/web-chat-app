@@ -41,7 +41,6 @@ import {
   createPlatform,
   togglePlatformStatus,
   updatePlatform,
-  clearNewPlatformApiKey,
 } from '../../redux/slices/platformSlice.jsx';
 
 const { Title, Text } = Typography;
@@ -50,7 +49,7 @@ export default function SuperAdminAdminsList() {
   useAuthGuard(['SUPER_ADMIN']);
   const { theme } = useTheme();
   const dispatch = useDispatch();
-  const { platforms, loading, newPlatformApiKey } = useSelector((state) => state.platform);
+  const { platforms, loading } = useSelector((state) => state.platform);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -77,16 +76,7 @@ export default function SuperAdminAdminsList() {
     fetchAdmins();
   }, []);
 
-  // Show API key modal when a new platform is created
-  useEffect(() => {
-    if (newPlatformApiKey) {
-      setDisplayedApiKey(newPlatformApiKey);
-      setApiKeyModalOpen(true);
-      dispatch(clearNewPlatformApiKey());
-    }
-  }, [newPlatformApiKey]);
-
-  const copyApiKey = () => {
+const copyApiKey = () => {
     navigator.clipboard.writeText(displayedApiKey);
     setApiKeyCopied(true);
     message.success('API key copied!');
@@ -127,6 +117,12 @@ export default function SuperAdminAdminsList() {
       const result = await dispatch(createPlatform(values));
       
       if (result.type === 'platform/createPlatform/fulfilled') {
+        // Extract apiKey directly from result — don't rely on useEffect timing
+        const apiKey = result.payload?.data?.platform?.apiKey || result.payload?.data?.apiKey;
+        if (apiKey) {
+          setDisplayedApiKey(apiKey);
+          setApiKeyModalOpen(true);
+        }
         message.success('Platform admin created successfully!');
         form.resetFields();
         setModalOpen(false);

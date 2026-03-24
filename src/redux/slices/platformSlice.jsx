@@ -270,7 +270,8 @@ const platformSlice = createSlice({
 
       // Get API Key
       .addCase(getApiKey.fulfilled, (state, action) => {
-        state.platformApiKey = action.payload.data?.hasApiKey ? 'exists' : null;
+        const data = action.payload.data;
+        state.platformApiKey = data?.apiKey || (data?.hasApiKey ? 'legacy' : null);
       })
 
       // Generate API Key
