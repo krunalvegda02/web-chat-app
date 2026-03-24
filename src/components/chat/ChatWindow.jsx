@@ -691,9 +691,10 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           padding: '20px',
           display: 'flex',
           flexDirection: 'column-reverse', // This makes messages start from bottom
-          background: theme?.chatBackgroundImage
-            ? `url(${theme.chatBackgroundImage}) center/cover no-repeat`
-            : `url(${whatsappBg}) center/cover no-repeat, ${theme?.chatBackgroundColor || '#E5DDD5'}`,
+          background: theme?.chatBackgroundColor || '#E5DDD5',
+          backgroundImage: theme?.chatBackgroundImage ? `url(${theme.chatBackgroundImage})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
         }}
       >
         {/* Auto-scroll anchor at top for reverse layout */}
