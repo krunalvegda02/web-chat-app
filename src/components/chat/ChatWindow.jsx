@@ -27,7 +27,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useCall } from '../../contexts/CallContext';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
-import whatsappBg from '../../assets/whatsapp-bg.webp';
 
 export default function ChatWindow({ isMobile = false, showMobileHeader = false, onBack, readOnly = false }) {
   const dispatch = useDispatch();
@@ -692,9 +691,6 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
           display: 'flex',
           flexDirection: 'column-reverse', // This makes messages start from bottom
           background: theme?.chatBackgroundColor || '#E5DDD5',
-          backgroundImage: theme?.chatBackgroundImage ? `url(${theme.chatBackgroundImage})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
         }}
       >
         {/* Auto-scroll anchor at top for reverse layout */}
