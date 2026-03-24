@@ -204,7 +204,9 @@ export const usePlatformDetection = () => {
       urlEmail: platformParams.email,
       urlPhone: platformParams.phone,
       userEmail: user?.email,
-      userPhone: user?.phone
+      userPhone: user?.phone,
+      platformParams: platformParams,
+      detectionResult: detectionResult
     });
 
     if (!initialized) return;

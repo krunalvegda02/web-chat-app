@@ -119,9 +119,20 @@ export const usePlatformIntegration = (apiKey = null) => {
         };
         
         // Update the entire auth state
-        store.dispatch({ 
+        const authAction = { 
           type: 'auth/setPlatformAuth', 
           payload: authPayload 
+        };
+        
+        console.log('🔄 [PlatformIntegration] Dispatching auth action:', authAction);
+        store.dispatch(authAction);
+        
+        // Verify the state was updated
+        const newState = store.getState().auth;
+        console.log('✅ [PlatformIntegration] Auth state after dispatch:', {
+          user: !!newState.user,
+          token: !!newState.token,
+          initialized: newState.initialized
         });
 
         console.log('✅ [PlatformIntegration] Login successful');
