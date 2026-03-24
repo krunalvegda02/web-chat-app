@@ -334,52 +334,54 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
   // ✅ Track when messages become visible and mark as read only then
   useEffect(() => {
     if (!activeRoomId || readOnly) return;
-
-    // Use Intersection Observer to track when messages are actually visible
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleMessageIds = [];
-        
-        entries.forEach(entry => {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-            const messageId = entry.target.getAttribute('data-message-id');
-            const messageStatus = entry.target.getAttribute('data-message-status');
-            const messageSenderId = entry.target.getAttribute('data-message-sender');
-            
-            // Only mark as read if:
-            // 1. Message is not already read
-            // 2. Message is not from current user
-            // 3. Message element is more than 50% visible
-            if (messageId && messageStatus !== 'read' && messageSenderId !== user?._id) {
-              visibleMessageIds.push(messageId);
-            }
-          }
-        });
-
-        // Mark visible messages as read after a delay
-        if (visibleMessageIds.length > 0) {
-          setTimeout(() => {
-            if (!document.hidden && activeRoomId) {
-              markMessagesAsRead(activeRoomId, visibleMessageIds);
-              console.log(`👁️ [ChatWindow] Marked ${visibleMessageIds.length} visible messages as read`);
-            }
-          }, 1500); // 1.5 second delay for actual reading time
+    // IntersectionObserver not supported on older iOS — guard it
+    if (typeof IntersectionObserver === 'undefined') {
+      // Fallback: just mark all messages as read after a delay
+      const timer = setTimeout(() => {
+        if (!document.hidden && activeRoomId) {
+          const unreadIds = messages
+            .filter(m => m.status !== 'read' && m.senderId !== user?._id)
+            .map(m => m._id)
+            .filter(Boolean);
+          if (unreadIds.length > 0) markMessagesAsRead(activeRoomId, unreadIds);
         }
-      },
-      {
-        threshold: 0.5, // Message must be 50% visible
-        rootMargin: '0px 0px -50px 0px' // Only count if not at very bottom edge
-      }
-    );
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
 
-    // Observe all message elements
-    const messageElements = document.querySelectorAll('[data-message-id]');
-    messageElements.forEach(el => observer.observe(el));
+    let observer;
+    try {
+      observer = new IntersectionObserver(
+        (entries) => {
+          const visibleMessageIds = [];
+          entries.forEach(entry => {
+            if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+              const messageId = entry.target.getAttribute('data-message-id');
+              const messageStatus = entry.target.getAttribute('data-message-status');
+              const messageSenderId = entry.target.getAttribute('data-message-sender');
+              if (messageId && messageStatus !== 'read' && messageSenderId !== user?._id) {
+                visibleMessageIds.push(messageId);
+              }
+            }
+          });
+          if (visibleMessageIds.length > 0) {
+            setTimeout(() => {
+              if (!document.hidden && activeRoomId) {
+                markMessagesAsRead(activeRoomId, visibleMessageIds);
+              }
+            }, 1500);
+          }
+        },
+        { threshold: 0.5, rootMargin: '0px 0px -50px 0px' }
+      );
+      const messageElements = document.querySelectorAll('[data-message-id]');
+      messageElements.forEach(el => observer.observe(el));
+    } catch (e) {
+      console.warn('[ChatWindow] IntersectionObserver failed:', e);
+    }
 
-    return () => {
-      observer.disconnect();
-    };
-  }, [activeRoomId, readOnly, user?._id, markMessagesAsRead]);
+    return () => { try { observer?.disconnect(); } catch(e) {} };
+  }, [activeRoomId, readOnly, user?._id, markMessagesAsRead, messages]);
 
   // ✅ Listen for real-time message status updates
   useEffect(() => {
@@ -417,11 +419,11 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
         // Call hook handles incoming call state
       }
     };
-
-    chatSocketClient.on('call_incoming', handleIncomingCall);
-
+    try {
+      chatSocketClient.on('call_incoming', handleIncomingCall);
+    } catch(e) {}
     return () => {
-      chatSocketClient.offAll('call_incoming');
+      try { chatSocketClient.offAll('call_incoming'); } catch(e) {}
     };
   }, [activeRoomId]);
 

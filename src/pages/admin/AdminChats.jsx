@@ -1,11 +1,10 @@
-
-import { useAuthGuard } from '../../hooks/useAuthGuard';
 import StandardChatLayout from '../../components/chat/StandardChatLayout';
 import { Card, Empty } from 'antd';
 import { MessageOutlined } from '@ant-design/icons';
+import { useSelector } from 'react-redux';
 
 export default function AdminChats() {
-  const { user } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
+  const { user } = useSelector(s => s.auth);
 
   if (!user) {
     return (
