@@ -34,6 +34,37 @@ export const usePlatformIntegration = (apiKey = null) => {
     setError(null);
   }, []);
 
+  // Consume session token (browser calls this — no API key needed)
+  const consumeSessionToken = useCallback(async (sessionToken) => {
+    if (!sessionToken) return { success: false, error: 'Session token is required' };
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await platformApi.consumeSessionToken(sessionToken);
+      if (response.data.success) {
+        const { user, accessToken, refreshToken, room } = response.data.data;
+        const authPayload = { user, token: accessToken, refreshToken, initialized: true, loading: false, error: null };
+        localStorage.setItem('persist:root', JSON.stringify({
+          auth: JSON.stringify(authPayload),
+          _persist: JSON.stringify({ version: -1, rehydrated: true })
+        }));
+        localStorage.setItem('authToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        dispatch(setUser(user));
+        store.dispatch({ type: 'auth/setPlatformAuth', payload: authPayload });
+        return { success: true, data: response.data.data };
+      } else {
+        throw new Error(response.data.message || 'Session login failed');
+      }
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Consume Session Token');
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [dispatch]);
+
   // Secure platform chat login
   const platformChatLogin = useCallback(async (userData, platformName = null) => {
     if (!isValidApiKey) {
@@ -45,12 +76,6 @@ export const usePlatformIntegration = (apiKey = null) => {
     if (!userData.email || !userData.phone) {
       setError('Email and phone are required');
       return { success: false, error: 'Email and phone are required' };
-    }
-
-    // For test API key, platform name is required
-    if (apiKey === 'test-api-key' && !platformName) {
-      setError('Platform name is required when using test API key');
-      return { success: false, error: 'Platform name is required when using test API key' };
     }
 
     // Validate email format
@@ -339,6 +364,7 @@ export const usePlatformIntegration = (apiKey = null) => {
     
     // Methods
     platformChatLogin,
+    consumeSessionToken,
     getUserByExternalId,
     updatePlatformUser,
     getPlatformStats,

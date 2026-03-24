@@ -240,7 +240,19 @@ const platformApi = {
         return platformApiClient.post('/platforms/integration/webhook', eventData, {
             platformApiKey: apiKey
         });
-    }
+    },
+
+    // Consume session token (no API key needed — token is single-use, short-lived)
+    consumeSessionToken: (sessionToken) => {
+        return platformApiClient.post('/platforms/session-login', { sessionToken });
+    },
+
+    // Generate session token (server-to-server: API key → session token)
+    generateSessionToken: (userData, apiKey) => {
+        return platformApiClient.post('/platforms/session-token', userData, {
+            platformApiKey: apiKey
+        });
+    },
 };
 
 // Security utilities
@@ -248,9 +260,6 @@ const securityUtils = {
     // Validate API key format
     isValidApiKey: (apiKey) => {
         if (typeof apiKey !== 'string') return false;
-        // Accept test API key for development
-        if (apiKey === 'test-api-key') return true;
-        // Production API keys must start with pk_ and be longer than 10 characters
         return apiKey.startsWith('pk_') && apiKey.length > 10;
     },
     

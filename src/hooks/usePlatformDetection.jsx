@@ -79,6 +79,7 @@ export const usePlatformDetection = () => {
     // Extract all possible parameter variations
     const result = {
       apiKey: getParam('apiKey', 'key', 'api_key'),
+      sessionToken: getParam('sessionToken', 'session', 'st'),
       name: getParam('name', 'username', 'user_name'),
       email: getParam('email', 'userEmail', 'user_email'),
       phone: getParam('phone', 'phoneNumber', 'phone_number'),
@@ -98,6 +99,7 @@ export const usePlatformDetection = () => {
   // Platform integration hook
   const {
     platformChatLogin,
+    consumeSessionToken,
     isValidApiKey,
     loading: platformLoading,
     error: platformError
@@ -111,29 +113,19 @@ export const usePlatformDetection = () => {
 
   // Detect if this is a platform user request (memoized)
   const detectionResult = useMemo(() => {
+    const hasSessionToken = !!platformParams.sessionToken;
     const hasApiKey = !!platformParams.apiKey;
     const hasPlatformParam = !!platformParams.platform;
     const hasUserData = !!(platformParams.name && platformParams.email && platformParams.phone);
     const hasAutoLogin = platformParams.autoLogin;
-    const isFromExternalDomain = document.referrer && !document.referrer.includes(window.location.hostname);
 
-    // Only detect platform if we have explicit platform indicators
-    const isDetected = hasApiKey || hasPlatformParam || (hasUserData && hasAutoLogin);
-
-    console.log('🔍 [PlatformDetection] Detection analysis:', {
-      hasApiKey,
-      hasPlatformParam,
-      hasUserData,
-      hasAutoLogin,
-      isFromExternalDomain,
-      isDetected,
-      email: platformParams.email,
-      phone: platformParams.phone
-    });
+    // Prefer sessionToken (secure), fall back to apiKey (legacy)
+    const isDetected = hasSessionToken || hasApiKey || hasPlatformParam || (hasUserData && hasAutoLogin);
 
     return {
       isDetected,
-      shouldAutoLogin: isDetected && (hasAutoLogin || (hasUserData && isValidApiKey)),
+      isSessionTokenFlow: hasSessionToken,
+      shouldAutoLogin: isDetected && (hasAutoLogin || hasSessionToken || (hasUserData && isValidApiKey)),
       userData: hasUserData ? {
         name: platformParams.name,
         email: platformParams.email,
@@ -145,6 +137,31 @@ export const usePlatformDetection = () => {
 
   // Auto-login function with retry logic
   const performAutoLogin = useCallback(async (userData) => {
+    // If sessionToken flow, use consumeSessionToken instead
+    if (detectionResult.isSessionTokenFlow && platformParams.sessionToken) {
+      setPlatformState(prev => ({ ...prev, isProcessing: true, error: null }));
+      try {
+        const result = await consumeSessionToken(platformParams.sessionToken);
+        if (result.success) {
+          const targetRoom = platformParams.roomId || result.data.room?._id;
+          if (targetRoom) {
+            dispatch(setActiveRoom(targetRoom));
+            navigate(`/user/chats/${targetRoom}`, { replace: true });
+            window.history.replaceState({}, document.title, `/user/chats/${targetRoom}`);
+          } else {
+            navigate('/user/chats', { replace: true });
+          }
+          setPlatformState(prev => ({ ...prev, isProcessing: false, retryCount: 0 }));
+          return true;
+        } else {
+          throw new Error(result.error || 'Session login failed');
+        }
+      } catch (error) {
+        setPlatformState(prev => ({ ...prev, isProcessing: false, error: error.message }));
+        return false;
+      }
+    }
+
     if (!userData || !isValidApiKey) {
       console.warn('⚠️ [PlatformDetection] Cannot auto-login: missing data or invalid API key');
       return false;
