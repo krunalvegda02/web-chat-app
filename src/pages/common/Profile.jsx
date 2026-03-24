@@ -36,12 +36,14 @@ import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/common/Avatar';
 import { updateProfile, forgotPassword, verifyResetOTP, resetPassword } from '../../redux/slices/authSlice';
 import { updateProfileWithAvatar } from '../../redux/slices/userSlice';
+import { getApiKey } from '../../redux/slices/platformSlice.jsx';
 import OTPInput from '../../components/common/OTPInput';
 import { copyToClipboardWithMessage } from '../../utils/clipboardUtils';
 
 export default function Profile() {
   const { theme } = useTheme();
   const { user } = useSelector((s) => s.auth);
+  const { platformApiKey } = useSelector((s) => s.platform);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
@@ -55,6 +57,9 @@ export default function Profile() {
   const [copied, setCopied] = useState(null);
   const fileInputRef = useRef(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
 
   // Reset password modal state
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -284,6 +289,22 @@ export default function Profile() {
       setTimeout(() => setCopied(null), 2000);
     }
   };
+
+  const loadApiKey = async () => {
+    if (!user?.platformId) return;
+    setApiKeyLoading(true);
+    try {
+      await dispatch(getApiKey(user.platformId));
+    } finally {
+      setApiKeyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'PLATFORM_ADMIN' && user?.platformId) {
+      loadApiKey();
+    }
+  }, [user?.platformId]);
 
   const memberSince = new Date(user?.createdAt).toLocaleDateString('en-US', { 
     month: 'long', 
@@ -678,7 +699,7 @@ export default function Profile() {
                   </div>
 
                   {/* Reset Password Row */}
-                  <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                  <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors${user?.role === 'PLATFORM_ADMIN' ? ' border-b' : ''}`} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
                       <div className="flex items-center gap-2 sm:gap-3 flex-1">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}>
@@ -704,6 +725,50 @@ export default function Profile() {
                       </Button>
                     </div>
                   </div>
+
+                  {/* API Key Row - Platform Admin only */}
+                  {user?.role === 'PLATFORM_ADMIN' && (
+                    <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2 sm:gap-4">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}>
+                              <SafetyCertificateOutlined className="text-sm sm:text-lg" style={{ color: '#f59e0b' }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-xs sm:text-sm" style={{ color: theme.sidebarTextColor || '#111B21' }}>API Key</p>
+                              <p className="text-xs" style={{ color: theme.timestampColor || '#667781' }}>Platform integration key</p>
+                            </div>
+                          </div>
+                          <Button
+                            size="small"
+                            icon={apiKeyVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                            loading={apiKeyLoading}
+                            onClick={() => setApiKeyVisible((v) => !v)}
+                            style={{ borderColor: '#f59e0b', color: '#f59e0b', borderRadius: '6px', fontSize: '12px' }}
+                          >
+                            {apiKeyVisible ? 'Hide' : 'Show'}
+                          </Button>
+                        </div>
+                        {apiKeyVisible && (
+                          <div
+                            className="flex items-center gap-2 p-2 rounded-lg"
+                            style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5', border: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` }}
+                          >
+                            {platformApiKey === 'exists' ? (
+                              <span className="flex-1 text-xs" style={{ color: theme.timestampColor || '#667781' }}>
+                                ✅ API key is active. The plain key was shown once at creation — contact your super admin to regenerate if needed.
+                              </span>
+                            ) : (
+                              <span className="flex-1 text-xs" style={{ color: '#ef4444' }}>
+                                No API key found. Contact your super admin.
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               </div>
 

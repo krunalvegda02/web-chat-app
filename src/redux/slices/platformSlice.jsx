@@ -64,6 +64,18 @@ export const updateUserStatus = createAsyncThunkHandler(
   (payload) => `/platforms/users/${payload.userId}/status`
 );
 
+export const generateApiKey = createAsyncThunkHandler(
+  'platform/generateApiKey',
+  _post,
+  (payload) => `/platforms/${payload}/api-key/generate`
+);
+
+export const getApiKey = createAsyncThunkHandler(
+  'platform/getApiKey',
+  _get,
+  (payload) => `/platforms/${payload}/api-key`
+);
+
 const initialState = {
   platforms: [],
   currentPlatform: null,
@@ -71,6 +83,8 @@ const initialState = {
   currentUser: null,
   loading: false,
   error: null,
+  newPlatformApiKey: null,
+  platformApiKey: null,
   pagination: {
     page: 1,
     limit: 20,
@@ -91,6 +105,9 @@ const platformSlice = createSlice({
     },
     clearPlatformUsers(state) {
       state.platformUsers = [];
+    },
+    clearNewPlatformApiKey(state) {
+      state.newPlatformApiKey = null;
     },
   },
   extraReducers: (builder) => {
@@ -120,11 +137,13 @@ const platformSlice = createSlice({
       })
       .addCase(createPlatform.fulfilled, (state, action) => {
         state.loading = false;
-        const newPlatform = action.payload.data?.platform || action.payload.data;
+        const data = action.payload.data?.platform || action.payload.data;
+        const { apiKey, ...platformData } = data || {};
         if (!Array.isArray(state.platforms)) {
           state.platforms = [];
         }
-        state.platforms.unshift(newPlatform);
+        state.platforms.unshift(platformData);
+        if (apiKey) state.newPlatformApiKey = apiKey;
       })
       .addCase(createPlatform.rejected, (state, action) => {
         state.loading = false;
@@ -247,9 +266,19 @@ const platformSlice = createSlice({
       .addCase(updateUserStatus.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // Get API Key
+      .addCase(getApiKey.fulfilled, (state, action) => {
+        state.platformApiKey = action.payload.data?.hasApiKey ? 'exists' : null;
+      })
+
+      // Generate API Key
+      .addCase(generateApiKey.fulfilled, (state, action) => {
+        state.platformApiKey = action.payload.data?.apiKey || null;
       });
   },
 });
 
-export const { clearError, clearCurrentPlatform, clearPlatformUsers } = platformSlice.actions;
+export const { clearError, clearCurrentPlatform, clearPlatformUsers, clearNewPlatformApiKey } = platformSlice.actions;
 export default platformSlice.reducer;
