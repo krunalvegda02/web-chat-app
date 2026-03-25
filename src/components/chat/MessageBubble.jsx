@@ -253,13 +253,19 @@ export default function MessageBubble({
     if (audioStates[audioId]?.isPlaying) {
       audio.pause();
     } else {
-      // Pause all other audios
       Object.keys(audioRefs.current).forEach(id => {
         if (id !== audioId && audioRefs.current[id]) {
           audioRefs.current[id].pause();
         }
       });
-      audio.play();
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // iOS/autoplay policy blocked — load and retry
+          audio.load();
+          audio.play().catch(() => {});
+        });
+      }
     }
   };
 
@@ -884,7 +890,7 @@ export default function MessageBubble({
                 {message.media.map((m, i) => {
                   const audioId = `${message._id}-${i}`;
                   const state = audioStates[audioId] || { isPlaying: false, currentTime: 0, duration: 0 };
-                  const isVoiceNote = m.mimeType?.includes('ogg') || m.mimeType?.includes('webm') || m.isVoiceNote;
+                  const isVoiceNote = m.mimeType?.includes('ogg') || m.mimeType?.includes('webm') || m.mimeType?.includes('mp4') || m.isVoiceNote;
 
                   return (
                     <div key={i} className={i < message.media.length - 1 ? 'mb-3' : ''}>

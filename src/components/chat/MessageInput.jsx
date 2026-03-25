@@ -209,12 +209,14 @@ const MessageInput = memo(function MessageInput() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const mimeType = isIOS ? 'audio/mp4' : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       const chunks = [];
 
       mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const blob = new Blob(chunks, { type: mimeType });
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
       };
@@ -326,7 +328,9 @@ const MessageInput = memo(function MessageInput() {
     setIsSending(true);
     try {
       const formData = new FormData();
-      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+      const mimeType = audioBlob.type || 'audio/webm';
+      const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.${ext}`, { type: mimeType });
       formData.append('files', audioFile);
 
       const uploadResult = await dispatch(uploadChatMedia(formData)).unwrap();
