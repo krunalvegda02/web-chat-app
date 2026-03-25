@@ -34,6 +34,12 @@ export const togglePlatformStatus = createAsyncThunkHandler(
   (payload) => `/platforms/${payload}/toggle-status`
 );
 
+export const changeAdminPassword = createAsyncThunkHandler(
+  'platform/changeAdminPassword',
+  _patch,
+  (payload) => `/platforms/${payload.id}/change-password`
+);
+
 export const deletePlatform = createAsyncThunkHandler(
   'platform/deletePlatform',
   _delete,

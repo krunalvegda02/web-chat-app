@@ -496,10 +496,21 @@ const MessageInput = memo(function MessageInput() {
           color: ${getPlaceholderColor()} !important;
           opacity: 0.7 !important;
         }
+        .msg-action-btn {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 40px !important;
+          height: 40px !important;
+          min-width: 40px !important;
+          padding: 0 !important;
+          border-radius: 50% !important;
+          flex-shrink: 0;
+        }
       `}</style>
       <div
         style={{
-          padding: '10px 16px',
+          padding: '8px 12px',
           backgroundColor: theme?.sidebarBackgroundColor || '#F0F2F5',
           position: 'relative',
         }}
@@ -525,7 +536,7 @@ const MessageInput = memo(function MessageInput() {
         <div style={{
           display: 'flex',
           gap: '6px',
-          alignItems: 'flex-end',
+          alignItems: 'center',
         }}>
           {/* Left icons - Emoji, Attach, Camera */}
           {!audioBlob && !isRecording && (
@@ -564,28 +575,11 @@ const MessageInput = memo(function MessageInput() {
               >
                 <Button
                   type="text"
-                  icon={
-                    <PaperClipOutlined
-                      style={{
-                        fontSize: '24px',
-                        color: '#54656F',
-                      }}
-                    />
-                  }
+                  icon={<PaperClipOutlined style={{ fontSize: '22px', color: '#54656F' }} />}
                   disabled={!activeRoomId || isSending}
-                  className="chat-attach-btn"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '40px',
-                    height: '40px',
-                    padding: 0,
-                    borderRadius: '8px',
-                    backgroundColor: 'transparent',
-                  }}
+                  className="msg-action-btn"
+                  style={{ backgroundColor: 'transparent' }}
                 />
-
               </Popover>
             </div>
           )}
@@ -705,16 +699,12 @@ const MessageInput = memo(function MessageInput() {
               <Button
                 type="primary"
                 shape="circle"
-                icon={<SendOutlined style={{ fontSize: '18px', color: '#FFFFFF' }} />}
+                icon={<SendOutlined style={{ fontSize: '16px', color: '#FFFFFF' }} />}
                 onClick={stopRecording}
+                className="msg-action-btn"
                 style={{
                   backgroundColor: '#00A884',
                   borderColor: '#00A884',
-                  width: '48px',
-                  height: '48px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                 }}
               />
 
@@ -784,9 +774,10 @@ const MessageInput = memo(function MessageInput() {
               flex: 1,
               backgroundColor: theme.inputBackgroundColor || '#FFFFFF',
               borderRadius: '24px',
-              padding: '8px 12px',
+              padding: '6px 12px',
               display: 'flex',
               alignItems: 'center',
+              minHeight: '40px',
             }}>
               <Input.TextArea
                 ref={inputRef}
@@ -820,17 +811,13 @@ const MessageInput = memo(function MessageInput() {
               <Button
                 type="primary"
                 shape="circle"
-                icon={<SendOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
+                icon={<SendOutlined style={{ fontSize: '16px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
                 onClick={sendAudioMessage}
                 loading={isSending}
+                className="msg-action-btn"
                 style={{
                   backgroundColor: theme.sendButtonColor || '#00A884',
                   borderColor: theme.sendButtonColor || '#00A884',
-                  width: '48px',
-                  height: '48px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                 }}
               />
             </Tooltip>
@@ -838,17 +825,13 @@ const MessageInput = memo(function MessageInput() {
             <Button
               type="primary"
               shape="circle"
-              icon={isSending ? <LoadingOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} spin /> : <SendOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
+              icon={isSending ? <LoadingOutlined style={{ fontSize: '16px', color: theme.sendButtonIconColor || '#FFFFFF' }} spin /> : <SendOutlined style={{ fontSize: '16px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
               onClick={handleSend}
               disabled={!activeRoomId || isSending || isRecording}
+              className="msg-action-btn"
               style={{
                 backgroundColor: theme.sendButtonColor || '#00A884',
                 borderColor: theme.sendButtonColor || '#00A884',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
               }}
             />
           ) : !isRecording ? (
@@ -866,16 +849,12 @@ const MessageInput = memo(function MessageInput() {
                 <Button
                   type="primary"
                   shape="circle"
-                  icon={<AudioOutlined style={{ fontSize: '20px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
+                  icon={<AudioOutlined style={{ fontSize: '18px', color: theme.sendButtonIconColor || '#FFFFFF' }} />}
                   disabled={!activeRoomId || isSending}
+                  className="msg-action-btn"
                   style={{
                     backgroundColor: theme.sendButtonColor || '#00A884',
                     borderColor: theme.sendButtonColor || '#00A884',
-                    width: '48px',
-                    height: '48px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     cursor: 'pointer',
                     userSelect: 'none',
                   }}

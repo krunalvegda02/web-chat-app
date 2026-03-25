@@ -419,7 +419,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
       return (
         <>
           <style>{`body { overflow: hidden !important; }`}</style>
-          <div className="chat-fullscreen flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
+          <div className="chat-fullscreen left-0 flex flex-col z-[150]" style={{ backgroundColor: theme?.backgroundColor || '#FFFFFF', overflow: 'hidden' }}>
             <ChatWindow
               showMobileHeader={true}
               onBack={() => {
@@ -442,7 +442,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
       return (
         <>
           <style>{`body { overflow: hidden !important; }`}</style>
-          <div className="chat-fullscreen flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
+          <div className="chat-fullscreen left-0 flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
             <div className="flex-1 flex items-center justify-center">
               <Spin size="large" tip="Loading chat..." />
             </div>
@@ -454,7 +454,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
     return (
       <>
         <style>{`body { overflow: hidden !important; }`}</style>
-        <div className="chat-fullscreen flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
+        <div className="chat-fullscreen left-0 flex flex-col z-10" style={{ backgroundColor: theme?.backgroundColor || '#F0F2F5', overflow: 'hidden' }}>
           <div className="flex-1 overflow-hidden">
             <RoomList onCreateRoom={handlePlusClick} onRoomClick={() => setChatOpened(true)} roomFilter={roomFilter} />
           </div>

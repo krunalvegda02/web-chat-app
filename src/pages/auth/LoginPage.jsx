@@ -448,11 +448,11 @@ export default function LoginPage() {
           </Text>
         </div> */}
 
-        <div style={{ textAlign: 'center', marginBottom: 0 }}>
+        {/* <div style={{ textAlign: 'center', marginBottom: 0 }}>
           <Link to="/reset-password" style={{ fontSize: 12, color: theme?.primaryColor || '#008069' }}>
             Forgot password?
           </Link>
-        </div>
+        </div> */}
 
       </Card>
     </div>

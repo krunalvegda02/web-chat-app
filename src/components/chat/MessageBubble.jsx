@@ -93,7 +93,7 @@ export default function MessageBubble({
   const messageSenderId = typeof message.senderId === 'object' && message.senderId?._id
     ? message.senderId._id
     : (message.senderId || message.sender?._id);
-  const isMine = messageSenderId === currentUser?._id || message.sender?._id === currentUser?._id;
+  const isMine = messageSenderId?.toString() === currentUser?._id?.toString() || message.sender?._id?.toString() === currentUser?._id?.toString();
 
   // Has any translation stored (regardless of current selected language)
   const hasTranslation = message.translation?.isTranslated &&

@@ -41,6 +41,7 @@ import {
   createPlatform,
   togglePlatformStatus,
   updatePlatform,
+  changeAdminPassword,
 } from '../../redux/slices/platformSlice.jsx';
 
 const { Title, Text } = Typography;
@@ -67,6 +68,12 @@ export default function SuperAdminAdminsList() {
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const [displayedApiKey, setDisplayedApiKey] = useState('');
   const [apiKeyCopied, setApiKeyCopied] = useState(false);
+
+  // Change password modal state
+  const [pwdModalOpen, setPwdModalOpen] = useState(false);
+  const [pwdTarget, setPwdTarget] = useState(null);
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdForm] = Form.useForm();
 
   const fetchAdmins = async () => {
     await dispatch(getAllPlatforms());
@@ -161,6 +168,30 @@ const copyApiKey = () => {
     }
   };
 
+  const handleChangePassword = (record) => {
+    setPwdTarget(record);
+    pwdForm.resetFields();
+    setPwdModalOpen(true);
+  };
+
+  const handleSubmitPassword = async (values) => {
+    setPwdLoading(true);
+    try {
+      const result = await dispatch(changeAdminPassword({ id: pwdTarget._id, password: values.password }));
+      if (result.type === 'platform/changeAdminPassword/fulfilled') {
+        message.success(`Password changed for ${pwdTarget.name}`);
+        setPwdModalOpen(false);
+        pwdForm.resetFields();
+      } else {
+        message.error(result.payload || 'Failed to change password');
+      }
+    } catch {
+      message.error('An unexpected error occurred');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   const handleEditTenant = (record) => {
     setEditingTenant(record);
     editForm.setFieldsValue({
@@ -208,15 +239,14 @@ const copyApiKey = () => {
       key: 'name',
       render: (name, record) => (
         <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: '#00806920' }}
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}
           >
-            <UserOutlined style={{ color: '#008069', fontSize: '18px' }} />
+            <UserOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '18px' }} />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate" style={{ color: '#111B21' }}>{name}</p>
-            <p className="text-xs truncate" style={{ color: '#9CA3AF' }}>ID: {record._id?.slice(0, 8)}...</p>
+            <p className="font-semibold text-sm truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{name}</p>
+            <p className="text-xs truncate" style={{ color: theme.timestampColor || '#9CA3AF' }}>ID: {record._id?.slice(0, 8)}...</p>
           </div>
         </div>
       ),
@@ -228,8 +258,8 @@ const copyApiKey = () => {
       responsive: ['sm'],
       render: (email) => (
         <div className="flex items-center gap-2">
-          <MailOutlined style={{ color: '#008069' }} />
-          <Text className="truncate" style={{ color: '#111B21' }}>{email || 'N/A'}</Text>
+          <MailOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />
+          <Text className="truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{email || 'N/A'}</Text>
         </div>
       ),
     },
@@ -257,7 +287,7 @@ const copyApiKey = () => {
       key: 'created',
       responsive: ['sm'],
       render: (_, record) => (
-        <Text style={{ color: '#6B7280', fontSize: '13px' }}>
+        <Text style={{ color: theme.timestampColor || '#6B7280', fontSize: '13px' }}>
           {record.createdAt
             ? new Date(record.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : 'N/A'}
@@ -277,7 +307,16 @@ const copyApiKey = () => {
               icon={<EditOutlined />}
               size="small"
               onClick={() => handleEditTenant(record)}
-              style={{ color: '#008069' }}
+              style={{ color: theme.sidebarHeaderColor || '#008069' }}
+            />
+          </Tooltip>
+          <Tooltip title="Change Password">
+            <Button
+              type="text"
+              icon={<KeyOutlined />}
+              size="small"
+              onClick={() => handleChangePassword(record)}
+              style={{ color: theme.sidebarHeaderColor || '#008069' }}
             />
           </Tooltip>
           <Popconfirm
@@ -306,16 +345,16 @@ const copyApiKey = () => {
   return (
     <div
       className="h-screen sm:min-h-screen p-3 sm:p-4 md:p-6 overflow-y-auto"
-      style={{ backgroundColor: '#F0F2F5', height: 'calc(100vh - 50px)' }}
+      style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', height: 'calc(100vh - 50px)' }}
     >
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <Title level={2} style={{ color: '#111B21', margin: 0, fontSize: 'clamp(20px, 5vw, 28px)' }}>
+            <Title level={2} style={{ color: theme.sidebarTextColor || '#111B21', margin: 0, fontSize: 'clamp(20px, 5vw, 28px)' }}>
               Admin Workspaces
             </Title>
-            <Text style={{ color: '#667781', fontSize: '14px' }}>Manage tenant workspaces & their admins</Text>
+            <Text style={{ color: theme.timestampColor || '#667781', fontSize: '14px' }}>Manage tenant workspaces & their admins</Text>
           </div>
           <Button
             type="primary"
@@ -323,7 +362,7 @@ const copyApiKey = () => {
             onClick={() => setModalOpen(true)}
             size="large"
             className="w-full sm:w-auto"
-            style={{ backgroundColor: '#008069', borderColor: '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}
+            style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}
           >
             <span className="hidden sm:inline">Add New Admin</span>
             <span className="sm:hidden">Add Admin</span>
@@ -334,13 +373,13 @@ const copyApiKey = () => {
         <div className="flex flex-col sm:flex-row gap-3 mb-2">
           <Input
             placeholder="Search by name, email, or phone..."
-            prefix={<SearchOutlined style={{ color: '#008069' }} />}
+            prefix={<SearchOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             allowClear
             onClear={() => { setSearchQuery(''); setCurrentPage(1); }}
             size="large"
-            style={{ borderRadius: '8px' }}
+            style={{ borderRadius: '8px', backgroundColor: theme.inputBackgroundColor || '#FFFFFF' }}
             autoComplete="off"
           />
           <Select
@@ -348,20 +387,20 @@ const copyApiKey = () => {
             onChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
             size="large"
             style={{ width: '100%', minWidth: '150px', borderRadius: '8px' }}
-            suffixIcon={<FilterOutlined style={{ color: '#008069' }} />}
+            suffixIcon={<FilterOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
           >
             <Select.Option value="all">All Status</Select.Option>
             <Select.Option value="ACTIVE">Active</Select.Option>
             <Select.Option value="INACTIVE">Inactive</Select.Option>
           </Select>
         </div>
-        <Text style={{ color: '#667781', fontSize: '13px' }}>
-          Showing <span style={{ color: '#008069', fontWeight: 600 }}>{filteredPlatforms.length}</span> of <span style={{ color: '#008069', fontWeight: 600 }}>{platformsArray.length}</span> admin{platformsArray.length !== 1 ? 's' : ''}
+        <Text style={{ color: theme.timestampColor || '#667781', fontSize: '13px' }}>
+          Showing <span style={{ color: theme.sidebarHeaderColor || '#008069', fontWeight: 600 }}>{filteredPlatforms.length}</span> of <span style={{ color: theme.sidebarHeaderColor || '#008069', fontWeight: 600 }}>{platformsArray.length}</span> admin{platformsArray.length !== 1 ? 's' : ''}
         </Text>
       </div>
 
       {/* Table - Desktop */}
-      <Card className="border-0 hidden md:block" style={{ backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+      <Card className="border-0 hidden md:block" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
         {filteredPlatforms.length > 0 ? (
           <Table
             columns={columns}
@@ -378,23 +417,23 @@ const copyApiKey = () => {
       </Card>
 
       {/* List - Mobile */}
-      <div className="md:hidden">
+      <div className="md:hidden ">
         {paginatedPlatforms.length > 0 ? (
           <>
             <List
               dataSource={paginatedPlatforms}
               loading={loading}
               renderItem={(item) => (
-              <Card className="mb-3 border-0" style={{ backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+              <Card className="mb-3  border-0" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#00806920' }}>
-                    <UserOutlined style={{ color: '#008069', fontSize: '20px' }} />
+                  <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}>
+                    <UserOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '20px' }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-base truncate" style={{ color: '#111B21' }}>{item.name}</p>
-                        <p className="text-xs" style={{ color: '#9CA3AF' }}>ID: {item._id?.slice(0, 8)}...</p>
+                        <p className="font-semibold text-base truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{item.name}</p>
+                        <p className="text-xs" style={{ color: theme.timestampColor || '#9CA3AF' }}>ID: {item._id?.slice(0, 8)}...</p>
                       </div>
                       <Tag
                         icon={item.status === 'ACTIVE' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
@@ -402,7 +441,7 @@ const copyApiKey = () => {
                           backgroundColor: item.status === 'ACTIVE' ? '#ECFDF5' : '#FEF2F2',
                           color: item.status === 'ACTIVE' ? '#10B981' : '#EF4444',
                           border: `1px solid ${item.status === 'ACTIVE' ? '#10B981' : '#EF4444'}`,
-                          borderRadius: '6px', padding: '2px 8px', marginLeft: '8px',
+                          borderRadius: '6px', padding: '2px 8px', marginLeft: '8px', flexShrink: 0,
                         }}
                       >
                         {item.status || 'ACTIVE'}
@@ -410,23 +449,25 @@ const copyApiKey = () => {
                     </div>
                     <div className="space-y-1 mb-3">
                       <div className="flex items-center gap-2">
-                        <MailOutlined style={{ color: '#008069', fontSize: '14px' }} />
-                        <Text className="text-sm truncate" style={{ color: '#667781' }}>{item.admin?.email || 'N/A'}</Text>
+                        <MailOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '14px' }} />
+                        <Text className="text-sm truncate" style={{ color: theme.timestampColor || '#667781' }}>{item.admin?.email || 'N/A'}</Text>
                       </div>
                       {item.admin?.phone && (
                         <div className="flex items-center gap-2">
-                          <PhoneOutlined style={{ color: '#008069', fontSize: '14px' }} />
-                          <Text className="text-sm" style={{ color: '#667781' }}>{item.admin.phone}</Text>
+                          <PhoneOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '14px' }} />
+                          <Text className="text-sm" style={{ color: theme.timestampColor || '#667781' }}>{item.admin.phone}</Text>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <Text className="text-xs" style={{ color: '#9CA3AF' }}>
+                        <Text className="text-xs" style={{ color: theme.timestampColor || '#9CA3AF' }}>
                           Created: {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                         </Text>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button type="default" icon={<EditOutlined />} size="small" onClick={() => handleEditTenant(item)} style={{ color: '#008069', borderColor: '#008069', borderRadius: '6px', flex: 1 }}>Edit</Button>
+                    {/* 2-col grid so buttons never overflow */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="default" icon={<EditOutlined />} size="small" onClick={() => handleEditTenant(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Edit</Button>
+                      <Button type="default" icon={<KeyOutlined />} size="small" onClick={() => handleChangePassword(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Password</Button>
                       <Popconfirm
                         title={`${item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} Admin`}
                         description={`Are you sure you want to ${item.status === 'ACTIVE' ? 'deactivate' : 'activate'} this admin workspace?`}
@@ -439,7 +480,7 @@ const copyApiKey = () => {
                           type="default"
                           icon={item.status === 'ACTIVE' ? <ExclamationCircleOutlined /> : <CheckCircleOutlined />}
                           size="small"
-                          style={{ color: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981', borderColor: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981', borderRadius: '6px', flex: 1 }}
+                          style={{ color: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981', borderColor: item.status === 'ACTIVE' ? '#F59E0B' : '#10B981', borderRadius: '6px', width: '100%' }}
                         >
                           {item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                         </Button>
@@ -463,7 +504,7 @@ const copyApiKey = () => {
             </div>
           </>
         ) : (
-          <Card className="border-0" style={{ backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+          <Card className="border-0" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
             <Empty description="No platforms found" style={{ padding: '40px 0' }} />
           </Card>
         )}
@@ -535,6 +576,70 @@ const copyApiKey = () => {
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={updateLoading} block size="large" style={{ backgroundColor: '#008069', borderColor: '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}>
               {updateLoading ? 'Updating Workspace...' : 'Update Workspace'}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}>
+              <KeyOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '20px' }} />
+            </div>
+            <span style={{ color: theme.sidebarTextColor || '#111B21', fontSize: '18px', fontWeight: 600 }}>Change Password — {pwdTarget?.name}</span>
+          </div>
+        }
+        open={pwdModalOpen}
+        onCancel={() => { setPwdModalOpen(false); pwdForm.resetFields(); }}
+        footer={null}
+        width={440}
+        centered
+      >
+        <Form form={pwdForm} layout="vertical" onFinish={handleSubmitPassword} autoComplete="off">
+          <Form.Item
+            label={<span style={{ color: theme.sidebarTextColor || '#111B21', fontWeight: 500 }}>New Password</span>}
+            name="password"
+            rules={[{ required: true, min: 6, message: 'Password must be at least 6 characters' }]}
+          >
+            <Input.Password
+              placeholder="Enter new password"
+              size="large"
+              prefix={<LockOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
+          <Form.Item
+            label={<span style={{ color: theme.sidebarTextColor || '#111B21', fontWeight: 500 }}>Confirm Password</span>}
+            name="confirmPassword"
+            rules={[
+              { required: true, message: 'Please confirm the password' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) return Promise.resolve();
+                  return Promise.reject(new Error('Passwords do not match'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password
+              placeholder="Confirm new password"
+              size="large"
+              prefix={<LockOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
+          <Form.Item className="mb-0">
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={pwdLoading}
+              block
+              size="large"
+              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}
+            >
+              {pwdLoading ? 'Changing...' : 'Change Password'}
             </Button>
           </Form.Item>
         </Form>

@@ -613,6 +613,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
               style={{ minWidth: 44, color: theme?.headerIconColor || '#FFFFFF' }}
               styles={{ selector: { padding: '0 4px', color: theme?.headerIconColor || '#FFFFFF' } }}
               options={[
+                { value: 'en', label: 'English' },
                 { value: 'hi', label: 'हिंदी Hindi' },
                 { value: 'bn', label: 'বাংলা Bengali' },
                 { value: 'te', label: 'తెలుగు Telugu' },
@@ -747,7 +748,7 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
 
       {/* Input - Fixed Bottom */}
       {!readOnly && (
-        <div style={{ flexShrink: 0, background: theme?.inputBackgroundColor || '#F0F0F0' }}>
+        <div className="chat-input-bar" style={{ flexShrink: 0, background: theme?.sidebarBackgroundColor || '#F0F2F5' }}>
           <MessageInput roomId={activeRoomId} />
         </div>
       )}

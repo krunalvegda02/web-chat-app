@@ -30,6 +30,7 @@ export default function ChatMonitorLayout({
   onUserSelect = () => {},
   title = 'Monitor Chats',
   initialSelectedUserId = null,
+  monitoredUserId = null,
 }) {
   const { theme } = useTheme();
   const [selectedUser, setSelectedUser] = useState(null);
@@ -275,18 +276,17 @@ export default function ChatMonitorLayout({
               ) : messages.length > 0 ? (
                 <>
                   {hasMore && <div className="text-center py-2"><Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>Load older messages</Button></div>}
-                  {messages.map((msg, idx) => {
-                    const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
-                    const sender = msg.sender || msg.senderId;
-                    const currentUserId = sender?.role === 'ADMIN' || sender?.role === 'TENANT_ADMIN' ? sender?._id : null;
-                    
-                    return (
-                      <div key={msg._id} id={`msg-${msg._id}`} style={{ backgroundColor: messageSearchResults[currentMessageSearchIndex]?.msg._id === msg._id ? 'rgba(255, 235, 59, 0.5)' : messageSearchResults.some(r => r.msg._id === msg._id) ? 'rgba(255, 235, 59, 0.2)' : 'transparent', borderRadius: '8px', padding: messageSearchResults.some(r => r.msg._id === msg._id) ? '4px' : '0', transition: 'background-color 0.3s ease' }}>
-                        {showDate && <div className="flex justify-center my-3"><div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>{formatDateLabel(msg.createdAt)}</div></div>}
-                        <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} searchQuery={messageSearchQuery} />
-                      </div>
-                    );
-                  })}
+                  {(() => {
+                    return messages.map((msg, idx) => {
+                      const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
+                      return (
+                        <div key={msg._id} id={`msg-${msg._id}`} style={{ backgroundColor: messageSearchResults[currentMessageSearchIndex]?.msg._id === msg._id ? 'rgba(255, 235, 59, 0.5)' : messageSearchResults.some(r => r.msg._id === msg._id) ? 'rgba(255, 235, 59, 0.2)' : 'transparent', borderRadius: '8px', padding: messageSearchResults.some(r => r.msg._id === msg._id) ? '4px' : '0', transition: 'background-color 0.3s ease' }}>
+                          {showDate && <div className="flex justify-center my-3"><div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>{formatDateLabel(msg.createdAt)}</div></div>}
+                          <MessageBubble message={msg} currentUser={{ _id: monitoredUserId }} showAvatar={true} searchQuery={messageSearchQuery} />
+                        </div>
+                      );
+                    });
+                  })()}
                   <div ref={messagesEndRef} />
                 </>
               ) : (
@@ -403,18 +403,17 @@ export default function ChatMonitorLayout({
                 ) : messages.length > 0 ? (
                   <>
                     {hasMore && <div className="text-center py-2"><Button size="small" loading={messagesLoading} onClick={() => fetchMessages(selectedChat.roomId, page + 1)}>Load older messages</Button></div>}
-                    {messages.map((msg, idx) => {
-                      const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
-                      const sender = msg.sender || msg.senderId;
-                      const currentUserId = sender?.role === 'ADMIN' || sender?.role === 'TENANT_ADMIN' ? sender?._id : null;
-                      
-                      return (
-                        <div key={msg._id} id={`msg-${msg._id}`} style={{ backgroundColor: messageSearchResults[currentMessageSearchIndex]?.msg._id === msg._id ? 'rgba(255, 235, 59, 0.5)' : messageSearchResults.some(r => r.msg._id === msg._id) ? 'rgba(255, 235, 59, 0.2)' : 'transparent', borderRadius: '8px', padding: messageSearchResults.some(r => r.msg._id === msg._id) ? '4px' : '0', transition: 'background-color 0.3s ease' }}>
-                          {showDate && <div className="flex justify-center my-3"><div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>{formatDateLabel(msg.createdAt)}</div></div>}
-                          <MessageBubble message={msg} currentUser={{ _id: currentUserId }} showAvatar={true} searchQuery={messageSearchQuery} />
-                        </div>
-                      );
-                    })}
+                    {(() => {
+                      return messages.map((msg, idx) => {
+                        const showDate = shouldShowDateSeparator(msg, messages[idx - 1]);
+                        return (
+                          <div key={msg._id} id={`msg-${msg._id}`} style={{ backgroundColor: messageSearchResults[currentMessageSearchIndex]?.msg._id === msg._id ? 'rgba(255, 235, 59, 0.5)' : messageSearchResults.some(r => r.msg._id === msg._id) ? 'rgba(255, 235, 59, 0.2)' : 'transparent', borderRadius: '8px', padding: messageSearchResults.some(r => r.msg._id === msg._id) ? '4px' : '0', transition: 'background-color 0.3s ease' }}>
+                            {showDate && <div className="flex justify-center my-3"><div className="px-3 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: '#E9EDEF', color: '#667781' }}>{formatDateLabel(msg.createdAt)}</div></div>}
+                            <MessageBubble message={msg} currentUser={{ _id: monitoredUserId }} showAvatar={true} searchQuery={messageSearchQuery} />
+                          </div>
+                        );
+                      });
+                    })()}
                     <div ref={messagesEndRef} />
                   </>
                 ) : (

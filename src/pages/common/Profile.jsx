@@ -700,7 +700,7 @@ export default function Profile() {
                   </div>
 
                   {/* Reset Password Row */}
-                  <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors${user?.role === 'PLATFORM_ADMIN' ? ' border-b' : ''}`} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                  {/* <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors${user?.role === 'PLATFORM_ADMIN' ? ' border-b' : ''}`} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
                       <div className="flex items-center gap-2 sm:gap-3 flex-1">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}>
@@ -725,7 +725,7 @@ export default function Profile() {
                         Reset
                       </Button>
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* API Key Row - Platform Admin only */}
                   {user?.role === 'PLATFORM_ADMIN' && (
@@ -878,7 +878,7 @@ export default function Profile() {
       )}
 
       {/* Reset Password Modal */}
-      <Modal
+      {/* <Modal
         title={
           <div className="flex items-center gap-2">
             <KeyOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />
@@ -906,7 +906,6 @@ export default function Profile() {
           <Alert message={resetError} type="error" showIcon closable onClose={() => setResetError(null)} style={{ marginBottom: 16 }} />
         )}
 
-        {/* Step 0: Send OTP */}
         {resetStep === 0 && (
           <div className="text-center">
             <p className="text-sm mb-1" style={{ color: theme.modalTextColor || '#111B21' }}>We'll send a 6-digit OTP to:</p>
@@ -924,7 +923,6 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Step 1: Verify OTP */}
         {resetStep === 1 && (
           <div>
             <p className="text-sm text-center mb-4" style={{ color: theme.timestampColor || '#667781' }}>Enter the 6-digit code sent to your email</p>
@@ -966,7 +964,6 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Step 2: New Password */}
         {resetStep === 2 && (
           <Form form={resetForm} layout="vertical" onFinish={handleSetNewPassword} autoComplete="off">
             <Form.Item name="password" rules={[{ validator: validatePasswordStrength }]}>
@@ -1012,7 +1009,6 @@ export default function Profile() {
           </Form>
         )}
 
-        {/* Step 3: Success */}
         {resetStep === 3 && (
           <div className="text-center py-4">
             <CheckCircleOutlined style={{ fontSize: 52, color: theme.sidebarHeaderColor || '#008069', marginBottom: 12 }} />
@@ -1028,7 +1024,7 @@ export default function Profile() {
             </Button>
           </div>
         )}
-      </Modal>
+      </Modal> */}
 
       {/* Remove Avatar Modal - Responsive */}
       <Modal

@@ -9,6 +9,7 @@ export default function SuperAdminAdminChats() {
   const [allUsers, setAllUsers] = useState([]);
   const [selectedUserChats, setSelectedUserChats] = useState([]);
   const [chatsLoading, setChatsLoading] = useState(false);
+  const [monitoredUserId, setMonitoredUserId] = useState(null);
 
   useEffect(() => {
     const loadAllUsers = async () => {
@@ -38,6 +39,8 @@ export default function SuperAdminAdminChats() {
     try {
       const response = await _get(`/chat/user/${userId}/rooms`);
       const rooms = response?.data?.data?.rooms || response?.data?.rooms || [];
+      const returnedUser = response?.data?.data?.user || response?.data?.user;
+      setMonitoredUserId(returnedUser?._id?.toString() || userId.toString());
       setSelectedUserChats(rooms.map(room => {
         const otherParticipant = room.otherParticipants?.[0];
         return {
@@ -69,6 +72,7 @@ export default function SuperAdminAdminChats() {
       chatsLoading={chatsLoading}
       onUserSelect={handleUserSelect}
       title="Monitor Chats"
+      monitoredUserId={monitoredUserId}
     />
   );
 }
