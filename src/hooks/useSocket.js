@@ -65,11 +65,17 @@ export const useSocket = () => {
                 message: messageWithStatus
               }));
 
-              // 🔔 Dispatch custom event for notification
-              window.dispatchEvent(new CustomEvent('socket_message', {
-                detail: { type: 'message_received', message: messageWithStatus }
-              }));
-              console.log('🔔 [SOCKET] Dispatched socket_message event for notifications');
+              // 🔔 Dispatch notification only if: message is from someone else AND room belongs to current user
+              const _currentUserId = user?._id?.toString();
+              const _senderId = data.senderId?._id?.toString() || data.senderId?.toString();
+              const _state = window.__REDUX_STORE__?.getState();
+              const _userRoomIds = (_state?.chat?.rooms || []).map(r => r._id?.toString());
+              const _isMyRoom = _userRoomIds.some(id => id === data.roomId?.toString());
+              if (_senderId && _senderId !== _currentUserId && _isMyRoom) {
+                window.dispatchEvent(new CustomEvent('socket_message', {
+                  detail: { type: 'message_received', message: messageWithStatus }
+                }));
+              }
 
               // ✅ Auto-mark as read logic - ONLY for messages that are actually being viewed
               const state = window.__REDUX_STORE__?.getState();
