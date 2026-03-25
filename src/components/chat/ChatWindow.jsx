@@ -6,10 +6,11 @@ import {
   fetchMessages,
   joinRoomThunk,
   setActiveRoom,
+  setRoomTranslationLanguage,
 } from '../../redux/slices/chatSlice';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import { Spin, Empty, Button, Space, Tooltip, message, Input } from 'antd';
+import { Spin, Empty, Button, Space, Tooltip, message, Input, Select } from 'antd';
 import {
   PhoneOutlined,
   VideoCameraOutlined,
@@ -20,6 +21,7 @@ import {
   CloseOutlined,
   UpOutlined,
   DownOutlined,
+  TranslationOutlined,
 } from '@ant-design/icons';
 import OnlineStatus from './OnlineStatus';
 import TypingIndicator from './TypingIndicator';
@@ -43,9 +45,11 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
     loadingMessages,
     rooms,
     onlineUsers,
+    roomTranslationLanguage,
   } = useSelector((s) => s.chat);
 
   const { user } = useSelector((s) => s.auth);
+  const translationLanguage = roomTranslationLanguage[activeRoomId] || null;
   const [roomDetails, setRoomDetails] = useState(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const hasJoinedRoom = useRef(false);
@@ -597,6 +601,33 @@ export default function ChatWindow({ isMobile = false, showMobileHeader = false,
         </div>
 
         <Space size="small">
+          {/* Language selector for translation */}
+          <Tooltip title={translationLanguage ? `Translating to ${translationLanguage.toUpperCase()}` : 'Translate messages'}>
+            <Select
+              value={translationLanguage}
+              onChange={(val) => dispatch(setRoomTranslationLanguage({ roomId: activeRoomId, language: val || null }))}
+              allowClear
+              placeholder={<TranslationOutlined style={{ color: theme?.headerIconColor || '#FFFFFF', fontSize: '18px' }} />}
+              popupMatchSelectWidth={false}
+              variant="borderless"
+              style={{ minWidth: 44, color: theme?.headerIconColor || '#FFFFFF' }}
+              styles={{ selector: { padding: '0 4px', color: theme?.headerIconColor || '#FFFFFF' } }}
+              options={[
+                { value: 'hi', label: 'हिंदी Hindi' },
+                { value: 'bn', label: 'বাংলা Bengali' },
+                { value: 'te', label: 'తెలుగు Telugu' },
+                { value: 'mr', label: 'मराठी Marathi' },
+                { value: 'ta', label: 'தமிழ் Tamil' },
+                { value: 'gu', label: 'ગુજરાતી Gujarati' },
+                { value: 'kn', label: 'ಕನ್ನಡ Kannada' },
+                { value: 'ml', label: 'മലയാളം Malayalam' },
+                { value: 'pa', label: 'ਪੰਜਾਬੀ Punjabi' },
+                { value: 'or', label: 'ଓଡ଼ିଆ Odia' },
+                { value: 'as', label: 'অসমীয়া Assamese' },
+                { value: 'ur', label: 'اردو Urdu' },
+              ]}
+            />
+          </Tooltip>
           <Tooltip title="Search">
             <Button
               type="text"

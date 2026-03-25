@@ -16,7 +16,8 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
   const dispatch = useDispatch();
   const { theme } = useTheme();
   const { user } = useSelector((s) => s.auth);
-  const { typingUsers, activeRoomId, loadingMessages } = useSelector((s) => s.chat);
+  const { typingUsers, activeRoomId, loadingMessages, roomTranslationLanguage, translatingMessages } = useSelector((s) => s.chat);
+  const translationLanguage = roomTranslationLanguage[activeRoomId] || null;
   const messagesContainerRef = useRef(null);
   const markedAsReadRef = useRef(new Set());
   const [page, setPage] = useState(1);
@@ -372,6 +373,8 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
                         onEdit={handleEdit}
                         onDelete={handleDelete}
                         searchQuery={searchQuery}
+                        translationLanguage={translationLanguage}
+                        isTranslating={!!translatingMessages[message._id]}
                       />
                     </div>
                   );

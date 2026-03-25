@@ -184,7 +184,9 @@ const initialState = {
   userOnlineStatus: {},
   isSendingMessage: false,
   pendingMessageIds: [],
-  _lastReadUpdate: 0, // Force re-render trigger
+  _lastReadUpdate: 0,
+  roomTranslationLanguage: (() => { try { return JSON.parse(localStorage.getItem('roomTranslationLanguage') || '{}'); } catch { return {}; } })(),
+  translatingMessages: {},
 };
 
 
@@ -536,14 +538,39 @@ const chatSlice = createSlice({
     },
 
 
+    // Set translation language for a room
+    setRoomTranslationLanguage(state, action) {
+      const { roomId, language } = action.payload;
+      if (language) {
+        state.roomTranslationLanguage[roomId] = language;
+      } else {
+        delete state.roomTranslationLanguage[roomId];
+      }
+      try { localStorage.setItem('roomTranslationLanguage', JSON.stringify(state.roomTranslationLanguage)); } catch {}
+    },
+
+    // Set translating loading state for a message
+    setMessageTranslating(state, action) {
+      const { messageId, loading } = action.payload;
+      if (loading) {
+        state.translatingMessages[messageId] = true;
+      } else {
+        delete state.translatingMessages[messageId];
+      }
+    },
+
     // ✅ Update message with translation data
     updateMessageTranslation(state, action) {
       const { roomId, messageId, translation } = action.payload;
-      console.log(`🌐 [REDUX] updateMessageTranslation:`, { roomId, messageId, translation });
 
-      if (!state.messagesByRoom[roomId]) return;
+      // Find the correct roomId key in case of string/object mismatch
+      const roomKey = state.messagesByRoom[roomId]
+        ? roomId
+        : Object.keys(state.messagesByRoom).find(k => k.toString() === roomId?.toString());
 
-      state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map(message => {
+      if (!roomKey || !state.messagesByRoom[roomKey]) return;
+
+      state.messagesByRoom[roomKey] = state.messagesByRoom[roomKey].map(message => {
         if (message._id === messageId || message._id?.toString() === messageId?.toString()) {
           return {
             ...message,
@@ -809,6 +836,8 @@ export const {
   setOnlineUsers,
   setUserOnlineStatus,
   updateMessagesReadStatus,
+  setRoomTranslationLanguage,
+  setMessageTranslating,
   updateMessageTranslation,
   editMessage,
   deleteMessage,

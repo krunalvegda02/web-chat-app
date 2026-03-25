@@ -11,6 +11,7 @@ import {
   updateMessageStatus,
   updateMessagesReadStatus,
   updateMessageTranslation,
+  setMessageTranslating,
   updateRoomUnreadCount,
   editMessage,
   deleteMessage,
@@ -63,7 +64,6 @@ export const useSocket = () => {
                 roomId: data.roomId,
                 message: messageWithStatus
               }));
-              console.log('✅ [SOCKET] Message added to Redux state with status:', messageWithStatus.status);
 
               // 🔔 Dispatch custom event for notification
               window.dispatchEvent(new CustomEvent('socket_message', {
@@ -294,10 +294,11 @@ export const useSocket = () => {
             }
           });
 
-          // ✅ Message translated (async translation complete)
+          // ✅ Message translated (on-demand)
           chatSocketClient.on('message_translated', (data) => {
-            console.log('🌐 [SOCKET] message_translated:', data);
+            console.log('🌐 [SOCKET] message_translated received:', data);
             if (data && data.messageId && data.roomId && data.translation) {
+              dispatch(setMessageTranslating({ messageId: data.messageId, loading: false }));
               dispatch(updateMessageTranslation({
                 roomId: data.roomId,
                 messageId: data.messageId,

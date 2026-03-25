@@ -26,7 +26,7 @@ import {
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { useDispatch, useSelector } from 'react-redux';
-import { editMessage, deleteMessage } from '../../redux/slices/chatSlice';
+import { editMessage, deleteMessage, setMessageTranslating } from '../../redux/slices/chatSlice';
 import { chatSocketClient } from '../../sockets/chatSocketClient';
 import ForwardMessageModal from './ForwardMessageModal';
 
@@ -37,10 +37,12 @@ import ForwardMessageModal from './ForwardMessageModal';
 export default function MessageBubble({
   message,
   currentUser,
-  showAvatar, // eslint-disable-line no-unused-vars
+  showAvatar,
   onEdit,
   onDelete,
   searchQuery = '',
+  translationLanguage = null,
+  isTranslating = false,
 }) {
   const { theme } = useTheme();
   const dispatch = useDispatch();
@@ -53,18 +55,25 @@ export default function MessageBubble({
   const audioRefs = useRef({});
   const [showOriginal, setShowOriginal] = useState(false);
 
-  // Check if current user is PLATFORM_ADMIN (sees translations)
-  const isPlatformAdmin = currentUser?.role === 'PLATFORM_ADMIN';
+  const handleTranslate = (e) => {
+    e.stopPropagation();
+    if (!translationLanguage || isTranslating) return;
+    const msgId = message._id?.toString?.() || message._id;
+    dispatch(setMessageTranslating({ messageId: msgId, loading: true }));
+    chatSocketClient.emit('translate_message', { messageId: msgId, targetLanguage: translationLanguage });
+  };
 
+ 
   // Check if user is a platform user (but not platform admin)
   const isPlatformUser = useMemo(() => {
     const hasExternalId = !!currentUser?.externalUserId;
     const hasPlatformId = !!currentUser?.platformId;
     const isUserRole = currentUser?.role === 'USER';
     const isPlatformAdmin = currentUser?.role === 'PLATFORM_ADMIN';
-    // Platform admins should have full functionality, only regular platform users are restricted
     return isUserRole && (hasExternalId || hasPlatformId) && !isPlatformAdmin;
   }, [currentUser]);
+
+  const isPlatformAdmin = currentUser?.role === 'PLATFORM_ADMIN';
 
   // Highlight search text
   const highlightText = (text) => {
@@ -85,6 +94,19 @@ export default function MessageBubble({
     ? message.senderId._id
     : (message.senderId || message.sender?._id);
   const isMine = messageSenderId === currentUser?._id || message.sender?._id === currentUser?._id;
+
+  // Has any translation stored (regardless of current selected language)
+  const hasTranslation = message.translation?.isTranslated &&
+    message.translation?.translatedContent;
+
+  // Only show translate button if language selected and no translation yet for that language
+  const canTranslate = !!translationLanguage &&
+    !isMine &&
+    (message.type === 'text' || message.type === 'audio' || message.type === 'voice') &&
+    (message.content?.trim().length > 0 || !!message.translation?.transcription);
+
+  const alreadyTranslatedForLang = hasTranslation &&
+    message.translation?.targetLanguage === translationLanguage;
 
   // ✅ Status icons - WhatsApp style (white for sent messages) with real-time updates
   const statusConfig = useMemo(() => {
@@ -991,24 +1013,38 @@ export default function MessageBubble({
                   </div>
                 )}
 
-                {/* ✅ TRANSLATED VOICE: Show Hindi audio for PLATFORM_ADMIN */}
-                {isPlatformAdmin && message.translation?.isTranslated && message.translation?.translatedAudioUrl && (
-                  <div className="mt-2 pt-2 border-t mx-3 mb-1" style={{ borderColor: 'rgba(0,0,0,0.1)' }}>
-                    <div className="flex items-center gap-1 text-[11px] mb-1.5" style={{ color: '#008069' }}>
-                      <span>🌐</span>
-                      <span className="font-medium">Hindi Translation</span>
-                    </div>
-                    <audio
-                      controls
-                      src={message.translation.translatedAudioUrl}
-                      className="w-full h-8"
-                      style={{ filter: 'sepia(20%) saturate(70%) grayscale(1) contrast(99%) invert(12%)' }}
-                      preload="metadata"
-                    />
-                    {message.translation.translatedTranscription && (
-                      <div className="text-xs mt-1 opacity-80 italic" style={{ color: '#667781' }}>
-                        "{message.translation.translatedTranscription}"
+                {/* Translation for audio/voice */}
+                {canTranslate && (
+                  <div className="mx-3 mt-1 mb-2">
+                    {isTranslating ? (
+                      <span className="text-[10px] opacity-50">⌛ Translating voice...</span>
+                    ) : alreadyTranslatedForLang ? (
+                      <div>
+                        {/* Translated audio player */}
+                        {message.translation.translatedAudioUrl && !showOriginal && (
+                          <div className="mb-1">
+                            {/* <div className="text-[10px] opacity-60 mb-0.5">🌐 Translated audio</div> */}
+                            <audio
+                              controls
+                              src={message.translation.translatedAudioUrl}
+                              className="w-full h-8"
+                              style={{ filter: 'sepia(20%) saturate(70%) grayscale(1) contrast(99%) invert(12%)' }}
+                              preload="metadata"
+                            />
+                          </div>
+                        )}
+                        {/* Translated caption */}
+                        {message.translation.translatedContent && !showOriginal && (
+                          <div className="text-[12px] italic opacity-80 mb-0.5">{message.translation.translatedContent}</div>
+                        )}
+                        <button onClick={(e) => { e.stopPropagation(); setShowOriginal(!showOriginal); }} className="text-[10px] opacity-60 hover:opacity-100 cursor-pointer" style={{ color:  '#008069', background: 'none', border: 'none', padding: 0 }}>
+                          {showOriginal ? '🌐 Show translation' : '🌐 Original'}
+                        </button>
                       </div>
+                    ) : (
+                      <button onClick={handleTranslate} className="text-[10px] opacity-60 hover:opacity-100 cursor-pointer" style={{ color: '#008069', background: 'none', border: 'none', padding: 0 }}>
+                        🌐 Translate
+                      </button>
                     )}
                   </div>
                 )}
@@ -1166,22 +1202,35 @@ export default function MessageBubble({
                     <span>Forwarded</span>
                   </div>
                 )}
-                <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '10px', minWidth: '120px', paddingTop: (message.isForwarded || message.forwarded) ? '0' : '1px' }}>
-                  {/* ✅ TRANSLATION: Show translated text for PLATFORM_ADMIN */}
-                  {isPlatformAdmin && message.translation?.isTranslated && message.translation?.translatedContent ? (
-                    <div>
-                      <div>{showOriginal ? highlightText(message.content) : highlightText(message.translation.translatedContent)}</div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setShowOriginal(!showOriginal); }}
-                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer hover:underline"
-                        style={{ color: '#008069', background: 'none', border: 'none', padding: 0 }}
-                      >
-                        <span>🌐</span>
-                        <span>{showOriginal ? 'Show translation' : `View original (${message.translation.originalLanguage?.toUpperCase() || '?'})`}</span>
-                      </button>
+                <div className="px-3" style={{ paddingTop: (message.isForwarded || message.forwarded) ? '0' : '0px', paddingBottom: '13px', minWidth: '120px' }}>
+                  {/* Show translated or original text */}
+                  {alreadyTranslatedForLang && !showOriginal
+                    ? highlightText(message.translation.translatedContent)
+                    : highlightText(message.content)
+                  }
+                  {/* Translation status row */}
+                  {canTranslate && (
+                    <div className="mt-0.5">
+                      {isTranslating ? (
+                        <span className="text-[10px] opacity-50">⌛ Translating...</span>
+                      ) : alreadyTranslatedForLang ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowOriginal(!showOriginal); }}
+                          className="text-[10px] opacity-60 hover:opacity-100 cursor-pointer"
+                          style={{ color:  '#008069', background: 'none', border: 'none', padding: 0 }}
+                        >
+                          {showOriginal ? '🌐 Show translation' : '🌐 Original'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleTranslate}
+                          className="text-[10px] opacity-60 hover:opacity-100 cursor-pointer"
+                          style={{ color:  '#008069', background: 'none', border: 'none', padding: 0 }}
+                        >
+                          🌐 Translate
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    highlightText(message.content)
                   )}
                 </div>
               </div>
