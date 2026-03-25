@@ -263,7 +263,7 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
           flexDirection: 'column',
           gap: '16px',
           padding: '40px',
-          background: '#E5DDD5',
+          // background: '#E5DDD5',
         }}
       >
         <div
@@ -313,7 +313,7 @@ const MessageList = memo(function MessageList({ messages = [], searchQuery = '',
             >
               <div
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  // backgroundColor: 'rgba(255, 255, 255, 0.9)',
                   padding: '6px 12px',
                   borderRadius: '8px',
                   fontSize: '12px',

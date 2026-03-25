@@ -635,10 +635,6 @@ export default function MessageBubble({
 
       {/* ✅ Message bubble with context menu */}
       <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
-        <Tooltip
-          title={format(new Date(message.createdAt), 'PPpp')}
-          placement={isMine ? 'left' : 'right'}
-        >
           <div
             className={`relative ${maxWidthClass} transition-all shadow-sm hover:shadow-md ${menuItems.length > 0 ? 'cursor-context-menu' : 'cursor-default'}`}
             style={{ ...bubbleStyle, wordWrap: 'break-word' }}
@@ -798,7 +794,7 @@ export default function MessageBubble({
                   </div>
                 )}
                 {message.content && (
-                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
+                  <div className="px-3 pb-1 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
                     {highlightText(message.content)}
                   </div>
                 )}
@@ -847,7 +843,7 @@ export default function MessageBubble({
                   </div>
                 ))}
                 {message.content && (
-                  <div className="px-3 pb-2 pt-2" style={{ paddingRight: '80px', minWidth: '120px' }}>
+                  <div className="px-3 pb-1 pt-1" style={{ paddingRight: '80px', minWidth: '120px' }}>
                     {highlightText(message.content)}
                   </div>
                 )}
@@ -990,7 +986,7 @@ export default function MessageBubble({
                   );
                 })}
                 {message.content && (
-                  <div className="mt-2 pt-2 border-t pb-2" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '80px', minWidth: '120px' }}>
+                  <div className="mt-2 pt-2 border-t pb-1" style={{ borderColor: isMine ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', paddingRight: '80px', minWidth: '120px' }}>
                     {highlightText(message.content)}
                   </div>
                 )}
@@ -1165,12 +1161,12 @@ export default function MessageBubble({
             {message.type === 'text' && (!message.media || message.media.length === 0) && message.content && (
               <div>
                 {(message.isForwarded || message.forwarded) && (
-                  <div className="px-3 pt-2 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', marginBottom: '2px' }}>
+                  <div className="px-3 pt-1 pb-1 flex items-center gap-1 text-xs italic" style={{ color: '#667781', backgroundColor: 'rgba(0,0,0,0.03)', marginBottom: '2px' }}>
                     <ShareAltOutlined style={{ fontSize: '10px' }} />
                     <span>Forwarded</span>
                   </div>
                 )}
-                <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '22px', minWidth: '120px', paddingTop: (message.isForwarded || message.forwarded) ? '0' : '8px' }}>
+                <div className="px-3 py-2" style={{ paddingRight: message.isEdited ? '115px' : '75px', paddingBottom: '10px', minWidth: '120px', paddingTop: (message.isForwarded || message.forwarded) ? '0' : '1px' }}>
                   {/* ✅ TRANSLATION: Show translated text for PLATFORM_ADMIN */}
                   {isPlatformAdmin && message.translation?.isTranslated && message.translation?.translatedContent ? (
                     <div>
@@ -1207,7 +1203,7 @@ export default function MessageBubble({
             )}
 
             {/* ✅ WhatsApp-style Overlay: Time, Status, Edited indicator */}
-            <div className={`absolute bottom-2 flex items-center gap-1 text-[11px] pointer-events-none z-10 ${isMine ? 'right-2.5' : 'right-2'}`}>
+            <div className={`absolute bottom-[0px] flex items-center gap-1 text-[11px] pointer-events-none z-10 ${isMine ? 'right-2.5' : 'right-2'}`}>
               {/* Edited indicator */}
               {message.isEdited && (
                 <span
@@ -1226,7 +1222,7 @@ export default function MessageBubble({
 
               {/* Time */}
               <span
-                className="text-[11px] font-normal tracking-wide select-none whitespace-nowrap"
+                className="text-[11px] font-normal tracking-wide select-none whitespace-nowrap py-0"
                 style={{
                   color: isMine ? (theme?.timestampColor || '#FFFFFF') : (theme?.timestampColor || '#667781'),
                   opacity: isMine ? 0.9 : 0.7,
@@ -1247,7 +1243,6 @@ export default function MessageBubble({
               )}
             </div>
           </div>
-        </Tooltip>
       </Dropdown>
 
       {/* ✅ Forward button - right side for sender's messages - Hidden for platform users */}
