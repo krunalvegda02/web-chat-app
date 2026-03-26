@@ -47,107 +47,95 @@ export const useSocket = () => {
 
         // ✅ FIX: Initialize global listeners ONCE with better error handling
         if (!globalListenersInitialized) {
-          // ✅ Message received event
+          // ✅ Message received event - OPTIMIZED for speed
           chatSocketClient.on('message_received', (data) => {
-            console.log('✅ [SOCKET] message_received:', data);
-            console.log('📦 [SOCKET] Current user role:', user?.role);
-            console.log('📦 [SOCKET] Dispatching socketMessageReceived for room:', data?.roomId);
-
+            console.log('⚡ [SOCKET] INSTANT message_received:', data);
+            
             if (data && data.roomId) {
-              // ✅ FIX: Ensure status is 'sent' for immediate tick mark
+              // ✅ IMMEDIATE status update - no delays
               const messageWithStatus = {
                 ...data,
                 status: data.status || 'sent'
               };
 
+              // INSTANT Redux dispatch
               dispatch(socketMessageReceived({
                 roomId: data.roomId,
                 message: messageWithStatus
               }));
 
-              // 🔔 Dispatch notification only if: message is from someone else AND room belongs to current user
+              // 🔔 INSTANT notification dispatch
               const _currentUserId = user?._id?.toString();
               const _senderId = data.senderId?._id?.toString() || data.senderId?.toString();
               const _state = window.__REDUX_STORE__?.getState();
               const _userRoomIds = (_state?.chat?.rooms || []).map(r => r._id?.toString());
               const _isMyRoom = _userRoomIds.some(id => id === data.roomId?.toString());
+              
               if (_senderId && _senderId !== _currentUserId && _isMyRoom) {
+                // IMMEDIATE notification
                 window.dispatchEvent(new CustomEvent('socket_message', {
                   detail: { type: 'message_received', message: messageWithStatus }
                 }));
               }
 
-              // ✅ Auto-mark as read logic - ONLY for messages that are actually being viewed
+              // ✅ INSTANT auto-read logic - no setTimeout delays
               const state = window.__REDUX_STORE__?.getState();
               const activeRoomId = state?.chat?.activeRoomId;
               const currentUserId = user?._id?.toString() || user?._id;
               const senderId = data.senderId?.toString() || data.senderId;
 
-              console.log('📦 [SOCKET] Auto-read check:', { activeRoomId, currentUserId, senderId, match: activeRoomId === data.roomId, differentSender: senderId !== currentUserId, documentVisible: !document.hidden });
-
-              // ONLY auto-mark as read if:
-              // 1. User is actively viewing the specific room where message was received
-              // 2. Message is from someone else (not own message)
-              // 3. Document/tab is visible (user is actually looking at it)
-              // 4. NOT in read-only mode (like admin monitoring)
               const shouldAutoMarkRead = (
                 activeRoomId === data.roomId &&
                 senderId !== currentUserId &&
                 !document.hidden &&
-                user?.role !== 'PLATFORM_ADMIN' // Platform admins shouldn't auto-mark as read
+                user?.role !== 'PLATFORM_ADMIN'
               );
 
               if (shouldAutoMarkRead) {
-                // Mark this specific message as read after a delay
-                setTimeout(() => {
-                  chatSocketClient.emit('mark_messages_read', {
-                    roomId: data.roomId,
-                    messageIds: [data._id]
-                  });
-                  console.log(`📖 [AUTO] Auto-marked message ${data._id} as read (user actively viewing room)`);
-                }, 1000); // Increased delay to ensure user actually sees the message
+                // IMMEDIATE mark as read - no delay
+                chatSocketClient.emit('mark_messages_read', {
+                  roomId: data.roomId,
+                  messageIds: [data._id]
+                });
+                console.log(`⚡ [AUTO] INSTANT auto-mark read: ${data._id}`);
               }
             }
           });
 
-          // ✅ FIX: Message sent event (emit by server after send succeeds) with immediate status update
+          // ✅ Message sent event - INSTANT processing
           chatSocketClient.on('message_sent', (data) => {
-            console.log('✅ [SOCKET] message_sent RECEIVED:', data);
+            console.log('⚡ [SOCKET] INSTANT message_sent:', data);
             if (data && (data.tempId || data.messageId) && data.roomId) {
-              console.log(`📦 [SOCKET] Reconciling optimistic message ${data.tempId} with DB ID ${data.messageId}`);
+              // IMMEDIATE status update
               dispatch(updateMessageStatus({
                 roomId: data.roomId,
                 messageId: data.tempId || data.messageId,
                 status: data.status || 'sent',
-                newId: data.messageId // ✅ Pass the permanent ID
+                newId: data.messageId
               }));
 
-              // Force immediate UI update
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('message_status_updated', {
-                  detail: { roomId: data.roomId, messageId: data.messageId, status: data.status }
-                }));
-              }, 50);
+              // IMMEDIATE UI update event
+              window.dispatchEvent(new CustomEvent('message_status_updated', {
+                detail: { roomId: data.roomId, messageId: data.messageId, status: data.status }
+              }));
             }
           });
 
-          // ✅ Message delivered event with immediate UI update
+          // ✅ Message delivered event - INSTANT processing
           chatSocketClient.on('message_delivered', (data) => {
-            console.log('✅ [SOCKET] message_delivered RECEIVED:', data);
+            console.log('⚡ [SOCKET] INSTANT message_delivered:', data);
             if (data && data.messageId && data.roomId) {
-              console.log(`📦 [SOCKET] Updating message ${data.messageId} to delivered`);
+              // IMMEDIATE status update
               dispatch(updateMessageStatus({
                 roomId: data.roomId,
                 messageId: data.messageId,
                 status: 'delivered'
               }));
 
-              // Force immediate UI update
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('message_status_updated', {
-                  detail: { roomId: data.roomId, messageId: data.messageId, status: 'delivered' }
-                }));
-              }, 50);
+              // IMMEDIATE UI update event
+              window.dispatchEvent(new CustomEvent('message_status_updated', {
+                detail: { roomId: data.roomId, messageId: data.messageId, status: 'delivered' }
+              }));
             }
           });
 

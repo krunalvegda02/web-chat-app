@@ -1,12 +1,14 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState, useCallback } from 'react';
-import { fetchRooms, setActiveRoom } from '../../redux/slices/chatSlice';
+import { fetchRooms, setActiveRoom, socketMessageReceived } from '../../redux/slices/chatSlice';
 import { Input, List, Empty, Button, Spin, Dropdown, Modal, message, App } from 'antd';
 import { SearchOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import Avatar from '../common/Avatar';
 import OnlineStatus from './OnlineStatus';
 import { format, isToday, isYesterday } from 'date-fns';
 import { useTheme } from '../../hooks/useTheme';
+import { useRealTimeRoomList } from '../../hooks/useRealTimeRoomList';
+import { useMessagePerformanceMonitor } from '../../hooks/useMessagePerformanceMonitor';
 import API from '../../constants/ApiEndpoints';
 import { _delete, _get, _post } from '../../helper/apiClient';
 
@@ -21,6 +23,12 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
   const [searchLoading, setSearchLoading] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const { modal, message: messageApi } = App.useApp();
+
+  // ✅ Enable real-time room list updates
+  useRealTimeRoomList();
+  
+  // ✅ Monitor message processing performance
+  useMessagePerformanceMonitor();
 
   // Contact search functionality
   const handleContactSearch = async (query) => {
@@ -331,6 +339,13 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
     )
   );
 
+  // ✅ Sort rooms by last message time (most recent first) - WhatsApp behavior
+  const sortedRooms = filteredRooms.sort((a, b) => {
+    const timeA = new Date(a.lastMessageTime || a.createdAt || 0).getTime();
+    const timeB = new Date(b.lastMessageTime || b.createdAt || 0).getTime();
+    return timeB - timeA; // Most recent first
+  });
+
   const getRoomDisplayName = useCallback((room) => {
     return room.name || 'Chat';
   }, []);
@@ -424,6 +439,25 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
         borderRight: `1px solid ${theme?.borderColor || '#E5E7EB'}`,
       }}
     >
+      {/* Add CSS animation for pulse effect */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.7;
+              transform: scale(1.1);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+        `}
+      </style>
       {/* ===== HEADER - WhatsApp Style ===== */}
       <div
         style={{
@@ -478,7 +512,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
 
       {/* ===== ROOM LIST - WhatsApp Style ===== */}
       <div style={{ flex: 1, overflowY: 'auto', backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF' }}>
-        {filteredRooms.length === 0 ? (
+        {sortedRooms.length === 0 ? (
           <div
             style={{
               display: 'flex',
@@ -532,7 +566,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
         ) : (
           
           <List
-            dataSource={filteredRooms}
+            dataSource={sortedRooms}
             renderItem={(room) => {
               const isActive = activeRoomId === room._id;
               const unreadCount = getUnreadCount(room);
@@ -605,7 +639,7 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {/* Top Row: Name and Time */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <div
                               style={{
                                 fontWeight: unreadCount > 0 ? '600' : '500',
@@ -619,6 +653,19 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
                             >
                               {getRoomDisplayName(room)}
                             </div>
+                            {/* New message indicator */}
+                            {unreadCount > 0 && (
+                              <div
+                                style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: theme?.primaryColor || '#00A884',
+                                  flexShrink: 0,
+                                  animation: 'pulse 2s infinite',
+                                }}
+                              />
+                            )}
                             {room.displayPhone && (
                               <div
                                 style={{

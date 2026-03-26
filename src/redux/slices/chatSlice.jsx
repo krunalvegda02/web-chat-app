@@ -246,58 +246,36 @@ const chatSlice = createSlice({
     socketMessageReceived(state, action) {
       const { roomId, message } = action.payload;
 
-      console.log('🔵 [REDUX] ========== socketMessageReceived ==========');
-      console.log('🔵 [REDUX] message_received event payload:', JSON.stringify(message, null, 2));
-      console.log('🔵 [REDUX] Current messages in room:', state.messagesByRoom[roomId]?.length || 0);
-      console.log('🔵 [REDUX] Pending message IDs in state:', state.pendingMessageIds);
-
-      if (message.type === 'call') {
-        console.log('📞 [DEBUG] CALL MESSAGE RECEIVED:', {
-          _id: message._id,
-          type: message.type,
-          content: message.content,
-          callLog: message.callLog,
-          senderId: message.senderId,
-          sender: message.sender
-        });
-      }
+      console.log('⚡ [REDUX] INSTANT socketMessageReceived:', message._id);
 
       if (!state.messagesByRoom[roomId]) {
-        console.log('🆕 [REDUX] Creating new message array for room:', roomId);
         state.messagesByRoom[roomId] = [];
       }
 
+      // FAST duplicate check
       const exists = state.messagesByRoom[roomId].some(m => m._id === message._id && !m.optimistic);
       if (exists) {
         console.log(`⚠️ [REDUX] Duplicate message ignored: ${message._id}`);
         return;
       }
 
-      const beforeCount = state.messagesByRoom[roomId].length;
-
-      // ✅ Find and replace optimistic message by matching content and sender
+      // INSTANT message processing
       let replacedOptimistic = false;
       let finalMessage = null;
       const messageSenderId = (message.senderId?._id || message.senderId)?.toString();
 
+      // FAST optimistic message replacement
       state.messagesByRoom[roomId] = state.messagesByRoom[roomId].map((m) => {
         if (m.optimistic && !replacedOptimistic) {
-          // ✅ Robust matching: Match by real ID OR tempId OR content/media type
           const messageIdStr = message._id?.toString();
           const tempIdStr = message.tempId?.toString();
-
           const isIdMatch = m._id === messageIdStr || (tempIdStr && m._id === tempIdStr);
           const mSenderId = m.senderId?.toString();
-
-          // Fallback Match by sender and content/media
           const contentMatch = m.content === message.content && m.content !== '';
-          const mediaMatch = m.media?.length > 0 && message.media?.length > 0 &&
-            m.type === message.type;
+          const mediaMatch = m.media?.length > 0 && message.media?.length > 0 && m.type === message.type;
 
           if (isIdMatch || (mSenderId === messageSenderId && (contentMatch || mediaMatch))) {
-            console.log(`🔄 [REDUX] Reconciling message. Replaced ${m._id} with ${message._id}`);
             replacedOptimistic = true;
-
             return {
               ...message,
               senderId: messageSenderId,
@@ -310,7 +288,7 @@ const chatSlice = createSlice({
         return m;
       });
 
-      // If no optimistic message was replaced, add as new message
+      // Add as new message if no optimistic replacement
       if (!replacedOptimistic) {
         finalMessage = {
           ...message,
@@ -323,21 +301,19 @@ const chatSlice = createSlice({
           _updatedAt: Date.now(),
         };
 
-        console.log('✅ [REDUX] Adding new message:', { _id: finalMessage._id, sender: finalMessage.sender?.name, status: finalMessage.status });
         state.messagesByRoom[roomId].push(finalMessage);
       } else {
-        // Find the message we just reconciled to update the room preview
         finalMessage = state.messagesByRoom[roomId].find(m => m._id === (message._id || message.tempId));
       }
 
-      // ✅ FIX: Only filter out the specific ID that was reconciled, not all temp messages
+      // INSTANT cleanup of pending IDs
       if (replacedOptimistic) {
         state.pendingMessageIds = state.pendingMessageIds.filter(id =>
           id !== message._id && id !== message.tempId
         );
       }
 
-      // Update room list only if finalMessage exists
+      // INSTANT room list update
       if (finalMessage) {
         const roomsArray = Array.isArray(state.rooms) ? [...state.rooms] : [];
         const roomIndex = roomsArray.findIndex(r => r._id === roomId);
@@ -346,16 +322,21 @@ const chatSlice = createSlice({
           room.lastMessage = finalMessage;
           room.lastMessageTime = finalMessage.createdAt;
           room.lastMessagePreview = finalMessage.content?.substring(0, 50) || '';
-          roomsArray.splice(roomIndex, 1);
-          roomsArray.unshift(room);
+          
+          // Move to top instantly if not already there
+          if (roomIndex !== 0) {
+            roomsArray.splice(roomIndex, 1);
+            roomsArray.unshift(room);
+          } else {
+            roomsArray[0] = room;
+          }
+          
           state.rooms = roomsArray;
-          console.log(`📋 [REDUX] Room list updated for room: ${roomId}`);
-        } else {
-          console.warn(`⚠️ [REDUX] Room ${roomId} not found in rooms array`);
+          console.log(`⚡ [REDUX] INSTANT room list update: ${roomId}`);
         }
       }
 
-      console.log('🔵 [REDUX] ========== END socketMessageReceived ==========');
+      console.log('⚡ [REDUX] INSTANT socketMessageReceived complete');
     },
 
 
