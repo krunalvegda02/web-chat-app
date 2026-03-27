@@ -456,6 +456,31 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
               transform: scale(1);
             }
           }
+          
+          /* Mobile navigation bar spacing */
+          @media (max-width: 768px) {
+            .room-list-container {
+              padding-bottom: 90px !important; /* Extra space for navigation bar */
+              margin-bottom: 0 !important;
+            }
+          }
+          
+          /* iOS Safari specific */
+          @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            @media (max-width: 768px) {
+              .room-list-container {
+                padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;
+              }
+            }
+          }
+          
+          /* Ensure smooth scrolling on mobile */
+          @media (max-width: 768px) {
+            .room-list-container {
+              -webkit-overflow-scrolling: touch;
+              overscroll-behavior: contain;
+            }
+          }
         `}
       </style>
       {/* ===== HEADER - WhatsApp Style ===== */}
@@ -511,7 +536,16 @@ export default function RoomList({ fetchRoomsAction = null, onCreateRoom = null,
       </div>
 
       {/* ===== ROOM LIST - WhatsApp Style ===== */}
-      <div style={{ flex: 1, overflowY: 'auto', backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF' }}>
+      <div 
+        className="room-list-container"
+        style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          backgroundColor: theme?.sidebarBackgroundColor || '#FFFFFF',
+          paddingBottom: '80px', // Default padding for navigation bar
+          scrollBehavior: 'smooth',
+        }}
+      >
         {sortedRooms.length === 0 ? (
           <div
             style={{
