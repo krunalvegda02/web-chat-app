@@ -26,7 +26,7 @@ export default function LayoutWrapper({ hasSidebar, hasTopbar, footer }) {
           ${isInChat ? "" : "mb-14 md:mb-0"}
         `}
         style={{
-          minHeight: '97vh',
+          minHeight: '100vh',
           backgroundColor: '#F9FAFB',
         }}
       >

@@ -54,6 +54,7 @@ import userReducer from './slices/userSlice.jsx';
 import adminChatReducer from './slices/adminChatSlice.jsx';
 import callLogReducer from './slices/callLogSlice.js';
 import notificationReducer from './slices/notificationSlice.jsx';
+import walletReducer from './slices/walletSlice.jsx';
 
 const persistConfig = {
   key: 'root',
@@ -69,6 +70,7 @@ const rootReducer = combineReducers({
   adminChat: adminChatReducer,
   callLogs: callLogReducer,
   notification: notificationReducer,
+  wallet: walletReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

@@ -2,6 +2,7 @@ import {
   MessageOutlined,
   EyeOutlined,
   TeamOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 
 export const getMenuItems = (role, navigate) => {
@@ -21,6 +22,12 @@ export const getMenuItems = (role, navigate) => {
         icon: <TeamOutlined className="text-[22px]" />,
         label: 'Platform Users',
         path: '/admin/platform-clients',
+      },
+      {
+        key: '/admin/wallet',
+        icon: <WalletOutlined className="text-[22px]" />,
+        label: 'Wallet',
+        path: '/admin/wallet',
       },
     ],
 
@@ -46,6 +53,12 @@ export const getMenuItems = (role, navigate) => {
         icon: <TeamOutlined className="text-[22px]" />,
         label: 'Admins',
         path: '/super-admin/admins',
+      },
+      {
+        key: '/super-admin/wallet-requests',
+        icon: <WalletOutlined className="text-[22px]" />,
+        label: 'Wallet',
+        path: '/super-admin/wallet-requests',
       },
     ],
 
@@ -75,3 +88,4 @@ export const getMenuItems = (role, navigate) => {
     })) || []
   );
 };
+

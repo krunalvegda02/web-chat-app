@@ -17,6 +17,7 @@ import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
 import SuperAdminAdminsList from "../pages/superAdmin/SuperAdmin_AdminsList";
 import SuperAdminChat from "../pages/superAdmin/SuperAdminChat";
 import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
+import SuperAdminWalletRequests from "../pages/superAdmin/SuperAdminWalletRequests";
 
 // Admin Pages
 import AdminDashboard from "../pages/admin/AdminChats";
@@ -24,6 +25,7 @@ import AdminUsersList from "../pages/admin/AdminUsersList";
 import AdminUsersChat from "../pages/admin/Admin_userschat";
 import PlatformClients from "../pages/admin/PlatformClients";
 import WhatsAppTestPage from "../pages/admin/WhatsAppTestPage";
+import WalletPage from "../pages/admin/WalletPage";
 
 // User Pages
 import UserChatPage from "../pages/user/UserChatPage";
@@ -69,6 +71,7 @@ export const pageRoutes = [
             { path: "/admin/user-chat", element: AdminUsersChat },
             { path: "/admin/platform-clients", element: PlatformClients },
             { path: "/admin/whatsapp-test", element: WhatsAppTestPage },
+            { path: "/admin/wallet", element: WalletPage },
         ],
     },
 
@@ -80,6 +83,7 @@ export const pageRoutes = [
             { path: "/super-admin/admins", element: SuperAdminAdminsList },
             { path: "/super-admin/chats", element: SuperAdminChat },
             { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
+            { path: "/super-admin/wallet-requests", element: SuperAdminWalletRequests },
         ],
     },
 
