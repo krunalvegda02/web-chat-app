@@ -44,6 +44,7 @@ import {
   fetchBankDetails,
 } from '../../redux/slices/walletSlice';
 import { uploadChatMedia } from '../../redux/slices/chatSlice';
+import clsx from 'clsx';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -56,10 +57,10 @@ export default function WalletPage() {
   const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [form] = Form.useForm();
-  
+
   const [fileList, setFileList] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
@@ -101,7 +102,7 @@ export default function WalletPage() {
       message.error('Payment screenshot is required to verify the transaction.');
       return;
     }
-    
+
     try {
       let finalScreenshotUrl = null;
       if (fileList.length > 0) {
@@ -140,7 +141,6 @@ export default function WalletPage() {
     CREDIT_REQUEST: 'Credit Request',
     CREDIT_APPROVED: 'Credit Added',
     CREDIT_REJECTED: 'Credit Rejected',
-    MESSAGE_DEBIT: 'Message Cost',
   };
 
   const columns = [
@@ -224,7 +224,7 @@ export default function WalletPage() {
             size="small"
             icon={<EyeOutlined />}
             onClick={() => showDetails(record)}
-            className="flex items-center justify-center text-blue-600 bg-blue-50 border-blue-100 hover:bg-blue-100 hover:border-blue-200 rounded-md shadow-sm"
+            className={clsx('flex', 'items-center', 'justify-center', 'text-blue-600', 'bg-blue-50', 'border-blue-100', 'hover:bg-blue-100', 'hover:border-blue-200', 'rounded-md', 'shadow-sm')}
           />
         </Tooltip>
       ),
@@ -243,15 +243,15 @@ export default function WalletPage() {
   };
 
   return (
-    <div className="p-3 md:p-6" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', minHeight: '100vh' }}>
+    <div className={clsx('p-3', 'md:p-6')} style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', minHeight: '100vh' }}>
       {/* Header */}
-      <Card className="mb-4 border-0 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <Card className={clsx('mb-4', 'border-0', 'shadow-sm')}>
+        <div className={clsx('flex', 'flex-col', 'md:flex-row', 'md:items-center', 'md:justify-between', 'gap-4')}>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: theme.sidebarTextColor || '#111B21' }}>
+            <h1 className={clsx('text-2xl', 'font-bold')} style={{ color: theme.sidebarTextColor || '#111B21' }}>
               Wallet
             </h1>
-            <p className="text-sm mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+            <p className={clsx('text-sm', 'mt-1')} style={{ color: theme.timestampColor || '#667781' }}>
               Manage your ChatCoin balance and purchase credits
             </p>
           </div>
@@ -260,7 +260,7 @@ export default function WalletPage() {
 
       {/* Balance Card */}
       <Card style={cardStyle} bodyStyle={{ padding: 0 }}>
-        <div className="p-5 sm:p-7 md:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 sm:gap-4">
+        <div className={clsx('p-5', 'sm:p-7', 'md:p-8', 'flex', 'flex-col', 'sm:flex-row', 'justify-between', 'items-start', 'sm:items-center', 'gap-5', 'sm:gap-4')}>
           <div>
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>
               Available Balance
@@ -270,17 +270,17 @@ export default function WalletPage() {
                 <Spin size="large" />
               ) : (
                 <>
-                  <span className="text-4xl sm:text-5xl md:text-6xl font-bold text-white leading-none">
+                  <span className={clsx('text-4xl', 'sm:text-5xl', 'md:text-6xl', 'font-bold', 'text-white', 'leading-none')}>
                     {balance?.toLocaleString() || '0'}
                   </span>
-                  <span className="text-base sm:text-lg text-white/90 font-medium">
+                  <span className={clsx('text-base', 'sm:text-lg', 'text-white/90', 'font-medium')}>
                     ChatCoin
                   </span>
                 </>
               )}
             </div>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 8, display: 'block' }}>
-              <ThunderboltOutlined /> 1 ChatCoin = 1 character in messages
+              <ThunderboltOutlined /> 5 ChatCoin = 160 character in messages
             </Text>
           </div>
           <Button
@@ -299,7 +299,7 @@ export default function WalletPage() {
               fontWeight: 600,
               boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
             }}
-            className="w-full sm:w-auto"
+            className={clsx('w-full', 'sm:w-auto')}
           >
             Buy Credits
           </Button>
@@ -516,7 +516,7 @@ export default function WalletPage() {
         ]}
       >
         {selectedRecord && (
-          <div className="flex flex-col gap-4">
+          <div className={clsx('flex', 'flex-col', 'gap-4')}>
             <div>
               <Text type="secondary">Transaction ID</Text>
               <div><Text strong>{selectedRecord._id}</Text></div>
@@ -530,14 +530,14 @@ export default function WalletPage() {
               <div>
                 <Tag color={
                   selectedRecord.type === 'CREDIT_REQUEST' ? 'blue' :
-                  selectedRecord.type === 'CREDIT_APPROVED' ? 'green' :
-                  selectedRecord.type === 'CREDIT_REJECTED' ? 'red' :
-                  selectedRecord.type === 'MESSAGE_DEBIT' ? 'volcano' : 'default'
+                    selectedRecord.type === 'CREDIT_APPROVED' ? 'green' :
+                      selectedRecord.type === 'CREDIT_REJECTED' ? 'red' :
+                        selectedRecord.type === 'MESSAGE_DEBIT' ? 'volcano' : 'default'
                 }>
                   {selectedRecord.type === 'CREDIT_REQUEST' ? 'Credit Request' :
-                   selectedRecord.type === 'CREDIT_APPROVED' ? 'Credit Added' :
-                   selectedRecord.type === 'CREDIT_REJECTED' ? 'Credit Rejected' :
-                   selectedRecord.type === 'MESSAGE_DEBIT' ? 'Message Cost' : selectedRecord.type}
+                    selectedRecord.type === 'CREDIT_APPROVED' ? 'Credit Added' :
+                      selectedRecord.type === 'CREDIT_REJECTED' ? 'Credit Rejected' :
+                        selectedRecord.type === 'MESSAGE_DEBIT' ? 'Message Cost' : selectedRecord.type}
                 </Tag>
               </div>
             </div>
@@ -560,7 +560,7 @@ export default function WalletPage() {
                 <Text type="secondary">Screenshot</Text>
                 <div className="mt-2">
                   <a href={selectedRecord.screenshotUrl} target="_blank" rel="noopener noreferrer">
-                    <img src={selectedRecord.screenshotUrl} alt="Payment Screenshot" className="max-w-full rounded border hover:opacity-90 transition-opacity" style={{ maxHeight: 300, objectFit: 'contain' }} />
+                    <img src={selectedRecord.screenshotUrl} alt="Payment Screenshot" className={clsx('max-w-full', 'rounded', 'border', 'hover:opacity-90', 'transition-opacity')} style={{ maxHeight: 300, objectFit: 'contain' }} />
                   </a>
                 </div>
               </div>
