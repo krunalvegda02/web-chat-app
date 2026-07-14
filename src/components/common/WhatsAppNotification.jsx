@@ -26,28 +26,17 @@ export default function WhatsAppNotification({ notification, onClose, onReply })
     
     if (notification.userRole === 'SUPER_ADMIN') {
       chatPath = '/super-admin/chats';
-    } else if (['TENANT_ADMIN', 'PLATFORM_ADMIN'].includes(notification.userRole)) {
+    } else if (['PLATFORM_ADMIN'].includes(notification.userRole)) {
       chatPath = '/admin';
     } else if (notification.userRole === 'USER') {
-      // Check if platform user
-      if (notification.externalUserId || notification.platformId) {
-        chatPath = '/user/chats';
-      } else {
-        chatPath = '/contacts'; // Regular users go to contacts first, then chat opens
-      }
+      chatPath = '/user/chats';
     }
     
     console.log('🔔 [Notification] Navigating to:', chatPath, 'for role:', notification.userRole);
     
     // Navigate to the appropriate chat route
     if (notification.roomId) {
-      if (chatPath === '/contacts') {
-        // For regular users, navigate to contacts and set active room
-        navigate(chatPath);
-      } else {
-        // For admin users, navigate directly to chat with room parameter
-        navigate(`${chatPath}?room=${notification.roomId}`);
-      }
+      navigate(`${chatPath}?room=${notification.roomId}`);
     } else {
       navigate(chatPath);
     }

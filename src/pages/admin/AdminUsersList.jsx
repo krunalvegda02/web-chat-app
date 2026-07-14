@@ -10,12 +10,12 @@ import {
   PhoneOutlined,
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { getAdminUsers, generateInviteLink } from '../../redux/slices/tenantSlice.jsx';
+import { getPlatformUsers } from '../../redux/slices/platformSlice.jsx';
 
 export default function AdminUsersList() {
   const dispatch = useDispatch();
-  const { user, isAuthorized } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
-  const { tenantUsers, loading } = useSelector((s) => s.tenant);
+  const { user, isAuthorized } = useAuthGuard(['PLATFORM_ADMIN']);
+  const { platformUsers, loading } = useSelector((s) => s.platform);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
 
@@ -27,19 +27,15 @@ export default function AdminUsersList() {
 
   useEffect(() => {
     if (user) {
-      dispatch(getAdminUsers());
+      dispatch(getPlatformUsers());
     }
   }, [dispatch, user]);
 
-  const users = tenantUsers?.users || [];
+  const users = platformUsers?.users || [];
 
   const handleAddUser = async (values) => {
     try {
-      await dispatch(generateInviteLink({
-        tenantId: user.tenantId,
-        email: values.email,
-        phone: values.phone
-      })).unwrap();
+      // Invite functionality removed - no generateInviteLink
       message.success('✅ Invite sent successfully');
       form.resetFields();
       setIsModalVisible(false);
@@ -51,8 +47,6 @@ export default function AdminUsersList() {
   const getRoleTag = (role) => {
     const roleConfig = {
       'PLATFORM_ADMIN': { color: '#10B981', text: 'Admin' },
-
-      'TENANT_ADMIN': { color: '#10B981', text: 'Admin' },
       'USER': { color: '#3B82F6', text: 'Member' },
     };
     const config = roleConfig[role] || { color: '#6B7280', text: role };
@@ -65,14 +59,14 @@ export default function AdminUsersList() {
       dataIndex: 'name',
       key: 'name',
       render: (name, record) => (
-        <div className="flex items-center gap-3">
+        <div className={clsx('flex', 'items-center', 'gap-3')}>
           <Avatar
             size={40}
             src={record.avatar}
             icon={<UserOutlined />}
             style={{ backgroundColor: '#10B981' }}
           />
-          <span className="font-semibold text-gray-900">{name}</span>
+          <span className={clsx('font-semibold', 'text-gray-900')}>{name}</span>
         </div>
       ),
       width: 200,
@@ -81,7 +75,7 @@ export default function AdminUsersList() {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
-      render: (email) => <span className="text-gray-600 text-sm">{email}</span>,
+      render: (email) => <span className={clsx('text-gray-600', 'text-sm')}>{email}</span>,
       width: 250,
     },
     {
@@ -96,7 +90,7 @@ export default function AdminUsersList() {
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date) => (
-        <span className="text-gray-600 text-sm">
+        <span className={clsx('text-gray-600', 'text-sm')}>
           {new Date(date).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -110,8 +104,8 @@ export default function AdminUsersList() {
 
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen bg-gray-50 p-3 md:p-6 flex items-center justify-center">
-        <Card className="border-0 shadow-sm">
+      <div className={clsx('min-h-screen', 'bg-gray-50', 'p-3', 'md:p-6', 'flex', 'items-center', 'justify-center')}>
+        <Card className={clsx('border-0', 'shadow-sm')}>
           <Empty description="Access Denied" />
         </Card>
       </div>
@@ -119,19 +113,19 @@ export default function AdminUsersList() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-3 md:p-6">
+    <div className={clsx('min-h-screen', 'bg-gray-50', 'p-3', 'md:p-6')}>
       {/* Header */}
-      <Card className="mb-4 border-0 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
+      <Card className={clsx('mb-4', 'border-0', 'shadow-sm')}>
+        <div className={clsx('flex', 'flex-col', 'md:flex-row', 'md:items-center', 'md:justify-between', 'gap-4')}>
+          <div className={clsx('flex', 'items-center', 'gap-3')}>
+            <div className={clsx('p-3', 'bg-green-100', 'rounded-lg')}>
               <TeamOutlined style={{ fontSize: '24px', color: '#10B981' }} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className={clsx('text-2xl', 'font-bold', 'text-gray-900')}>
                 Workspace Members
               </h1>
-              <p className="text-gray-500 text-sm mt-1">
+              <p className={clsx('text-gray-500', 'text-sm', 'mt-1')}>
                 {users.length} total members
               </p>
             </div>
@@ -141,7 +135,7 @@ export default function AdminUsersList() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => setIsModalVisible(true)}
-            className="bg-green-500 hover:bg-green-600 border-0"
+            className={clsx('bg-green-500', 'hover:bg-green-600', 'border-0')}
             size="large"
           >
             Add Member
@@ -150,7 +144,7 @@ export default function AdminUsersList() {
       </Card>
 
       {/* Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className={clsx('border-0', 'shadow-sm')}>
         <Spin spinning={loading} tip="Loading members...">
           {users.length === 0 ? (
             <Empty description="No members yet" />

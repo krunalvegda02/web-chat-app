@@ -75,15 +75,10 @@ export default function RootRedirect() {
     switch (user.role) {
       case 'SUPER_ADMIN':
         return <Navigate to="/super-admin/admins" replace />;
-      case 'TENANT_ADMIN':
       case 'PLATFORM_ADMIN':
         return <Navigate to="/admin" replace />;
       case 'USER':
-        // Check if platform user
-        if (user.externalUserId || user.platformId) {
-          return <Navigate to="/user/chats" replace />;
-        }
-        return <Navigate to="/contacts" replace />;
+        return <Navigate to="/user/chats" replace />;
       default:
         console.log('❓ [RootRedirect] Unknown role, redirecting to login');
         return <Navigate to="/login" replace />;

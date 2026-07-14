@@ -11,12 +11,6 @@ export const login = createAsyncThunkHandler(
   '/auth/login'
 );
 
-export const register = createAsyncThunkHandler(
-  'auth/register',
-  _post,
-  '/auth/register'
-);
-
 export const fetchMe = createAsyncThunkHandler(
   'auth/fetchMe',
   _get,
@@ -29,34 +23,10 @@ export const logout = createAsyncThunkHandler(
   '/auth/logout'
 );
 
-export const forgotPassword = createAsyncThunkHandler(
-  'auth/forgotPassword',
+export const changePassword = createAsyncThunkHandler(
+  'auth/changePassword',
   _post,
-  '/auth/forgot-password'
-);
-
-export const verifyResetOTP = createAsyncThunkHandler(
-  'auth/verifyResetOTP',
-  _post,
-  '/auth/verify-reset-otp'
-);
-
-export const resetPassword = createAsyncThunkHandler(
-  'auth/resetPassword',
-  _post,
-  '/auth/reset-password'
-);
-
-export const fetchInviteInfo = createAsyncThunkHandler(
-  'auth/fetchInviteInfo',
-  _get,
-  (payload) => `/auth/invite-info?token=${payload.token}&tenantId=${payload.tenantId}`
-);
-
-export const registerWithInvite = createAsyncThunkHandler(
-  'auth/registerWithInvite',
-  _post,
-  '/auth/register-with-invite'
+  '/auth/change-password'
 );
 
 export const updateProfile = createAsyncThunkHandler(
@@ -82,9 +52,6 @@ const initialState = {
   initialized: false,
   token: null,
   refreshToken: null,
-  inviteInfo: null,
-  inviteLoading: false,
-  inviteError: null,
 };
 
 const authSlice = createSlice({
@@ -156,29 +123,17 @@ const authSlice = createSlice({
         state.initialized = true;
       })
 
-      // Register
-      .addCase(register.pending, (state) => {
+      // Change Password
+      .addCase(changePassword.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(register.fulfilled, (state, action) => {
+      .addCase(changePassword.fulfilled, (state) => {
         state.loading = false;
-        // Clear any existing tokens first
-        clearAuthTokens();
-        
-        const { user, accessToken, refreshToken } = action.payload.data || {};
-        state.user = user;
-        state.token = accessToken;
-        state.refreshToken = refreshToken;
-        state.initialized = true;
-        
-        // Save new tokens to localStorage
-        saveTokens(user, accessToken, refreshToken);
       })
-      .addCase(register.rejected, (state, action) => {
+      .addCase(changePassword.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        state.initialized = true;
       })
 
       // Fetch Me
@@ -219,43 +174,7 @@ const authSlice = createSlice({
         clearAuthTokens();
       })
 
-      // Fetch Invite Info
-      .addCase(fetchInviteInfo.pending, (state) => {
-        state.inviteLoading = true;
-        state.inviteError = null;
-      })
-      .addCase(fetchInviteInfo.fulfilled, (state, action) => {
-        state.inviteLoading = false;
-        state.inviteInfo = action.payload.data;
-      })
-      .addCase(fetchInviteInfo.rejected, (state, action) => {
-        state.inviteLoading = false;
-        state.inviteError = action.payload;
-      })
 
-      // Register with Invite
-      .addCase(registerWithInvite.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(registerWithInvite.fulfilled, (state, action) => {
-        state.loading = false;
-        // Clear any existing tokens first
-        clearAuthTokens();
-        
-        const { user, accessToken, refreshToken } = action.payload.data || {};
-        state.user = user;
-        state.token = accessToken;
-        state.refreshToken = refreshToken;
-        state.initialized = true;
-        
-        // Save new tokens to localStorage
-        saveTokens(user, accessToken, refreshToken);
-      })
-      .addCase(registerWithInvite.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
 
       // Update Profile
       .addCase(updateProfile.pending, (state) => {

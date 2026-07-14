@@ -334,8 +334,7 @@ export const usePlatformDetection = () => {
   // Check if current page should be bypassed for platform users
   const shouldBypassCurrentPage = useCallback(() => {
     const isLoginPage = location.pathname === '/login';
-    const isRegisterPage = location.pathname === '/register';
-    const shouldBypass = platformState.isDetected && platformState.shouldAutoLogin && (isLoginPage || isRegisterPage);
+    const shouldBypass = platformState.isDetected && platformState.shouldAutoLogin && isLoginPage;
 
     if (shouldBypass) {
       console.log('🔄 [PlatformDetection] Bypassing auth page for platform user');

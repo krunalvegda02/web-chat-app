@@ -1,12 +1,11 @@
 export function buildUrlWithParams(baseUrl, params = {}) {
-    const { page, limit, search, tenantId } = params;
+    const { page, limit, search } = params;
 
     const queryParams = new URLSearchParams();
 
     if (page) queryParams.append("page", page);
     if (limit) queryParams.append("limit", limit);
     if (search) queryParams.append("search", search);
-    if (tenantId) queryParams.append("tenantId", tenantId);
 
     const queryString = queryParams.toString();
     return queryString ? `${baseUrl}?${queryString}` : baseUrl;

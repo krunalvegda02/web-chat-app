@@ -105,7 +105,7 @@ export default function ProtectedRoute({
           id: user._id,
           email: user.email,
           role: user.role,
-          tenantId: user.tenantId,
+
           platformId: user.platformId,
         },
       });

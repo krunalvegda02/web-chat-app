@@ -10,8 +10,6 @@ import RootRedirect from "../components/routing/RootRedirect";
 
 // Auth Pages
 import LoginPage from "../pages/auth/LoginPage";
-import RegisterPage from "../pages/auth/RegisterPage";
-import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import PlatformAuth from "../components/auth/PlatformAuth";
 
 // Super Admin Pages
@@ -22,7 +20,6 @@ import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
 
 // Admin Pages
 import AdminDashboard from "../pages/admin/AdminChats";
-import AdminThemeSettings from "../pages/admin/AdminThemeSettings";
 import AdminUsersList from "../pages/admin/AdminUsersList";
 import AdminUsersChat from "../pages/admin/Admin_userschat";
 import PlatformClients from "../pages/admin/PlatformClients";
@@ -31,14 +28,11 @@ import WhatsAppTestPage from "../pages/admin/WhatsAppTestPage";
 // User Pages
 import UserChatPage from "../pages/user/UserChatPage";
 import CallLogs from "../pages/common/CallLogsPage";
-import ContactsNew from "../pages/common/ContactsPageNew";
 import Profile from "../pages/common/Profile";
-import UserProfile from "../pages/common/Profile";
 
 // Error Pages
 import Unauthorized from "../pages/common/Unauthorized";
 import NotFound from "../pages/common/NotFound";
-import JoinPage from "../pages/user/JoinPage";
 
 // ------------------------------------
 // CENTRALIZED ROUTE CONFIG
@@ -61,9 +55,6 @@ export const pageRoutes = [
         layout: AuthLayout,
         routes: [
             { path: "/login", element: LoginPage },
-            { path: "/register", element: RegisterPage },
-            { path: "/reset-password", element: ResetPasswordPage },
-            { path: "/join", element: JoinPage },
             { path: "/platform-auth", element: PlatformAuth },
         ],
     },
@@ -71,10 +62,9 @@ export const pageRoutes = [
     // Admin Routes
     {
         layout: AdminLayout,
-        requiredRoles: ["TENANT_ADMIN", "PLATFORM_ADMIN"],
+        requiredRoles: ["PLATFORM_ADMIN"],
         routes: [
             { path: "/admin", element: AdminDashboard },
-            { path: "/admin/theme", element: AdminThemeSettings },
             { path: "/admin/users", element: AdminUsersList },
             { path: "/admin/user-chat", element: AdminUsersChat },
             { path: "/admin/platform-clients", element: PlatformClients },
@@ -106,11 +96,9 @@ export const pageRoutes = [
     // Shared routes for all authenticated users
     {
         layout: SharedLayout,
-        requiredRoles: ["USER", "TENANT_ADMIN", "PLATFORM_ADMIN", "SUPER_ADMIN"],
+        requiredRoles: ["USER", "PLATFORM_ADMIN", "SUPER_ADMIN"],
         routes: [
             { path: "/profile", element: Profile },
-            { path: "/profile/:userId", element: UserProfile },
-            { path: "/contacts", element: ContactsNew },
             { path: "/calls", element: CallLogs },
         ],
     },

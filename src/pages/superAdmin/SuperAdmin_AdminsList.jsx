@@ -54,7 +54,7 @@ export default function SuperAdminAdminsList() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingTenant, setEditingTenant] = useState(null);
+  const [editingPlatform, setEditingPlatform] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -192,8 +192,8 @@ const copyApiKey = () => {
     }
   };
 
-  const handleEditTenant = (record) => {
-    setEditingTenant(record);
+  const handleEditPlatform = (record) => {
+    setEditingPlatform(record);
     editForm.setFieldsValue({
       name: record.name,
       email: record.admin?.email,
@@ -202,16 +202,16 @@ const copyApiKey = () => {
     setEditModalOpen(true);
   };
 
-  const handleUpdateTenant = async (values) => {
+  const handleUpdatePlatform = async (values) => {
     setUpdateLoading(true);
     try {
-      const result = await dispatch(updatePlatform({ id: editingTenant._id, ...values }));
+      const result = await dispatch(updatePlatform({ id: editingPlatform._id, ...values }));
       
       if (result.type === 'platform/updatePlatform/fulfilled') {
         message.success('Platform updated successfully!');
         editForm.resetFields();
         setEditModalOpen(false);
-        setEditingTenant(null);
+        setEditingPlatform(null);
         await fetchAdmins();
       } else if (result.type === 'platform/updatePlatform/rejected') {
         const errorMessage = result.payload || result.error?.message || 'Failed to update platform';
@@ -306,7 +306,7 @@ const copyApiKey = () => {
               type="text"
               icon={<EditOutlined />}
               size="small"
-              onClick={() => handleEditTenant(record)}
+              onClick={() => handleEditPlatform(record)}
               style={{ color: theme.sidebarHeaderColor || '#008069' }}
             />
           </Tooltip>
@@ -354,7 +354,7 @@ const copyApiKey = () => {
             <Title level={2} style={{ color: theme.sidebarTextColor || '#111B21', margin: 0, fontSize: 'clamp(20px, 5vw, 28px)' }}>
               Admin Workspaces
             </Title>
-            <Text style={{ color: theme.timestampColor || '#667781', fontSize: '14px' }}>Manage tenant workspaces & their admins</Text>
+            <Text style={{ color: theme.timestampColor || '#667781', fontSize: '14px' }}>Manage platform workspaces & their admins</Text>
           </div>
           <Button
             type="primary"
@@ -466,7 +466,7 @@ const copyApiKey = () => {
                     </div>
                     {/* 2-col grid so buttons never overflow */}
                     <div className="grid grid-cols-2 gap-2">
-                      <Button type="default" icon={<EditOutlined />} size="small" onClick={() => handleEditTenant(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Edit</Button>
+                      <Button type="default" icon={<EditOutlined />} size="small" onClick={() => handleEditPlatform(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Edit</Button>
                       <Button type="default" icon={<KeyOutlined />} size="small" onClick={() => handleChangePassword(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Password</Button>
                       <Popconfirm
                         title={`${item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} Admin`}
@@ -558,12 +558,12 @@ const copyApiKey = () => {
           </div>
         }
         open={editModalOpen}
-        onCancel={() => { setEditModalOpen(false); setEditingTenant(null); editForm.resetFields(); }}
+        onCancel={() => { setEditModalOpen(false); setEditingPlatform(null); editForm.resetFields(); }}
         footer={null}
         width={500}
         centered
       >
-        <Form form={editForm} layout="vertical" onFinish={handleUpdateTenant} autoComplete="off">
+        <Form form={editForm} layout="vertical" onFinish={handleUpdatePlatform} autoComplete="off">
           <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Platform name</span>} name="name" rules={[{ required: true, message: 'Please enter Platform name' }]}>
             <Input placeholder="Enter Platform name" size="large" prefix={<UserOutlined style={{ color: '#008069' }} />} style={{ borderRadius: '8px' }} />
           </Form.Item>

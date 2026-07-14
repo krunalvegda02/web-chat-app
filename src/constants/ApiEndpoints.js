@@ -1,6 +1,5 @@
 const API = {
     AUTH: {
-        REGISTER: '/auth/register',
         LOGIN: '/auth/login',
         LOGOUT: '/auth/logout',
         ME: '/auth/me',
@@ -27,19 +26,6 @@ const API = {
         ADMIN_MEMBER_CHATS: '/chat/admin/member-chats',
         SPECIFIC_MEMBER_CHATS: '/chat/admin/member-chats/:memberId',
         MEMBER_CHAT_HISTORY: '/chat/admin/member-chats/:memberId/room/:roomId',
-    },
-    CONTACTS: {
-        SEARCH_USER: '/contacts/search-user',
-        ADD: '/contacts',
-        GET_ALL: '/contacts',
-        REMOVE: '/contacts',
-        UPDATE_NAME: '/contacts',
-    },
-    TENANT: {
-        GET_ALL: '/tenants',
-        GET_THEME: '/tenants/:tenantId/theme',
-        UPDATE_THEME: '/tenants/:tenantId/theme',
-        ADMIN_USERS: '/tenants/admin-users',
     },
     PLATFORM: {
         GET_THEME: '/platforms/:platformId/theme',

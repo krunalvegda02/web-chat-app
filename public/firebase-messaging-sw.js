@@ -15,12 +15,12 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message:', payload);
-  
+
   const { data } = payload;
   const title = data?.senderName || data?.title || 'New Message';
   const body = data?.body || 'You have a new message';
   const icon = data?.avatar || 'https://ui-avatars.com/api/?name=User&background=25D366&color=fff&size=128';
-  
+
   return self.registration.showNotification(title, {
     body,
     icon,
@@ -43,17 +43,17 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked - Action:', event.action);
-  
+
   const data = event.notification.data;
   const roomId = data?.roomId;
   const userRole = data?.userRole || 'USER';
-  
+
   // Handle inline reply with text input
   if (event.action === 'reply') {
     if (event.reply) {
       console.log('[SW] Reply text:', event.reply);
       event.notification.close();
-      
+
       // Send reply to app
       event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })
@@ -71,19 +71,19 @@ self.addEventListener('notificationclick', (event) => {
       return;
     }
   }
-  
+
   // Handle notification body click - open chat
   event.notification.close();
-  
+
   let chatPath = '/chat';
   if (userRole === 'SUPER_ADMIN') {
     chatPath = '/super-admin/chats';
-  } else if (['ADMIN', 'TENANT_ADMIN'].includes(userRole)) {
+  } else if (['PLATFORM_ADMIN'].includes(userRole)) {
     chatPath = '/admin/chats';
   }
-  
+
   const url = roomId ? `${chatPath}?room=${roomId}` : chatPath;
-  
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {

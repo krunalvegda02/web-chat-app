@@ -1,15 +1,7 @@
 import {
   MessageOutlined,
-  BgColorsOutlined,
-  UsergroupAddOutlined,
-  AreaChartOutlined,
-  DashboardOutlined,
-  ContactsOutlined,
   EyeOutlined,
   TeamOutlined,
-  CommentOutlined,
-  BookOutlined,
-  SolutionOutlined,
 } from '@ant-design/icons';
 
 export const getMenuItems = (role, navigate) => {
@@ -24,67 +16,14 @@ export const getMenuItems = (role, navigate) => {
         label: 'Messages',
         path: '/admin',
       },
-      // {
-      //   key: '/admin/contacts',
-      //   icon: <SolutionOutlined className="text-[22px]" />,
-      //   label: 'Contacts',
-      //   path: '/contacts',
-      // },
       {
         key: '/admin/platform-clients',
         icon: <TeamOutlined className="text-[22px]" />,
         label: 'Platform Users',
         path: '/admin/platform-clients',
       },
-      // {
-      //   key: '/admin/user-chat',
-      //   icon: <CommentOutlined className="text-[22px]" />,
-      //   label: 'User Chats',
-      //   path: '/admin/user-chat',
-      // },
-      // {
-      //   key: '/admin/appearance',
-      //   icon: <BgColorsOutlined className="text-[22px]" />,
-      //   label: 'Appearance',
-      //   path: '/admin/theme',
-      // },
     ],
 
-    /* ============================
-       TENANT ADMIN MENU
-       ============================ */
-    TENANT_ADMIN: [
-      {
-        key: '/admin/messages',
-        icon: <MessageOutlined className="text-[22px]" />,
-        label: 'Messages',
-        path: '/admin',
-      },
-      // {
-      //   key: '/admin/contacts',
-      //   icon: <SolutionOutlined className="text-[22px]" />,
-      //   label: 'Contacts',
-      //   path: '/contacts',
-      // },
-      {
-        key: '/admin/users',
-        icon: <TeamOutlined className="text-[22px]" />,
-        label: 'User Management',
-        path: '/admin/users',
-      },
-      // {
-      //   key: '/admin/user-chat',
-      //   icon: <CommentOutlined className="text-[22px]" />,
-      //   label: 'Member Chats',
-      //   path: '/admin/user-chat',
-      // },
-      {
-        key: '/admin/appearance',
-        icon: <BgColorsOutlined className="text-[22px]" />,
-        label: 'Appearance',
-        path: '/admin/theme',
-      },
-    ],
 
     /* ============================
        SUPER ADMIN MENU
@@ -119,12 +58,6 @@ export const getMenuItems = (role, navigate) => {
         icon: <MessageOutlined className="text-[22px]" />,
         label: 'Chats',
         path: '/user/chats',
-      },
-      {
-        key: '/user/contacts',
-        icon: <ContactsOutlined className="text-[22px]" />,
-        label: 'Contacts',
-        path: '/contacts',
       },
     ],
   };

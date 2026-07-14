@@ -129,7 +129,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
   }, [location.pathname, searchParams, activeRoomId, dispatch, navigate]);
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  const isAdmin = ['ADMIN', 'TENANT_ADMIN', 'PLATFORM_ADMIN'].includes(user?.role);
+  const isAdmin = ['ADMIN', 'PLATFORM_ADMIN'].includes(user?.role);
   const isRegularUser = user?.role === 'USER';
   const isNonSuperAdmin = isAdmin || isRegularUser;
 
@@ -140,100 +140,15 @@ export default function StandardChatLayout({ roomFilter = null }) {
     setAvailableUsers([]);
     setCurrentPage(1);
 
-    if (isSuperAdmin) {
-      setLoadingUsers(false);
-      return;
-    }
-
     setLoadingUsers(true);
     try {
-      if (isNonSuperAdmin) {
-        const response = await _get('/contacts');
-        const contacts = response?.data?.contacts || response?.data?.data?.contacts || [];
-        setAvailableUsers(
-          contacts.map((c) => ({
-            _id: c.userId?._id || c.userId,
-            name: c.userId?.name || c.name,
-            email: c.userId?.email || c.email,
-            phone: c.userId?.phone || c.phone,
-            avatar: c.userId?.avatar || c.avatar,
-            role: c.userId?.role || c.role,
-            contactName: c.contactName,
-          }))
-        );
-      }
+      const response = await _get('/chat/available-users');
+      const users = response?.data?.users || response?.data?.data?.users || [];
+      setAvailableUsers(users);
     } catch (error) {
-      message.error('Failed to load contacts');
+      message.error('Failed to load users');
     } finally {
       setLoadingUsers(false);
-    }
-  };
-
-  const handleSearchClick = async () => {
-    if (!searchUserTerm.trim()) {
-      setSearchResults([]);
-      setCurrentPage(1);
-      return;
-    }
-
-    setCurrentPage(1);
-    setSearchLoading(true);
-    try {
-      const response = await _get(`/users/search?query=${searchUserTerm}`);
-      const users = response?.data?.data?.users || [];
-      const mappedUsers = users.map((u) => ({
-        _id: u._id,
-        name: u.name,
-        email: u.email?.replace('mailto:', '') || u.email,
-        phone: u.phone,
-        avatar: u.avatar,
-        role: u.role,
-        isSearchResult: true,
-      }));
-      setSearchResults(mappedUsers);
-    } catch (error) {
-      message.error('Search failed');
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const isUserInContacts = useCallback(
-    (userId) => {
-      return availableUsers.some((u) => u._id === userId);
-    },
-    [availableUsers]
-  );
-
-  const handleAddContactAndChat = async (selectedUser) => {
-    try {
-      setCreatingRoom(true);
-
-      try {
-        await _post('/contacts/add', {
-          identifier: selectedUser.email || selectedUser.phone,
-          contactName: selectedUser.name,
-        });
-      } catch (error) {
-        if (error.response?.status !== 400) {
-          throw error;
-        }
-      }
-
-      const result = await dispatch(createOrGetRoom({ userId: selectedUser._id })).unwrap();
-
-      const roomId = result?.data?.room?._id || result?.room?._id || result?._id;
-
-      if (roomId) {
-        dispatch(setActiveRoom(roomId));
-        await dispatch(fetchRooms());
-        setChatOpened(true);
-        setShowModal(false);
-      }
-    } catch (error) {
-      message.error(error?.response?.data?.message || 'Failed to create chat');
-    } finally {
-      setCreatingRoom(false);
     }
   };
 
@@ -261,26 +176,21 @@ export default function StandardChatLayout({ roomFilter = null }) {
   const sortedUsers = useMemo(() => {
     let users = availableUsers;
 
-    // For super admin, use search results when searching
-    if (isSuperAdmin && searchUserTerm.trim()) {
-      users = searchResults;
-    }
-    // For admin/user, filter contacts by search term
-    else if (isNonSuperAdmin && searchUserTerm.trim()) {
+    if (searchUserTerm.trim()) {
       const query = searchUserTerm.toLowerCase();
       users = availableUsers.filter(u => {
-        const name = (u.contactName || u.name || '').toLowerCase();
+        const name = (u.name || '').toLowerCase();
         const phone = (u.phone || '').toLowerCase();
         return name.includes(query) || phone.includes(query);
       });
     }
 
     return [...users].sort((a, b) => {
-      const nameA = (a.contactName || a.name || '').toLowerCase();
-      const nameB = (b.contactName || b.name || '').toLowerCase();
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
-  }, [searchUserTerm, searchResults, availableUsers, isNonSuperAdmin, isSuperAdmin]);
+  }, [searchUserTerm, availableUsers]);
 
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -291,7 +201,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
   const groupedUsers = useMemo(() => {
     const groups = {};
     paginatedUsers.forEach(user => {
-      const firstLetter = (user.contactName || user.name || '?').charAt(0).toUpperCase();
+      const firstLetter = (user.name || '?').charAt(0).toUpperCase();
       if (!groups[firstLetter]) {
         groups[firstLetter] = [];
       }
@@ -330,13 +240,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
-                  onClick={() => {
-                    if (isNonSuperAdmin && userItem.isSearchResult && !isUserInContacts(userItem._id)) {
-                      handleAddContactAndChat(userItem);
-                    } else {
-                      handleCreateRoom(userItem);
-                    }
-                  }}
+                  onClick={() => handleCreateRoom(userItem)}
                 >
                   <div className="flex items-center gap-3">
                     <Avatar size={48} style={{ backgroundColor: primaryColor, fontWeight: 600 }}>
@@ -344,7 +248,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <Text strong style={{ fontSize: '16px', display: 'block' }}>
-                        {userItem.contactName || userItem.name}
+                        {userItem.name}
                       </Text>
                       <Text style={{ color: '#667781', fontSize: '14px', display: 'block' }}>
                         {userItem.phone || userItem.email}
@@ -401,15 +305,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
           )}
         </>
       ) : (
-        <Empty
-          description={
-            isSuperAdmin
-              ? 'Search by name, email or phone to find users'
-              : searchUserTerm
-                ? 'No contacts found'
-                : 'No contacts yet. Search to add new contacts.'
-          }
-        />
+        <Empty description="No users found" />
       )}
     </div>
   );
@@ -467,7 +363,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
                 <UserAddOutlined style={{ color: primaryColor, fontSize: '18px' }} />
               </div>
               <span style={{ fontSize: '16px', fontWeight: 600 }}>
-                {isSuperAdmin ? 'Search Users' : 'My Users'}
+                Select User
               </span>
             </div>
           }
@@ -478,37 +374,14 @@ export default function StandardChatLayout({ roomFilter = null }) {
           centered
         >
           <div className="mb-4">
-            {isSuperAdmin ? (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Search by name, email or phone..."
-                  value={searchUserTerm}
-                  onChange={(e) => setSearchUserTerm(e.target.value)}
-                  onPressEnter={handleSearchClick}
-                  size="large"
-                  style={{ borderRadius: '8px', flex: 1 }}
-                />
-                <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  onClick={handleSearchClick}
-                  loading={searchLoading}
-                  size="large"
-                  style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
-                >
-                  Search
-                </Button>
-              </div>
-            ) : (
-              <Input
-                placeholder="Search contacts..."
-                value={searchUserTerm}
-                onChange={(e) => setSearchUserTerm(e.target.value)}
-                size="large"
-                prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
-                style={{ borderRadius: '8px' }}
-              />
-            )}
+            <Input
+              placeholder="Search users..."
+              value={searchUserTerm}
+              onChange={(e) => setSearchUserTerm(e.target.value)}
+              size="large"
+              prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
+              style={{ borderRadius: '8px' }}
+            />
           </div>
 
           {renderContactList()}
@@ -523,7 +396,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
               }}
             >
               <Text style={{ color: '#667781', fontSize: '14px' }}>
-                {totalUsers} contact{totalUsers !== 1 ? 's' : ''}
+                {totalUsers} user{totalUsers !== 1 ? 's' : ''}
               </Text>
             </div>
           )}
@@ -568,7 +441,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
               <UserAddOutlined style={{ color: primaryColor, fontSize: '18px' }} />
             </div>
             <span style={{ fontSize: '16px', fontWeight: 600 }}>
-              {isSuperAdmin ? 'Search Users' : 'My Users'}
+              Select User
             </span>
           </div>
         }
@@ -579,37 +452,14 @@ export default function StandardChatLayout({ roomFilter = null }) {
         centered
       >
         <div className="mb-4">
-          {isSuperAdmin ? (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search by name, email or phone..."
-                value={searchUserTerm}
-                onChange={(e) => setSearchUserTerm(e.target.value)}
-                onPressEnter={handleSearchClick}
-                size="large"
-                style={{ borderRadius: '8px', flex: 1 }}
-              />
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                onClick={handleSearchClick}
-                loading={searchLoading}
-                size="large"
-                style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
-              >
-                Search
-              </Button>
-            </div>
-          ) : (
-            <Input
-              placeholder="Search contacts..."
-              value={searchUserTerm}
-              onChange={(e) => setSearchUserTerm(e.target.value)}
-              size="large"
-              prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
-              style={{ borderRadius: '8px' }}
-            />
-          )}
+          <Input
+            placeholder="Search users..."
+            value={searchUserTerm}
+            onChange={(e) => setSearchUserTerm(e.target.value)}
+            size="large"
+            prefix={<SearchOutlined style={{ color: '#8696A0' }} />}
+            style={{ borderRadius: '8px' }}
+          />
         </div>
 
         {renderContactList()}
@@ -624,7 +474,7 @@ export default function StandardChatLayout({ roomFilter = null }) {
             }}
           >
             <Text style={{ color: '#667781', fontSize: '14px' }}>
-              {totalUsers} contact{totalUsers !== 1 ? 's' : ''}
+              {totalUsers} user{totalUsers !== 1 ? 's' : ''}
             </Text>
           </div>
         )}

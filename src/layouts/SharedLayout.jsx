@@ -5,7 +5,7 @@ import { LayoutProvider } from '../hooks/useLayout';
 import { useSocket } from '../hooks/useSocket';
 
 export default function SharedLayout() {
-  const { user } = useAuthGuard(['USER', 'TENANT_ADMIN', 'PLATFORM_ADMIN', 'SUPER_ADMIN']);
+  const { user } = useAuthGuard(['USER', 'PLATFORM_ADMIN', 'SUPER_ADMIN']);
   
   useSocket();
 

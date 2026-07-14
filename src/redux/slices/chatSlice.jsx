@@ -12,7 +12,7 @@ import API from '../../constants/ApiEndpoints';
 export const fetchRooms = createAsyncThunkHandler(
   'chat/fetchRooms',
   _get,
-  (tenantId) => buildUrlWithParams(API.CHAT.ROOMS, tenantId ? { tenantId } : {})
+  () => API.CHAT.ROOMS,
 );
 
 

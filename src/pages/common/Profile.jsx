@@ -34,10 +34,9 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/common/Avatar';
-import { updateProfile, forgotPassword, verifyResetOTP, resetPassword } from '../../redux/slices/authSlice';
+import { updateProfile, changePassword } from '../../redux/slices/authSlice';
 import { updateProfileWithAvatar } from '../../redux/slices/userSlice';
 import { getApiKey } from '../../redux/slices/platformSlice.jsx';
-import OTPInput from '../../components/common/OTPInput';
 import { copyToClipboardWithMessage } from '../../utils/clipboardUtils';
 
 export default function Profile() {
@@ -62,14 +61,11 @@ export default function Profile() {
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
   const [apiKeyCopied, setApiKeyCopied] = useState(false);
 
-  // Reset password modal state
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [resetStep, setResetStep] = useState(0);
-  const [resetOtp, setResetOtp] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetError, setResetError] = useState(null);
-  const [resendTimer, setResendTimer] = useState(0);
-  const [resetForm] = Form.useForm();
+  // Change password modal state
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState(null);
+  const [changePasswordForm] = Form.useForm();
 
   // Handle window resize
   useEffect(() => {
@@ -78,73 +74,33 @@ export default function Profile() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    if (resendTimer > 0) {
-      const t = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
-      return () => clearTimeout(t);
-    }
-  }, [resendTimer]);
-
-  const openResetModal = () => {
-    setResetStep(0);
-    setResetOtp('');
-    setResetError(null);
-    resetForm.resetFields();
-    setResetModalOpen(true);
+  const openChangePasswordModal = () => {
+    changePasswordForm.resetFields();
+    setChangePasswordError(null);
+    setChangePasswordModalOpen(true);
   };
 
-  const closeResetModal = () => {
-    setResetModalOpen(false);
-    setResetStep(0);
-    setResetOtp('');
-    setResetError(null);
-    resetForm.resetFields();
+  const closeChangePasswordModal = () => {
+    setChangePasswordModalOpen(false);
+    setChangePasswordError(null);
+    changePasswordForm.resetFields();
   };
 
-  const handleSendOtp = async () => {
+  const handleChangePassword = async (values) => {
     try {
-      setResetLoading(true);
-      setResetError(null);
-      await dispatch(forgotPassword({ email: user?.email })).unwrap();
-      setResetStep(1);
-      setResendTimer(30);
-      antMessage.success('OTP sent to your email');
+      setChangePasswordLoading(true);
+      setChangePasswordError(null);
+      await dispatch(changePassword({
+        oldPassword: values.oldPassword,
+        newPassword: values.newPassword,
+        confirmPassword: values.confirmPassword
+      })).unwrap();
+      antMessage.success('Password changed successfully!');
+      closeChangePasswordModal();
     } catch (err) {
-      setResetError(err || 'Failed to send OTP');
+      setChangePasswordError(err || 'Failed to change password');
     } finally {
-      setResetLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (resetOtp.length !== 6) {
-      antMessage.error('Please enter the 6-digit OTP');
-      return;
-    }
-    try {
-      setResetLoading(true);
-      setResetError(null);
-      await dispatch(verifyResetOTP({ email: user?.email, otp: resetOtp })).unwrap();
-      setResetStep(2);
-      antMessage.success('OTP verified!');
-    } catch (err) {
-      setResetError(err || 'Invalid or expired OTP');
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
-  const handleSetNewPassword = async (values) => {
-    try {
-      setResetLoading(true);
-      setResetError(null);
-      await dispatch(resetPassword({ email: user?.email, otp: resetOtp, password: values.password, confirmPassword: values.confirmPassword })).unwrap();
-      setResetStep(3);
-      antMessage.success('Password reset successfully!');
-    } catch (err) {
-      setResetError(err || 'Failed to reset password');
-    } finally {
-      setResetLoading(false);
+      setChangePasswordLoading(false);
     }
   };
 
@@ -700,7 +656,7 @@ export default function Profile() {
                   </div>
 
                   {/* Reset Password Row */}
-                  {/* <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors${user?.role === 'PLATFORM_ADMIN' ? ' border-b' : ''}`} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                  <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 transition-colors${user?.role === 'PLATFORM_ADMIN' ? ' border-b' : ''}`} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
                       <div className="flex items-center gap-2 sm:gap-3 flex-1">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.inputBackgroundColor || '#F0F2F5' }}>
@@ -714,7 +670,7 @@ export default function Profile() {
                       <Button
                         size="small"
                         icon={<KeyOutlined />}
-                        onClick={openResetModal}
+                        onClick={openChangePasswordModal}
                         style={{
                           borderColor: theme.sidebarHeaderColor || '#008069',
                           color: theme.sidebarHeaderColor || '#008069',
@@ -722,10 +678,10 @@ export default function Profile() {
                           fontSize: '12px',
                         }}
                       >
-                        Reset
+                        Change
                       </Button>
                     </div>
-                  </div> */}
+                  </div>
 
                   {/* API Key Row - Platform Admin only */}
                   {user?.role === 'PLATFORM_ADMIN' && (
@@ -877,16 +833,16 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Reset Password Modal */}
-      {/* <Modal
+      {/* Change Password Modal */}
+      <Modal
         title={
           <div className="flex items-center gap-2">
             <KeyOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />
-            <span style={{ color: theme.modalTextColor || '#111B21' }}>Reset Password</span>
+            <span style={{ color: theme.modalTextColor || '#111B21' }}>Change Password</span>
           </div>
         }
-        open={resetModalOpen}
-        onCancel={closeResetModal}
+        open={changePasswordModalOpen}
+        onCancel={closeChangePasswordModal}
         footer={null}
         centered
         width={440}
@@ -895,136 +851,68 @@ export default function Profile() {
           header: { backgroundColor: theme.modalBackgroundColor || '#FFFFFF', borderBottom: `1px solid ${theme.sidebarBorderColor || '#E9EDEF'}` },
         }}
       >
-        <Steps
-          current={resetStep}
-          size="small"
-          items={[{ title: 'Send OTP' }, { title: 'Verify' }, { title: 'New Password' }, { title: 'Done' }]}
-          style={{ marginBottom: 24, marginTop: 8 }}
-        />
-
-        {resetError && (
-          <Alert message={resetError} type="error" showIcon closable onClose={() => setResetError(null)} style={{ marginBottom: 16 }} />
+        {changePasswordError && (
+          <Alert message={changePasswordError} type="error" showIcon closable onClose={() => setChangePasswordError(null)} style={{ marginBottom: 16 }} />
         )}
 
-        {resetStep === 0 && (
-          <div className="text-center">
-            <p className="text-sm mb-1" style={{ color: theme.modalTextColor || '#111B21' }}>We'll send a 6-digit OTP to:</p>
-            <p className="font-semibold mb-6" style={{ color: theme.sidebarHeaderColor || '#008069' }}>{user?.email}</p>
-            <Button
-              type="primary"
-              block
+        <Form form={changePasswordForm} layout="vertical" onFinish={handleChangePassword} autoComplete="off">
+          <Form.Item
+            name="oldPassword"
+            rules={[{ required: true, message: 'Current password is required' }]}
+          >
+            <Input.Password
               size="large"
-              loading={resetLoading}
-              onClick={handleSendOtp}
-              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
-            >
-              Send OTP
-            </Button>
-          </div>
-        )}
+              prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
+              placeholder="Current password"
+              disabled={changePasswordLoading}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
 
-        {resetStep === 1 && (
-          <div>
-            <p className="text-sm text-center mb-4" style={{ color: theme.timestampColor || '#667781' }}>Enter the 6-digit code sent to your email</p>
-            <div className="flex justify-center mb-4">
-              <OTPInput value={resetOtp} onChange={setResetOtp} disabled={resetLoading} />
-            </div>
-            <Button
-              type="primary"
-              block
+          <Form.Item name="newPassword" rules={[{ validator: validatePasswordStrength }]}>
+            <Input.Password
               size="large"
-              loading={resetLoading}
-              onClick={handleVerifyOtp}
-              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px', marginBottom: 8 }}
-            >
-              Verify OTP
-            </Button>
-            <div className="text-center">
-              <Button
-                type="link"
-                disabled={resendTimer > 0 || resetLoading}
-                style={{ color: resendTimer > 0 ? '#999' : theme.sidebarHeaderColor || '#008069' }}
-                onClick={async () => {
-                  setResetOtp('');
-                  try {
-                    setResetLoading(true);
-                    await dispatch(forgotPassword({ email: user?.email })).unwrap();
-                    setResendTimer(30);
-                    antMessage.success('OTP resent');
-                  } catch (err) {
-                    setResetError(err || 'Failed to resend OTP');
-                  } finally {
-                    setResetLoading(false);
-                  }
-                }}
-              >
-                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-              </Button>
-            </div>
-          </div>
-        )}
+              prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
+              placeholder="New password"
+              disabled={changePasswordLoading}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
 
-        {resetStep === 2 && (
-          <Form form={resetForm} layout="vertical" onFinish={handleSetNewPassword} autoComplete="off">
-            <Form.Item name="password" rules={[{ validator: validatePasswordStrength }]}>
-              <Input.Password
-                size="large"
-                prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
-                placeholder="New password"
-                disabled={resetLoading}
-                style={{ borderRadius: '8px' }}
-              />
-            </Form.Item>
-            <Form.Item
-              name="confirmPassword"
-              rules={[
-                { required: true, message: 'Please confirm your password' },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (!value || getFieldValue('password') === value) return Promise.resolve();
-                    return Promise.reject(new Error('Passwords do not match'));
-                  },
-                }),
-              ]}
-            >
-              <Input.Password
-                size="large"
-                prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
-                placeholder="Confirm new password"
-                disabled={resetLoading}
-                style={{ borderRadius: '8px' }}
-              />
-            </Form.Item>
-            <p className="text-xs mb-4" style={{ color: theme.timestampColor || '#667781' }}>Min 8 chars · uppercase · lowercase · number · special char</p>
-            <Button
-              type="primary"
-              htmlType="submit"
-              block
+          <Form.Item
+            name="confirmPassword"
+            rules={[
+              { required: true, message: 'Please confirm your new password' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
+                  return Promise.reject(new Error('Passwords do not match'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password
               size="large"
-              loading={resetLoading}
-              style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
-            >
-              Set New Password
-            </Button>
-          </Form>
-        )}
+              prefix={<LockOutlined style={{ color: theme.timestampColor || '#667781' }} />}
+              placeholder="Confirm new password"
+              disabled={changePasswordLoading}
+              style={{ borderRadius: '8px' }}
+            />
+          </Form.Item>
 
-        {resetStep === 3 && (
-          <div className="text-center py-4">
-            <CheckCircleOutlined style={{ fontSize: 52, color: theme.sidebarHeaderColor || '#008069', marginBottom: 12 }} />
-            <p className="font-semibold text-base" style={{ color: theme.modalTextColor || '#111B21' }}>Password changed successfully!</p>
-            <Button
-              type="primary"
-              block
-              size="large"
-              onClick={closeResetModal}
-              style={{ marginTop: 20, backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
-            >
-              Done
-            </Button>
-          </div>
-        )}
-      </Modal> */}
+          <p className="text-xs mb-4" style={{ color: theme.timestampColor || '#667781' }}>Min 8 chars · uppercase · lowercase · number · special char</p>
+          <Button
+            type="primary"
+            htmlType="submit"
+            block
+            size="large"
+            loading={changePasswordLoading}
+            style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '8px' }}
+          >
+            Change Password
+          </Button>
+        </Form>
+      </Modal>
 
       {/* Remove Avatar Modal - Responsive */}
       <Modal

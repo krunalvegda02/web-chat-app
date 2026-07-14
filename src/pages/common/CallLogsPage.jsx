@@ -121,10 +121,7 @@ export default function CallLogs() {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.sidebarHoverColor || '#F5F6F6'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <div 
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/profile/${otherUser._id}`)}
-                >
+                <div>
                   <Avatar
                     src={otherUser.avatar}
                     size={50}
@@ -134,10 +131,7 @@ export default function CallLogs() {
                   </Avatar>
                 </div>
 
-                <div 
-                  className="flex-1 min-w-0 cursor-pointer"
-                  onClick={() => navigate(`/profile/${otherUser._id}`)}
-                >
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-medium text-[16px] truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>
                       {otherUser.name}

@@ -1,7 +1,3 @@
-import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { fetchTenantTheme } from '../redux/slices/themeSlice';
-
 // Default theme - WhatsApp Style
 const DEFAULT_THEME = {
   appName: 'Chat App',
@@ -63,46 +59,7 @@ const DEFAULT_THEME = {
 };
 
 export const useTheme = () => {
-  const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth || {});
-  const { theme: tenantTheme, loading, fetchedTenantIds } = useSelector((state) => state.theme || {});
-  const [theme, setTheme] = useState(DEFAULT_THEME);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch tenant theme when user logs in (only once per tenantId)
-  useEffect(() => {
-    const alreadyFetched = Array.isArray(fetchedTenantIds) && fetchedTenantIds.includes(user?.tenantId);
-    if (user?.tenantId && user?.role === 'USER' && !alreadyFetched && !loading) {
-      console.log('🎨 Fetching theme for tenant:', user.tenantId);
-      dispatch(fetchTenantTheme(user.tenantId));
-    }
-  }, [user?.tenantId, user?.role]);
-
-  useEffect(() => {
-    // USER role sees tenant's custom theme (if set by admin)
-    // ADMIN, TENANT_ADMIN, and SUPER_ADMIN always see default WhatsApp theme
-    const isAdmin = ['ADMIN', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(user?.role);
-    
-    if (user?.role === 'USER' && tenantTheme && Object.keys(tenantTheme).length > 0) {
-      // Merge custom theme with WhatsApp defaults (only non-null values)
-      const mergedTheme = { ...DEFAULT_THEME };
-      
-      // Only apply non-null custom theme values
-      Object.keys(tenantTheme).forEach(key => {
-        if (tenantTheme[key] !== null && tenantTheme[key] !== undefined) {
-          mergedTheme[key] = tenantTheme[key];
-        }
-      });
-      
-      setTheme(mergedTheme);
-    } else {
-      // ADMIN/TENANT_ADMIN/SUPER_ADMIN or no custom theme: use default WhatsApp theme
-      setTheme(DEFAULT_THEME);
-    }
-    setIsLoading(loading || false);
-  }, [user?.role, tenantTheme, loading]);
-
-  return { theme, isLoading };
+  return { theme: DEFAULT_THEME, isLoading: false };
 };
 
 export default DEFAULT_THEME;

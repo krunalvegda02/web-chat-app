@@ -49,12 +49,9 @@ const storage = {
 
 import authReducer from './slices/authSlice.jsx';
 import chatReducer from './slices/chatSlice.jsx';
-import tenantReducer from './slices/tenantSlice.jsx';
 import platformReducer from './slices/platformSlice.jsx';
 import userReducer from './slices/userSlice.jsx';
-import themeReducer from './slices/themeSlice.jsx';
 import adminChatReducer from './slices/adminChatSlice.jsx';
-import contactReducer from './slices/contactSlice.js';
 import callLogReducer from './slices/callLogSlice.js';
 import notificationReducer from './slices/notificationSlice.jsx';
 
@@ -67,12 +64,9 @@ const persistConfig = {
 const rootReducer = combineReducers({
   auth: authReducer,
   chat: chatReducer,
-  tenant: tenantReducer,
   platform: platformReducer,
   user: userReducer,
-  theme: themeReducer,
   adminChat: adminChatReducer,
-  contacts: contactReducer,
   callLogs: callLogReducer,
   notification: notificationReducer,
 });

@@ -5,7 +5,7 @@ import { useAuthGuard } from '../hooks/useAuthGuard';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function AdminLayout() {
-  const { user, isAuthorized, isInitialized } = useAuthGuard(['TENANT_ADMIN', 'PLATFORM_ADMIN']);
+  const { user, isAuthorized, isInitialized } = useAuthGuard(['PLATFORM_ADMIN']);
 
   // Wait for auth to initialize — prevents white screen on iPhone during rehydration
   if (!isInitialized) {
