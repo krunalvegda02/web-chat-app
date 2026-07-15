@@ -18,26 +18,8 @@ export default function RootRedirect() {
     currentPath: window.location.pathname
   });
   
-  // Force redirect using multiple methods
-  useEffect(() => {
-    const forceRedirect = () => {
-      const currentPath = window.location.pathname;
-      if (currentPath === '/') {
-        console.log('🔄 [RootRedirect] Forcing redirect to login');
-        
-        // Try multiple redirect methods
-        setTimeout(() => {
-          if (window.location.pathname === '/') {
-            window.location.replace('/login');
-          }
-        }, 100);
-      }
-    };
-    
-    if (initialized) {
-      forceRedirect();
-    }
-  }, [initialized]);
+  // Remove manual window.location force-redirect hack.
+  // React Router <Navigate> handles this natively and preserves query strings correctly.
   
   // If not initialized yet, show loading spinner
   if (!initialized) {
@@ -48,28 +30,24 @@ export default function RootRedirect() {
   // Check for platform parameters in URL
   const urlParams = new URLSearchParams(window.location.search);
   const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
+  const hasSessionToken = urlParams.get('sessionToken') || urlParams.get('st');
   const hasPlatformParam = urlParams.get('platform');
   const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
   const hasAutoLogin = urlParams.get('autoLogin') === 'true' || urlParams.get('auto') === 'true';
   
   // If platform parameters exist, let platform detection handle it
-  const isPlatformRequest = hasApiKey || hasPlatformParam || (hasUserData && hasAutoLogin);
+  const isPlatformRequest = hasApiKey || hasSessionToken || hasPlatformParam || (hasUserData && hasAutoLogin);
   
   console.log('🔍 [RootRedirect] Platform check:', {
     hasApiKey: !!hasApiKey,
+    hasSessionToken: !!hasSessionToken,
     hasPlatformParam: !!hasPlatformParam,
     hasUserData: !!hasUserData,
     hasAutoLogin,
     isPlatformRequest
   });
   
-  // If platform request, redirect to login and let platform detection handle it
-  if (isPlatformRequest) {
-    console.log('🔄 [RootRedirect] Platform request detected, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
-  
-  // If user is authenticated, redirect based on role
+  // If user is authenticated, redirect based on role (even if it's a platform request)
   if (user && token) {
     console.log('👤 [RootRedirect] User authenticated, redirecting based on role:', user.role);
     switch (user.role) {
@@ -81,8 +59,14 @@ export default function RootRedirect() {
         return <Navigate to="/user/chats" replace />;
       default:
         console.log('❓ [RootRedirect] Unknown role, redirecting to login');
-        return <Navigate to="/login" replace />;
+        return <Navigate to={`/login${window.location.search}`} replace />;
     }
+  }
+
+  // If not authenticated and it's a platform request, redirect to login so platform detection can finish
+  if (isPlatformRequest) {
+    console.log('🔄 [RootRedirect] Platform request (unauthenticated), redirecting to login');
+    return <Navigate to={`/login${window.location.search}`} replace />;
   }
   
   // Default: redirect to login with multiple fallback methods

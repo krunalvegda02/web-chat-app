@@ -31,7 +31,8 @@ import {
   SafetyCertificateOutlined,
   CameraFilled,
   UploadOutlined,
-  KeyOutlined
+  KeyOutlined,
+  WalletOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/common/Avatar';
@@ -43,6 +44,7 @@ import { copyToClipboardWithMessage } from '../../utils/clipboardUtils';
 export default function Profile() {
   const { theme } = useTheme();
   const { user } = useSelector((s) => s.auth);
+  const { balance: walletBalance } = useSelector((s) => s.wallet);
   const { platformApiKey } = useSelector((s) => s.platform);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -461,18 +463,40 @@ export default function Profile() {
                             color={user?.status === 'ACTIVE' ? 'success' : 'default'}
                             text={<span className={clsx('text-xs', 'font-medium')}>{user?.status || 'Active'}</span>}
                           />
+                          {user?.role === 'PLATFORM_ADMIN' && (
+                            <Badge
+                              icon={<WalletOutlined />}
+                              color="purple"
+                              text={
+                                <span className={clsx('text-xs', 'font-medium')}>
+                                  {walletBalance.toLocaleString()} Coins
+                                </span>
+                              }
+                            />
+                          )}
                         </div>
 
-                        {/* Mobile: Phone Verified Badge Only */}
-                        {user?.phoneVerified && (
-                          <div className={clsx('sm:hidden', 'flex', 'pt-1')}>
+                        {/* Mobile: Badges */}
+                        <div className={clsx('sm:hidden', 'flex', 'flex-wrap', 'gap-2', 'pt-1')}>
+                          {user?.phoneVerified && (
                             <Badge
                               icon={<CheckCircleOutlined />}
                               color="success"
                               text={<span className={clsx('text-xs', 'font-medium')}>Phone Verified</span>}
                             />
-                          </div>
-                        )}
+                          )}
+                          {user?.role === 'PLATFORM_ADMIN' && (
+                            <Badge
+                              icon={<WalletOutlined />}
+                              color="purple"
+                              text={
+                                <span className={clsx('text-xs', 'font-medium')}>
+                                  {walletBalance.toLocaleString()} Coins
+                                </span>
+                              }
+                            />
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className={clsx('space-y-3', 'sm:space-y-4', 'w-full')}>

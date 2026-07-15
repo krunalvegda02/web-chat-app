@@ -1,9 +1,10 @@
 import { useDispatch, useSelector } from "react-redux";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { chatSocketClient } from "./sockets/chatSocketClient";
 
 import { fetchMe, setInitialized, clearAuth } from "./redux/slices/authSlice";
+import { fetchWalletBalance } from "./redux/slices/walletSlice";
 import { setActiveRoom } from "./redux/slices/chatSlice";
 import { pageRoutes } from "./routes/pageRoutes";
 import ProtectedRoute from "./routes/protectedRoutes";
@@ -67,6 +68,14 @@ function AppContent() {
     }
   }, [callState.isInCall, callState.isIncoming, callState.callStatus]);
 
+  // Fetch wallet balance for platform admins whenever user/token is set
+  useEffect(() => {
+    if (user?.role === 'PLATFORM_ADMIN' && token) {
+      console.log('💰 [App] Platform admin detected, fetching wallet balance');
+      dispatch(fetchWalletBalance());
+    }
+  }, [user?.role, token, dispatch]);
+
   // Handle root path redirect immediately if needed
   useEffect(() => {
     const currentPath = window.location.pathname;
@@ -117,8 +126,9 @@ function AppContent() {
       isPlatformRequest
     });
 
-    if (token && !initialized) {
-      console.log('🔐 [App] Token exists and not initialized, calling fetchMe...');
+    if (!initialized) {
+    if (token) {
+      console.log('🔐 [App] Token exists, calling fetchMe...');
       // Token exists, fetch user data to verify it's still valid
       dispatch(fetchMe()).unwrap().catch((error) => {
         console.warn('⚠️ [App] fetchMe failed:', error);
@@ -127,8 +137,8 @@ function AppContent() {
         console.log('🔐 [App] Calling setInitialized after fetchMe failure');
         dispatch(setInitialized());
       });
-    } else if (!token && !initialized) {
-      console.log('🔐 [App] No token and not initialized, calling setInitialized');
+    } else {
+      console.log('🔐 [App] No token, calling setInitialized');
       // No token, mark as initialized
       dispatch(setInitialized());
       
@@ -140,6 +150,7 @@ function AppContent() {
         } else {
           console.log('🔄 [App] Platform request detected, staying on root');
         }
+      }
       }
     } else {
       console.log('🔐 [App] Already initialized or token check skipped');
@@ -157,7 +168,7 @@ function AppContent() {
     <PlatformGateway>
       <Routes>
         {pageRoutes.map(({ layout: Layout, routes, requiredRoles, wrapper: Wrapper }, i) => {
-          const layoutElement = Layout ? <Layout /> : <></>;
+          const layoutElement = Layout ? <Layout /> : <Outlet />;
           const wrappedLayout = Wrapper ? <Wrapper>{layoutElement}</Wrapper> : layoutElement;
 
           return (
@@ -183,8 +194,8 @@ function AppContent() {
       {user && <NotificationPrompt />}
 
       {notifications.length > 0 && (
-        <div className="fixed top-0 right-0 p-4" style={{ zIndex: 999999, pointerEvents: 'none' }}>
-          <div className="flex flex-col gap-3" style={{ pointerEvents: 'auto' }}>
+        <div cclassName={clsx('fixed', 'top-0', 'right-0', 'p-4')}style={{ zIndex: 999999, pointerEvents: 'none' }}>
+          <div cclassName={clsx('flex', 'flex-col', 'gap-3')}style={{ pointerEvents: 'auto' }}>
             {notifications.map((notification) => (
               <WhatsAppNotification
                 key={notification.id}

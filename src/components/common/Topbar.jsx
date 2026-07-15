@@ -9,6 +9,7 @@ import {
   UserOutlined,
   QuestionCircleOutlined,
   MenuOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 import { getMenuItems } from '../../routes/pageData';
 import { useTheme } from '../../hooks/useTheme';
@@ -20,6 +21,7 @@ export default function Topbar() {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const activeRoomId = useSelector((s) => s.chat?.activeRoomId || '');
+  const { balance: walletBalance } = useSelector((s) => s.wallet);
 
   const isInChat = location.pathname.includes('/chat') || location.pathname.includes('/user');
   const isInActiveChat = isInChat && activeRoomId && activeRoomId !== '';
@@ -141,12 +143,23 @@ export default function Topbar() {
             <div className="flex items-center justify-center py-2">
               <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
             </div>
-            <div style={{ backgroundColor: theme?.sidebarBackgroundColor || '#F0F2F5' }} className="px-4 py-3 flex items-center gap-3 border-b border-gray-200">
-              <Avatar size={48} src={user?.avatar} icon={<UserOutlined />} style={{ backgroundColor: theme?.primaryColor || '#00A884' }} />
-              <div>
-                <p className="text-gray-900 font-medium text-base">{user?.name}</p>
-                <p className="text-gray-500 text-sm">{user?.role === 'USER' ? user?.email : user?.role?.replace('_', ' ')}</p>
+            <div style={{ backgroundColor: theme?.sidebarBackgroundColor || '#F0F2F5' }} className="px-4 py-3 flex items-center justify-between border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <Avatar size={48} src={user?.avatar} icon={<UserOutlined />} style={{ backgroundColor: theme?.primaryColor || '#00A884' }} />
+                <div>
+                  <p className="text-gray-900 font-medium text-base">{user?.name}</p>
+                  <p className="text-gray-500 text-sm">{user?.role === 'USER' ? user?.email : user?.role?.replace('_', ' ')}</p>
+                </div>
               </div>
+              {user?.role === 'PLATFORM_ADMIN' && (
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-100 rounded-lg text-purple-700">
+                    <WalletOutlined />
+                    <span className="font-bold text-sm">{walletBalance.toLocaleString()}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 font-medium mt-0.5">Coins</span>
+                </div>
+              )}
             </div>
             
             {/* Additional menu items (items 4 and beyond) */}

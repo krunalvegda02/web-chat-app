@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>External Platform - Chat Widget Demo</title>
+  
+  <!-- Modern Font (Optional) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    /* =========================================
+       EXTERNAL PLATFORM STYLES (Mock Website)
+       ========================================= */
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9fafb;
+      color: #111827;
+    }
+    .hero {
+      padding: 80px 20px;
+      text-align: center;
+      background: linear-gradient(135deg, #1f2937, #111827);
+      color: white;
+    }
+    .hero h1 { margin-bottom: 10px; font-size: 2.5rem; }
+    .hero p { color: #9ca3af; font-size: 1.1rem; }
+    
+    .content {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+
+    /* =========================================
+       CHAT WIDGET STYLES (The Drop-in Component)
+       ========================================= */
+    
+    /* The Floating Button */
+    #chat-widget-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 60px;
+      height: 60px;
+      background-color: #00A884; /* WhatsApp style green */
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 168, 132, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    #chat-widget-btn:hover {
+      transform: scale(1.1);
+      background-color: #008f6f;
+    }
+
+    /* The Chat SVG Icon */
+    #chat-widget-btn svg {
+      width: 28px;
+      height: 28px;
+      fill: currentColor;
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top: 3px solid white;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Error Toast */
+    #chat-error {
+      position: fixed;
+      bottom: 95px;
+      right: 24px;
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 9999;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* The Iframe Overlay Container */
+    #chat-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .chat-window {
+      width: 100%;
+      max-width: 450px;
+      height: 100%;
+      max-height: 800px;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    @keyframes popIn {
+      from { transform: scale(0.9); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    /* Header for closing the iframe */
+    .chat-header {
+      background: #111827;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+    }
+    
+    .chat-header span {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .chat-close-btn {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      transition: color 0.2s;
+    }
+    .chat-close-btn:hover { color: #f87171; }
+    
+    #chat-iframe {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #f0f2f5;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 600px) {
+      #chat-overlay { padding: 0; }
+      .chat-window { max-width: 100%; height: 100%; max-height: 100vh; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================
+       MOCK EXTERNAL WEBSITE CONTENT
+       ========================================= -->
+  <div class="hero">
+    <h1>Welcome to External Club</h1>
+    <p>This is a demonstration of how an external platform embeds the chat widget.</p>
+  </div>
+  <div class="content">
+    <h2>Dashboard</h2>
+    <p>Imagine the user is logged into their account here. We know their name, email, and phone number.</p>
+    <p>When they click the floating chat widget on the bottom right, it will authenticate with the Chat Platform via API and open the chat inside an overlay iframe.</p>
+  </div>
+
+
+  <!-- =========================================
+       CHAT WIDGET HTML (Copy this to external site)
+       ========================================= -->
+       
+  <!-- Error Toast -->
+  <div id="chat-error">
+    <span id="chat-error-msg">Something went wrong</span>
+    <button onclick="document.getElementById('chat-error').style.display='none'" style="background:none;border:none;cursor:pointer;padding:0;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+
+  <!-- Floating Button -->
+  <button id="chat-widget-btn" onclick="initiateChat()" title="Chat with Support">
+    <svg id="chat-icon" viewBox="0 0 24 24">
+      <path d="M12 3C6.5 3 2 6.58 2 11a7.77 7.77 0 0 0 2.75 5.74L2 21l5.5-2c1.39.53 2.9.82 4.5.82 5.5 0 10-3.58 10-8S17.5 3 12 3m-1 11H7v-2h4v2m6 0h-4v-2h4v2m0-4H7V8h10v2z" />
+    </svg>
+    <div id="chat-spinner" class="spinner"></div>
+  </button>
+
+  <!-- Iframe Overlay -->
+  <div id="chat-overlay">
+    <div class="chat-window">
+      <div class="chat-header">
+        <span>Support Chat</span>
+        <button class="chat-close-btn" onclick="closeChat()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <iframe id="chat-iframe" allow="camera; microphone; fullscreen"></iframe>
+    </div>
+  </div>
+
+  <!-- =========================================
+       CHAT WIDGET JAVASCRIPT
+       ========================================= -->
+  <script>
+    // --- CONFIGURATION ---
+    // Change these to point to your live chat server
+    const CHAT_PLATFORM_URL = "http://localhost:5173"; 
+    const CHAT_API_URL = "http://localhost:5500";
+    const API_KEY = "pk_7a4a6dfc0c7f7b831cb4c6ff108c0a41828fe21c6f37d99e5786d4a992436efb"; // The platform's API Key
+
+    // --- MOCK USER DATA ---
+    // In production, the external site injects the real logged-in user data here
+    const externalUser = {
+      name: "Demo User",
+      email: "demo@external.club",
+      phone: "1234567890"
+    };
+
+    // DOM Elements
+    const btn = document.getElementById('chat-widget-btn');
+    const icon = document.getElementById('chat-icon');
+    const spinner = document.getElementById('chat-spinner');
+    const overlay = document.getElementById('chat-overlay');
+    const iframe = document.getElementById('chat-iframe');
+    const errorToast = document.getElementById('chat-error');
+    const errorMsg = document.getElementById('chat-error-msg');
+
+    async function initiateChat() {
+      // Show loading state
+      btn.disabled = true;
+      icon.style.display = 'none';
+      spinner.style.display = 'block';
+      errorToast.style.display = 'none';
+
+      try {
+        // 1. Call Chat API to authenticate chat
+        const response = await fetch(`${CHAT_API_URL}/api/v1/platforms/integration/chat-login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY,
+          },
+          body: JSON.stringify({
+            name: externalUser.name,
+            email: externalUser.email,
+            phone: externalUser.phone,
+            externalUserId: `${externalUser.name.toLowerCase()}_${externalUser.phone}`,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || "Login is required");
+        }
+
+        const data = await response.json();
+        
+        // 2. Build the Chat URL
+        const path = (data.data && data.data.redirectUrl) ? data.data.redirectUrl : '/';
+        
+        const params = new URLSearchParams({
+          apiKey: API_KEY,
+          name: externalUser.name,
+          email: externalUser.email,
+          phone: externalUser.phone,
+          autoLogin: "true",
+        });
+
+        const fullChatUrl = `${CHAT_PLATFORM_URL}${path}?${params.toString()}`;
+
+        // 3. Open Iframe
+        iframe.src = fullChatUrl;
+        overlay.style.display = 'flex';
+
+      } catch (err) {
+        console.error("Chat error:", err);
+        errorMsg.textContent = err.message || "Something went wrong";
+        errorToast.style.display = 'flex';
+      } finally {
+        // Reset button state
+        btn.disabled = false;
+        icon.style.display = 'block';
+        spinner.style.display = 'none';
+      }
+    }
+
+    function closeChat() {
+      overlay.style.display = 'none';
+      iframe.src = ''; // clear iframe
+    }
+  </script>
+</body>
+</html>

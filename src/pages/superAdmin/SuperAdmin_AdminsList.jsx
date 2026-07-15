@@ -20,6 +20,7 @@ import {
   App,
   message,
   Alert,
+  Switch,
 } from 'antd';
 import {
   UserOutlined,
@@ -34,6 +35,7 @@ import {
   FilterOutlined,
   KeyOutlined,
   CopyOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -198,6 +200,7 @@ const copyApiKey = () => {
       name: record.name,
       email: record.admin?.email,
       phone: record.admin?.phone,
+      senderCharge: record.senderCharge || false,
     });
     setEditModalOpen(true);
   };
@@ -295,6 +298,22 @@ const copyApiKey = () => {
       ),
     },
     {
+      title: 'Wallet Balance',
+      dataIndex: ['admin', 'walletBalance'],
+      key: 'walletBalance',
+      responsive: ['md'],
+      render: (balance) => (
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-md flex items-center justify-center" style={{ backgroundColor: '#F3E8FF', color: '#9333EA' }}>
+            <WalletOutlined style={{ fontSize: '14px' }} />
+          </div>
+          <Text style={{ color: theme.sidebarTextColor || '#111B21', fontWeight: 600 }}>
+            {balance !== undefined ? balance.toLocaleString() : '0'} <span className="text-xs font-normal text-gray-500">Coins</span>
+          </Text>
+        </div>
+      ),
+    },
+    {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
@@ -370,7 +389,7 @@ const copyApiKey = () => {
         </div>
 
         {/* Search and Filter */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-2">
+        <div className="flex flex-col sm:flex-row items-center gap-4 mb-2">
           <Input
             placeholder="Search by name, email, or phone..."
             prefix={<SearchOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
@@ -379,6 +398,7 @@ const copyApiKey = () => {
             allowClear
             onClear={() => { setSearchQuery(''); setCurrentPage(1); }}
             size="large"
+            className="flex-1 w-full"
             style={{ borderRadius: '8px', backgroundColor: theme.inputBackgroundColor || '#FFFFFF' }}
             autoComplete="off"
           />
@@ -386,7 +406,8 @@ const copyApiKey = () => {
             value={statusFilter}
             onChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
             size="large"
-            style={{ width: '100%', minWidth: '150px', borderRadius: '8px' }}
+            className="w-full sm:w-48 shrink-0"
+            style={{ borderRadius: '8px' }}
             suffixIcon={<FilterOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
           >
             <Select.Option value="all">All Status</Select.Option>
@@ -539,6 +560,9 @@ const copyApiKey = () => {
           <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Password</span>} name="password" rules={[{ required: true, min: 6, message: 'Password must be at least 6 characters' }]}>
             <Input.Password placeholder="Enter password (min 6 characters)" size="large" prefix={<LockOutlined style={{ color: '#008069' }} />} style={{ borderRadius: '8px' }} />
           </Form.Item>
+          <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Sender Charge (Charge Users for Messages)</span>} name="senderCharge" valuePropName="checked" initialValue={false}>
+            <Switch />
+          </Form.Item>
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={createLoading} block size="large" style={{ backgroundColor: '#008069', borderColor: '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}>
               {createLoading ? 'Creating Workspace...' : 'Create Workspace'}
@@ -572,6 +596,9 @@ const copyApiKey = () => {
           </Form.Item>
           <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Phone Number</span>} name="phone">
             <Input placeholder="+1234567890" size="large" prefix={<PhoneOutlined style={{ color: '#008069' }} />} style={{ borderRadius: '8px' }} />
+          </Form.Item>
+          <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Sender Charge (Charge Users for Messages)</span>} name="senderCharge" valuePropName="checked">
+            <Switch />
           </Form.Item>
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={updateLoading} block size="large" style={{ backgroundColor: '#008069', borderColor: '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}>

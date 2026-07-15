@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Integration - Session Token Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color: #f3f4f6; color: #1f2937; }
+    .header { padding: 40px 20px; text-align: center; background: #2563eb; color: white; }
+    .content { max-width: 800px; margin: 40px auto; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    
+    .code-block { background: #1f2937; color: #10b981; padding: 15px; border-radius: 8px; font-family: monospace; overflow-x: auto; font-size: 13px; }
+    
+    #chat-widget-btn {
+      position: fixed; bottom: 24px; right: 24px; width: 60px; height: 60px;
+      background-color: #2563eb; color: white; border: none; border-radius: 50%;
+      cursor: pointer; box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+      display: flex; align-items: center; justify-content: center; z-index: 9999;
+      transition: all 0.3s;
+    }
+    #chat-widget-btn:hover { transform: scale(1.1); }
+    #chat-widget-btn svg { width: 28px; height: 28px; fill: currentColor; }
+    
+    .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 3px solid white; width: 24px; height: 24px; animation: spin 1s linear infinite; display: none; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    #chat-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .chat-window {
+      width: 100%; max-width: 450px; height: 100%; max-height: 800px; background: white;
+      border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+    }
+    .chat-header { background: #111827; padding: 16px; display: flex; justify-content: space-between; align-items: center; color: white; }
+    .chat-close-btn { background: transparent; border: none; color: #9ca3af; cursor: pointer; padding: 4px; }
+    #chat-iframe { flex: 1; width: 100%; border: none; background: #f0f2f5; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Secure Session Token Demo</h1>
+    <p>Option 2: Server-to-Server Flow Demonstration</p>
+  </div>
+
+  <div class="content">
+    <h2>How this demo works:</h2>
+    <p>When you click the chat button, the following steps occur instantly:</p>
+    <ol>
+      <li><strong>MOCK BACKEND:</strong> This page simulates a secure backend making a POST request to your <code>/api/v1/platforms/session-token</code> endpoint.</li>
+      <li><strong>TOKEN GENERATION:</strong> Your server returns a secure, 1-time-use <code>sessionToken</code>.</li>
+      <li><strong>IFRAME LAUNCH:</strong> We embed the chat iframe using <strong>ONLY</strong> the session token (the API key is completely hidden!).</li>
+    </ol>
+
+    <h3>What the iframe URL looks like:</h3>
+    <div class="code-block" id="url-display">Waiting for click...</div>
+  </div>
+
+  <!-- Floating Button -->
+  <button id="chat-widget-btn" onclick="initiateSecureChat()">
+    <svg id="chat-icon" viewBox="0 0 24 24"><path d="M12 3C6.5 3 2 6.58 2 11a7.77 7.77 0 0 0 2.75 5.74L2 21l5.5-2c1.39.53 2.9.82 4.5.82 5.5 0 10-3.58 10-8S17.5 3 12 3m-1 11H7v-2h4v2m6 0h-4v-2h4v2m0-4H7V8h10v2z" /></svg>
+    <div id="chat-spinner" class="spinner"></div>
+  </button>
+
+  <!-- Iframe Overlay -->
+  <div id="chat-overlay">
+    <div class="chat-window">
+      <div class="chat-header">
+        <span>Secure Support Chat</span>
+        <button class="chat-close-btn" onclick="closeChat()">✖</button>
+      </div>
+      <iframe id="chat-iframe" allow="camera; microphone; fullscreen"></iframe>
+    </div>
+  </div>
+
+  <script>
+    // --- CONFIGURATION ---
+    const CHAT_PLATFORM_URL = "http://localhost:5173"; 
+    const CHAT_API_URL = "http://localhost:5500";
+    
+    // In a real world scenario, this API_KEY is hidden deep in the client's backend (.env)
+    const API_KEY = "pk_7a4a6dfc0c7f7b831cb4c6ff108c0a41828fe21c6f37d99e5786d4a992436efb"; 
+
+    // --- MOCK USER DATA ---
+    const externalUser = { name: "Secure User", email: "secure@test.com", phone: "1234567890" };
+
+    const btn = document.getElementById('chat-widget-btn');
+    const icon = document.getElementById('chat-icon');
+    const spinner = document.getElementById('chat-spinner');
+    const overlay = document.getElementById('chat-overlay');
+    const iframe = document.getElementById('chat-iframe');
+    const urlDisplay = document.getElementById('url-display');
+
+    async function initiateSecureChat() {
+      // Show loading state
+      btn.disabled = true;
+      icon.style.display = 'none';
+      spinner.style.display = 'block';
+
+      try {
+        // STEP 1: Server-to-Server API Request (Mocked here for demo)
+        // We call /session-token instead of /chat-login
+        const response = await fetch(`${CHAT_API_URL}/api/v1/platforms/session-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY, // The API key is securely used here
+          },
+          body: JSON.stringify({
+            name: externalUser.name,
+            email: externalUser.email,
+            phone: externalUser.phone,
+            externalUserId: `secure_${externalUser.phone}`,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Failed to generate session token");
+        const data = await response.json();
+        
+        // Extract the secure token
+        const sessionToken = data.data.sessionToken;
+        
+        // STEP 2: Build the Chat URL WITHOUT the API Key!
+        const params = new URLSearchParams({
+          sessionToken: sessionToken,
+          autoLogin: "true",
+        });
+
+        // The React app already has logic to read ?sessionToken= from the URL!
+        const fullChatUrl = `${CHAT_PLATFORM_URL}/?${params.toString()}`;
+        
+        // Display the URL on the screen to prove it's safe
+        urlDisplay.textContent = fullChatUrl;
+
+        // STEP 3: Open Iframe
+        iframe.src = fullChatUrl;
+        overlay.style.display = 'flex';
+
+      } catch (err) {
+        alert("Error: " + err.message);
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        icon.style.display = 'block';
+        spinner.style.display = 'none';
+      }
+    }
+
+    function closeChat() {
+      overlay.style.display = 'none';
+      iframe.src = ''; 
+    }
+  </script>
+</body>
+</html>

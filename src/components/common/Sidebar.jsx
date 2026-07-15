@@ -1,14 +1,16 @@
 
 import { useRef } from 'react';
 import { Avatar, Tooltip, Dropdown } from 'antd';
-import { UserOutlined, LogoutOutlined, SettingOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, QuestionCircleOutlined, WalletOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { getMenuItems } from '../../routes/pageData';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { balance: walletBalance } = useSelector((s) => s.wallet);
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,6 +26,24 @@ export default function Sidebar() {
   });
 
   const userMenu = [
+    ...(user?.role === 'PLATFORM_ADMIN'
+      ? [
+          {
+            key: 'wallet',
+            label: (
+              <div className="flex items-center justify-between gap-4">
+                <span>Wallet Balance</span>
+                <span className="font-semibold text-purple-600">
+                  {walletBalance.toLocaleString()} Coins
+                </span>
+              </div>
+            ),
+            icon: <WalletOutlined style={{ fontSize: '14px', color: '#9333EA' }} />,
+            // onClick removed as per user request
+          },
+          { type: 'divider' },
+        ]
+      : []),
     {
       key: 'profile',
       label: 'My Profile',
