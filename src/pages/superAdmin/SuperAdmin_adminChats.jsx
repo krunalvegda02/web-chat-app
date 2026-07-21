@@ -17,7 +17,8 @@ export default function SuperAdminAdminChats() {
       try {
         const response = await _get('/users/all');
         const users = response?.data?.data?.users || response?.data?.users || [];
-        setAllUsers(users.map(u => ({
+        const platformAdmins = users.filter(u => u.role === 'PLATFORM_ADMIN');
+        setAllUsers(platformAdmins.map(u => ({
           id: u._id,
           name: u.name,
           email: u.email,
