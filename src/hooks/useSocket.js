@@ -16,6 +16,7 @@ import {
   editMessage,
   deleteMessage,
 } from '../redux/slices/chatSlice';
+import { setBalance } from '../redux/slices/walletSlice';
 
 let globalListenersInitialized = false;
 
@@ -47,6 +48,14 @@ export const useSocket = () => {
 
         // ✅ FIX: Initialize global listeners ONCE with better error handling
         if (!globalListenersInitialized) {
+          // ✅ Wallet balance updated event
+          chatSocketClient.on('wallet_balance_updated', (data) => {
+            console.log('⚡ [SOCKET] wallet_balance_updated:', data);
+            if (data && data.balance !== undefined) {
+              dispatch(setBalance(data.balance));
+            }
+          });
+
           // ✅ Message received event - OPTIMIZED for speed
           chatSocketClient.on('message_received', (data) => {
             console.log('⚡ [SOCKET] INSTANT message_received:', data);

@@ -88,6 +88,11 @@ const authSlice = createSlice({
       // Clear localStorage tokens
       clearAuthTokens();
     },
+    updateWalletBalance(state, action) {
+      if (state.user) {
+        state.user.walletBalance = action.payload;
+      }
+    },
     setInitialized(state) {
       state.initialized = true;
     },
@@ -203,7 +208,7 @@ const authSlice = createSlice({
 
 console.log('Auth Slice Initial State:', initialState);
 
-export const { clearError, setUser, setPlatformAuth, clearAuth, setInitialized } = authSlice.actions;
+export const { clearError, setUser, setPlatformAuth, clearAuth, updateWalletBalance, setInitialized } = authSlice.actions;
 
 // Auth Selectors
 export const selectAuth = (state) => state.auth;
