@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getPlatformUsers } from '../../redux/slices/platformSlice.jsx';
 import { useTheme } from '../../hooks/useTheme';
+import clsx from 'clsx';
 
 export default function PlatformClients() {
   const { user } = useSelector((s) => s.auth);
@@ -75,8 +76,8 @@ export default function PlatformClients() {
         <Space>
           <Avatar src={record.avatar}>{record.name?.[0]?.toUpperCase()}</Avatar>
           <div>
-            <div className="font-medium text-sm">{record.name}</div>
-            <div className="text-xs text-gray-500">{record.email}</div>
+            <div className={clsx('font-medium', 'text-sm')}>{record.name}</div>
+            <div className={clsx('text-xs', 'text-gray-500')}>{record.email}</div>
           </div>
         </Space>
       ),
@@ -130,7 +131,7 @@ export default function PlatformClients() {
 
   if (loading && platformUsers.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}>
+      <div className={clsx('flex', 'items-center', 'justify-center', 'h-full')} style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5' }}>
         <Spin size="large" />
       </div>
     );
@@ -139,19 +140,19 @@ export default function PlatformClients() {
   // Mobile Card View
   if (isMobile) {
     return (
-      <div className="fixed top-0 right-0 bottom-0 sm:left-20 left-0 flex flex-col" style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
+      <div className={clsx('fixed', 'top-0', 'right-0', 'bottom-0', 'sm:left-20', 'left-0', 'flex', 'flex-col')} style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
         {/* Header */}
-        <div className="px-4 py-5 flex items-center justify-between" style={{ background: theme?.sidebarHeaderColor || '#008069' }}>
+        <div className={clsx('px-4', 'py-5', 'flex', 'items-center', 'justify-between')} style={{ background: theme?.sidebarHeaderColor || '#008069' }}>
           <div>
-            <h1 className="text-lg font-bold" style={{ color: theme.headerTextColor || '#FFFFFF' }}>Platform Users</h1>
-            <p className="text-xs mt-1" style={{ color: theme.headerTextColor || '#FFFFFF', opacity: 0.8 }}>
+            <h1 className={clsx('text-lg', 'font-bold')} style={{ color: theme.headerTextColor || '#FFFFFF' }}>Platform Users</h1>
+            <p className={clsx('text-xs', 'mt-1')} style={{ color: theme.headerTextColor || '#FFFFFF', opacity: 0.8 }}>
               {platformUsers.length} users
             </p>
           </div>
         </div>
 
         {/* Search */}
-        <div className="px-4 py-3 border-b" style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
+        <div className={clsx('px-4', 'py-3', 'border-b')} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
           <Input
             placeholder="Search users..."
             prefix={<SearchOutlined />}
@@ -168,22 +169,22 @@ export default function PlatformClients() {
         </div>
 
         {/* User List */}
-        <div className="flex-1 overflow-y-auto pb-14" style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
+        <div className={clsx('flex-1', 'overflow-y-auto', 'pb-14')} style={{ backgroundColor: theme.sidebarBackgroundColor || '#FFFFFF' }}>
           {platformUsers.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
+            <div className={clsx('flex', 'items-center', 'justify-center', 'h-full')}>
               <Empty description="No users found" />
             </div>
           ) : (
             <>
-              <div className="p-3 space-y-3">
+              <div className={clsx('p-3', 'space-y-3')}>
                 {platformUsers.map((user) => (
                   <Card
                     key={user._id}
-                    className="border-0 shadow-sm"
+                    className={clsx('border-0', 'shadow-sm')}
                     style={{ borderRadius: '12px' }}
                     bodyStyle={{ padding: '12px' }}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className={clsx('flex', 'items-start', 'gap-3')}>
                       <Avatar
                         src={user.avatar}
                         size={48}
@@ -191,19 +192,19 @@ export default function PlatformClients() {
                       >
                         {user.name?.[0]?.toUpperCase()}
                       </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>
+                      <div className={clsx('flex-1', 'min-w-0')}>
+                        <p className={clsx('font-medium', 'text-sm', 'truncate')} style={{ color: theme.sidebarTextColor || '#111B21' }}>
                           {user.name}
                         </p>
-                        <p className="text-xs truncate mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+                        <p className={clsx('text-xs', 'truncate', 'mt-1')} style={{ color: theme.timestampColor || '#667781' }}>
                           {user.email}
                         </p>
                         {user.phone && (
-                          <p className="text-xs truncate mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+                          <p className={clsx('text-xs', 'truncate', 'mt-1')} style={{ color: theme.timestampColor || '#667781' }}>
                             {user.phone}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className={clsx('flex', 'items-center', 'gap-2', 'mt-2')}>
                           <Tag color={user.status === 'ACTIVE' ? 'green' : user.status === 'INACTIVE' ? 'orange' : 'red'} className="text-xs">
                             {user.status}
                           </Tag>
@@ -228,7 +229,7 @@ export default function PlatformClients() {
               
               {/* Mobile Pagination */}
               {pagination?.total > 0 && (
-                <div className="p-4 border-t" style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
+                <div className={clsx('p-4', 'border-t')} style={{ borderColor: theme.sidebarBorderColor || '#E9EDEF' }}>
                   <Pagination
                     current={currentPage}
                     total={pagination.total}
@@ -252,13 +253,13 @@ export default function PlatformClients() {
 
   // Desktop Table View
   return (
-    <div className="p-3 md:p-6" style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', minHeight: '100vh' }}>
+    <div className={clsx('p-3', 'md:p-6')} style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', minHeight: '100vh' }}>
       {/* Header */}
-      <Card className="mb-4 border-0 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <Card className={clsx('mb-4', 'border-0', 'shadow-sm')}>
+        <div className={clsx('flex', 'flex-col', 'md:flex-row', 'md:items-center', 'md:justify-between', 'gap-4')}>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: theme.sidebarTextColor || '#111B21' }}>Platform Users</h1>
-            <p className="text-sm mt-1" style={{ color: theme.timestampColor || '#667781' }}>
+            <h1 className={clsx('text-2xl', 'font-bold')} style={{ color: theme.sidebarTextColor || '#111B21' }}>Platform Users</h1>
+            <p className={clsx('text-sm', 'mt-1')} style={{ color: theme.timestampColor || '#667781' }}>
               Users are automatically created when they click WhatsApp button on your platform
             </p>
           </div>
@@ -266,7 +267,7 @@ export default function PlatformClients() {
       </Card>
 
       {/* Search */}
-      <div className="mb-4">
+      <div className="my-4">
         <Input
           placeholder="Search by name, phone, or email"
           prefix={<SearchOutlined />}
@@ -279,7 +280,7 @@ export default function PlatformClients() {
       </div>
 
       {/* Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className={clsx('border-0', 'shadow-sm')}>
         <Table
           columns={columns}
           dataSource={platformUsers}

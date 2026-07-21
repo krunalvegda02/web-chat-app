@@ -3,6 +3,7 @@ import {
   EyeOutlined,
   TeamOutlined,
   WalletOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 
 export const getMenuItems = (role, navigate) => {
@@ -59,6 +60,12 @@ export const getMenuItems = (role, navigate) => {
         icon: <WalletOutlined className="text-[22px]" />,
         label: 'Wallet',
         path: '/super-admin/wallet-requests',
+      },
+      {
+        key: '/super-admin/settings',
+        icon: <SettingOutlined className="text-[22px]" />,
+        label: 'Settings',
+        path: '/super-admin/settings',
       },
     ],
 

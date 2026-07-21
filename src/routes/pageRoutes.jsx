@@ -18,6 +18,7 @@ import SuperAdminAdminsList from "../pages/superAdmin/SuperAdmin_AdminsList";
 import SuperAdminChat from "../pages/superAdmin/SuperAdminChat";
 import SuperAdminAdminChats from "../pages/superAdmin/SuperAdmin_adminChats";
 import SuperAdminWalletRequests from "../pages/superAdmin/SuperAdminWalletRequests";
+import SuperAdminSettings from "../pages/superAdmin/SuperAdminSettings";
 
 // Admin Pages
 import AdminDashboard from "../pages/admin/AdminChats";
@@ -84,6 +85,7 @@ export const pageRoutes = [
             { path: "/super-admin/chats", element: SuperAdminChat },
             { path: "/super-admin/admin-chats", element: SuperAdminAdminChats },
             { path: "/super-admin/wallet-requests", element: SuperAdminWalletRequests },
+            { path: "/super-admin/settings", element: SuperAdminSettings },
         ],
     },
 

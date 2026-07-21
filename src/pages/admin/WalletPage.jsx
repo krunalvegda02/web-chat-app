@@ -260,7 +260,7 @@ export default function WalletPage() {
 
       {/* Balance Card */}
       <Card style={cardStyle} bodyStyle={{ padding: 0 }}>
-        <div className={clsx('p-5', 'sm:p-7', 'md:p-8', 'flex', 'flex-col', 'sm:flex-row', 'justify-between', 'items-start', 'sm:items-center', 'gap-5', 'sm:gap-4')}>
+        <div className={clsx('p-5', 'sm:p-7', 'md:p-8', 'flex', 'flex-col', 'sm:flex-row', 'justify-between', 'items-start', 'sm:items-center', 'gap-5', 'sm:gap-4', "mt-6")}>
           <div>
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>
               Available Balance

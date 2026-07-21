@@ -320,13 +320,13 @@ export default function SuperAdminWalletRequests() {
       style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', height: 'calc(100vh - 50px)' }}
     >
       {/* Header */}
-      <Card className="mb-4 border-0 shadow-sm" bodyStyle={{ padding: '24px' }} style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', borderRadius: '12px' }}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <Card className={clsx('mb-4', 'border-0', 'shadow-sm')} bodyStyle={{ padding: '24px' }} style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', borderRadius: '12px' , marginBottom:"20px"}}>
+        <div className={clsx('flex', 'flex-col', 'md:flex-row', 'md:items-center', 'md:justify-between', 'gap-4')}>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: theme.sidebarTextColor || '#111B21', margin: 0 }}>
+            <h1 className={clsx('text-2xl', 'font-bold')} style={{ color: theme.sidebarTextColor || '#111B21', margin: 0 }}>
               Wallet Management
             </h1>
-            <p className="text-sm mt-1" style={{ color: theme.timestampColor || '#667781', margin: 0 }}>
+            <p className={clsx('text-sm', 'mt-1')} style={{ color: theme.timestampColor || '#667781', margin: 0 }}>
               Manage credit requests, add credits, and configure bank details
             </p>
           </div>
@@ -356,14 +356,14 @@ export default function SuperAdminWalletRequests() {
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
-        <Card className="border-0 hover:shadow-md transition-shadow" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: '16px' }} bodyStyle={{ padding: '24px' }}>
-          <div className="flex items-center justify-between">
+        <Card className={clsx('border-0', 'hover:shadow-md', 'transition-shadow')} style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: '16px' }} bodyStyle={{ padding: '24px' }}>
+          <div className={clsx('flex', 'items-center', 'justify-between')}>
             <div>
               <Text style={{ color: theme.timestampColor || '#667781', fontSize: '13px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                 Pending Requests
               </Text>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-4xl font-bold tracking-tight" style={{ color: '#faad14' }}>
+              <div className={clsx('mt-2', 'flex', 'items-baseline', 'gap-2')}>
+                <span className={clsx('text-4xl', 'font-bold', 'tracking-tight')} style={{ color: '#faad14' }}>
                   {pendingPagination.total || 0}
                 </span>
                 <span style={{ color: theme.timestampColor || '#667781', fontSize: '14px', fontWeight: 500 }}>
@@ -371,20 +371,20 @@ export default function SuperAdminWalletRequests() {
                 </span>
               </div>
             </div>
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ backgroundColor: '#fffbe6', border: '1px solid #ffe58f' }}>
+            <div className={clsx('w-14', 'h-14', 'rounded-2xl', 'flex', 'items-center', 'justify-center', 'flex-shrink-0', 'shadow-sm')} style={{ backgroundColor: '#fffbe6', border: '1px solid #ffe58f' }}>
               <ClockCircleOutlined style={{ color: '#faad14', fontSize: '26px' }} />
             </div>
           </div>
         </Card>
         
-        <Card className="border-0 hover:shadow-md transition-shadow" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: '16px' }} bodyStyle={{ padding: '24px' }}>
-          <div className="flex items-center justify-between">
+        <Card className={clsx('border-0', 'hover:shadow-md', 'transition-shadow')} style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: '16px' }} bodyStyle={{ padding: '24px' }}>
+          <div className={clsx('flex', 'items-center', 'justify-between')}>
             <div>
               <Text style={{ color: theme.timestampColor || '#667781', fontSize: '13px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                 Total Transactions
               </Text>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-4xl font-bold tracking-tight" style={{ color: theme.sidebarTextColor || '#111B21' }}>
+              <div className={clsx('mt-2', 'flex', 'items-baseline', 'gap-2')}>
+                <span className={clsx('text-4xl', 'font-bold', 'tracking-tight')} style={{ color: theme.sidebarTextColor || '#111B21' }}>
                   {pagination.total || 0}
                 </span>
                 <span style={{ color: theme.timestampColor || '#667781', fontSize: '14px', fontWeight: 500 }}>
@@ -392,7 +392,7 @@ export default function SuperAdminWalletRequests() {
                 </span>
               </div>
             </div>
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}10`, border: `1px solid ${theme.sidebarHeaderColor || '#008069'}30` }}>
+            <div className={clsx('w-14', 'h-14', 'rounded-2xl', 'flex', 'items-center', 'justify-center', 'flex-shrink-0', 'shadow-sm')} style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}10`, border: `1px solid ${theme.sidebarHeaderColor || '#008069'}30` }}>
               <HistoryOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '26px' }} />
             </div>
           </div>

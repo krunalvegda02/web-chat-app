@@ -21,6 +21,8 @@ import {
   message,
   Alert,
   Switch,
+  InputNumber,
+  Divider,
 } from 'antd';
 import {
   UserOutlined,
@@ -36,6 +38,10 @@ import {
   KeyOutlined,
   CopyOutlined,
   WalletOutlined,
+  DollarCircleOutlined,
+  StopOutlined,
+  UnlockOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -45,6 +51,8 @@ import {
   updatePlatform,
   changeAdminPassword,
 } from '../../redux/slices/platformSlice.jsx';
+import { addCreditsManually } from '../../redux/slices/walletSlice.jsx';
+import clsx from 'clsx';
 
 const { Title, Text } = Typography;
 
@@ -63,8 +71,7 @@ export default function SuperAdminAdminsList() {
   const [pageSize, setPageSize] = useState(10);
   const [createLoading, setCreateLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
-  const [form] = Form.useForm();
-  const [editForm] = Form.useForm();
+
 
   // API Key modal state
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
@@ -75,7 +82,15 @@ export default function SuperAdminAdminsList() {
   const [pwdModalOpen, setPwdModalOpen] = useState(false);
   const [pwdTarget, setPwdTarget] = useState(null);
   const [pwdLoading, setPwdLoading] = useState(false);
+
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const [creditTarget, setCreditTarget] = useState(null);
+  const [creditLoading, setCreditLoading] = useState(false);
+
+  const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [pwdForm] = Form.useForm();
+  const [creditForm] = Form.useForm();
 
   const fetchAdmins = async () => {
     await dispatch(getAllPlatforms());
@@ -170,6 +185,20 @@ const copyApiKey = () => {
     }
   };
 
+  const handleToggleSenderCharge = async (id, currentVal) => {
+    try {
+      const result = await dispatch(updatePlatform({ id, senderCharge: currentVal }));
+      if (result.type === 'platform/updatePlatform/fulfilled') {
+        message.success(`Sender charge ${currentVal ? 'enabled' : 'disabled'} successfully`);
+        await fetchAdmins();
+      } else {
+        message.error('Failed to update sender charge');
+      }
+    } catch (error) {
+      message.error('An unexpected error occurred');
+    }
+  };
+
   const handleChangePassword = (record) => {
     setPwdTarget(record);
     pwdForm.resetFields();
@@ -194,6 +223,39 @@ const copyApiKey = () => {
     }
   };
 
+  const handleOpenCreditModal = (record) => {
+    if (!record.admin?._id) {
+      message.error("Platform admin account not found.");
+      return;
+    }
+    setCreditTarget(record);
+    creditForm.resetFields();
+    setCreditModalOpen(true);
+  };
+
+  const handleSubmitCredit = async (values) => {
+    setCreditLoading(true);
+    try {
+      const result = await dispatch(addCreditsManually({
+        userId: creditTarget.admin._id,
+        amount: values.amount,
+        remark: values.remark || 'Manual top up by Super Admin'
+      }));
+      if (result.type === 'wallet/addManually/fulfilled') {
+        message.success(`Added ${values.amount} ChatCoin to ${creditTarget.name}`);
+        setCreditModalOpen(false);
+        creditForm.resetFields();
+        await fetchAdmins();
+      } else {
+        message.error(result.payload || 'Failed to add credit');
+      }
+    } catch {
+      message.error('An unexpected error occurred');
+    } finally {
+      setCreditLoading(false);
+    }
+  };
+
   const handleEditPlatform = (record) => {
     setEditingPlatform(record);
     editForm.setFieldsValue({
@@ -201,6 +263,11 @@ const copyApiKey = () => {
       email: record.admin?.email,
       phone: record.admin?.phone,
       senderCharge: record.senderCharge || false,
+      textCost: record.customPricing?.textCost,
+      mediaCost: record.customPricing?.mediaCost,
+      textTranslationCost: record.customPricing?.textTranslationCost,
+      voiceCost: record.customPricing?.voiceCost,
+      voiceTranslationCost: record.customPricing?.voiceTranslationCost,
     });
     setEditModalOpen(true);
   };
@@ -208,7 +275,20 @@ const copyApiKey = () => {
   const handleUpdatePlatform = async (values) => {
     setUpdateLoading(true);
     try {
-      const result = await dispatch(updatePlatform({ id: editingPlatform._id, ...values }));
+      const { textCost, mediaCost, textTranslationCost, voiceCost, voiceTranslationCost, ...restValues } = values;
+      
+      const payload = {
+        id: editingPlatform._id,
+        ...restValues
+      };
+
+      if (textCost !== undefined || mediaCost !== undefined || textTranslationCost !== undefined || voiceCost !== undefined || voiceTranslationCost !== undefined) {
+         payload.customPricing = { textCost, mediaCost, textTranslationCost, voiceCost, voiceTranslationCost };
+      } else {
+         payload.customPricing = null;
+      }
+
+      const result = await dispatch(updatePlatform(payload));
       
       if (result.type === 'platform/updatePlatform/fulfilled') {
         message.success('Platform updated successfully!');
@@ -241,15 +321,15 @@ const copyApiKey = () => {
       dataIndex: 'name',
       key: 'name',
       render: (name, record) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+        <div className={clsx('flex', 'items-center', 'gap-3')}>
+          <div className={clsx('w-10', 'h-10', 'rounded-lg', 'flex', 'items-center', 'justify-center', 'flex-shrink-0')}
             style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}
           >
             <UserOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '18px' }} />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{name}</p>
-            <p className="text-xs truncate" style={{ color: theme.timestampColor || '#9CA3AF' }}>ID: {record._id?.slice(0, 8)}...</p>
+            <p className={clsx('font-semibold', 'text-sm', 'truncate')} style={{ color: theme.sidebarTextColor || '#111B21' }}>{name}</p>
+            <p className={clsx('text-xs', 'truncate')} style={{ color: theme.timestampColor || '#9CA3AF' }}>ID: {record._id?.slice(0, 8)}...</p>
           </div>
         </div>
       ),
@@ -258,9 +338,8 @@ const copyApiKey = () => {
       title: 'Email',
       dataIndex: ['admin', 'email'],
       key: 'email',
-      responsive: ['sm'],
       render: (email) => (
-        <div className="flex items-center gap-2">
+        <div className={clsx('flex', 'items-center', 'gap-2')}>
           <MailOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />
           <Text className="truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{email || 'N/A'}</Text>
         </div>
@@ -269,7 +348,6 @@ const copyApiKey = () => {
     {
       title: 'Status',
       key: 'status',
-      responsive: ['sm'],
       render: (_, record) => (
         <Tag
           icon={record.status === 'ACTIVE' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
@@ -288,7 +366,6 @@ const copyApiKey = () => {
     {
       title: 'Created',
       key: 'created',
-      responsive: ['sm'],
       render: (_, record) => (
         <Text style={{ color: theme.timestampColor || '#6B7280', fontSize: '13px' }}>
           {record.createdAt
@@ -301,25 +378,38 @@ const copyApiKey = () => {
       title: 'Wallet Balance',
       dataIndex: ['admin', 'walletBalance'],
       key: 'walletBalance',
-      responsive: ['md'],
       render: (balance) => (
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-md flex items-center justify-center" style={{ backgroundColor: '#F3E8FF', color: '#9333EA' }}>
+        <div className={clsx('flex', 'items-center', 'gap-2')}>
+          <div className={clsx('p-1.5', 'rounded-md', 'flex', 'items-center', 'justify-center')} style={{ backgroundColor: '#F3E8FF', color: '#9333EA' }}>
             <WalletOutlined style={{ fontSize: '14px' }} />
           </div>
           <Text style={{ color: theme.sidebarTextColor || '#111B21', fontWeight: 600 }}>
-            {balance !== undefined ? balance.toLocaleString() : '0'} <span className="text-xs font-normal text-gray-500">Coins</span>
+            {balance !== undefined ? balance.toLocaleString() : '0'} <span className={clsx('text-xs', 'font-normal', 'text-gray-500')}>Coins</span>
           </Text>
         </div>
+      ),
+    },
+    {
+      title: 'Sender Charge',
+      dataIndex: 'senderCharge',
+      key: 'senderCharge',
+      width: 130,
+      render: (senderCharge, record) => (
+        <Switch 
+          checked={senderCharge}
+          onChange={(checked) => handleToggleSenderCharge(record._id, checked)}
+          checkedChildren="Yes"
+          unCheckedChildren="No"
+        />
       ),
     },
     {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 100,
+      width: 160,
       render: (_, record) => (
-        <Space size="small">
+        <div className={clsx('flex', 'items-center', 'gap-1')}>
           <Tooltip title="Edit">
             <Button
               type="text"
@@ -332,10 +422,19 @@ const copyApiKey = () => {
           <Tooltip title="Change Password">
             <Button
               type="text"
-              icon={<KeyOutlined />}
+              icon={<UnlockOutlined />}
               size="small"
               onClick={() => handleChangePassword(record)}
               style={{ color: theme.sidebarHeaderColor || '#008069' }}
+            />
+          </Tooltip>
+          <Tooltip title="Add Credit">
+            <Button
+              type="text"
+              icon={<DollarCircleOutlined />}
+              size="small"
+              onClick={() => handleOpenCreditModal(record)}
+              style={{ color: '#10B981' }}
             />
           </Tooltip>
           <Popconfirm
@@ -350,25 +449,25 @@ const copyApiKey = () => {
             <Tooltip title={record.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}>
               <Button
                 type="text"
-                icon={record.status === 'ACTIVE' ? <ExclamationCircleOutlined /> : <CheckCircleOutlined />}
+                icon={record.status === 'ACTIVE' ? <StopOutlined /> : <CheckCircleOutlined />}
                 size="small"
-                style={{ color: record.status === 'ACTIVE' ? '#F59E0B' : '#10B981' }}
+                style={{ color: record.status === 'ACTIVE' ? '#EF4444' : '#10B981' }}
               />
             </Tooltip>
           </Popconfirm>
-        </Space>
+        </div>
       ),
     },
   ];
 
   return (
     <div
-      className="h-screen sm:min-h-screen p-3 sm:p-4 md:p-6 overflow-y-auto"
+      className={clsx('h-screen', 'sm:min-h-screen', 'p-3', 'sm:p-4', 'md:p-6', 'overflow-y-auto')}
       style={{ backgroundColor: theme.sidebarBackgroundColor || '#F0F2F5', height: 'calc(100vh - 50px)' }}
     >
       {/* Header */}
       <div className="mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div className={clsx('flex', 'flex-col', 'sm:flex-row', 'items-start', 'sm:items-center', 'justify-between', 'gap-4', 'mb-6')}>
           <div>
             <Title level={2} style={{ color: theme.sidebarTextColor || '#111B21', margin: 0, fontSize: 'clamp(20px, 5vw, 28px)' }}>
               Admin Workspaces
@@ -380,16 +479,16 @@ const copyApiKey = () => {
             icon={<PlusOutlined />}
             onClick={() => setModalOpen(true)}
             size="large"
-            className="w-full sm:w-auto"
+            className={clsx('w-full', 'sm:w-auto')}
             style={{ backgroundColor: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}
           >
-            <span className="hidden sm:inline">Add New Admin</span>
+            <span className={clsx('hidden', 'sm:inline')}>Add New Admin</span>
             <span className="sm:hidden">Add Admin</span>
           </Button>
         </div>
 
         {/* Search and Filter */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 mb-2">
+        <div className={clsx('flex', 'flex-col', 'sm:flex-row', 'items-center', 'gap-4', 'mb-2')}>
           <Input
             placeholder="Search by name, email, or phone..."
             prefix={<SearchOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
@@ -398,7 +497,7 @@ const copyApiKey = () => {
             allowClear
             onClear={() => { setSearchQuery(''); setCurrentPage(1); }}
             size="large"
-            className="flex-1 w-full"
+            className={clsx('flex-1', 'w-full')}
             style={{ borderRadius: '8px', backgroundColor: theme.inputBackgroundColor || '#FFFFFF' }}
             autoComplete="off"
           />
@@ -406,7 +505,7 @@ const copyApiKey = () => {
             value={statusFilter}
             onChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
             size="large"
-            className="w-full sm:w-48 shrink-0"
+            className={clsx('w-full', 'sm:w-48', 'shrink-0')}
             style={{ borderRadius: '8px' }}
             suffixIcon={<FilterOutlined style={{ color: theme.sidebarHeaderColor || '#008069' }} />}
           >
@@ -421,15 +520,16 @@ const copyApiKey = () => {
       </div>
 
       {/* Table - Desktop */}
-      <Card className="border-0 hidden md:block" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+      <Card className={clsx('border-0', 'hidden', 'md:block')} style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
         {filteredPlatforms.length > 0 ? (
           <Table
             columns={columns}
             dataSource={filteredPlatforms}
             loading={loading}
             rowKey="_id"
-            scroll={{ x: 800 }}
-            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`, responsive: true }}
+            className={clsx('admin-list-table', 'custom-hover-table')}
+            scroll={{ x: 'max-content' }}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}` }}
             rowClassName="hover:bg-gray-50 transition-colors"
           />
         ) : (
@@ -445,15 +545,15 @@ const copyApiKey = () => {
               dataSource={paginatedPlatforms}
               loading={loading}
               renderItem={(item) => (
-              <Card className="mb-3  border-0" style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}>
+              <Card className={clsx('mb-3', 'border-0')} style={{ backgroundColor: theme.inputBackgroundColor || '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+                <div className={clsx('flex', 'items-start', 'gap-3')}>
+                  <div className={clsx('w-12', 'h-12', 'rounded-lg', 'flex', 'items-center', 'justify-center', 'flex-shrink-0')} style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}>
                     <UserOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '20px' }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-base truncate" style={{ color: theme.sidebarTextColor || '#111B21' }}>{item.name}</p>
+                  <div className={clsx('flex-1', 'min-w-0')}>
+                    <div className={clsx('flex', 'items-start', 'justify-between', 'mb-2')}>
+                      <div className={clsx('flex-1', 'min-w-0')}>
+                        <p className={clsx('font-semibold', 'text-base', 'truncate')} style={{ color: theme.sidebarTextColor || '#111B21' }}>{item.name}</p>
                         <p className="text-xs" style={{ color: theme.timestampColor || '#9CA3AF' }}>ID: {item._id?.slice(0, 8)}...</p>
                       </div>
                       <Tag
@@ -468,25 +568,25 @@ const copyApiKey = () => {
                         {item.status || 'ACTIVE'}
                       </Tag>
                     </div>
-                    <div className="space-y-1 mb-3">
-                      <div className="flex items-center gap-2">
+                    <div className={clsx('space-y-1', 'mb-3')}>
+                      <div className={clsx('flex', 'items-center', 'gap-2')}>
                         <MailOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '14px' }} />
-                        <Text className="text-sm truncate" style={{ color: theme.timestampColor || '#667781' }}>{item.admin?.email || 'N/A'}</Text>
+                        <Text className={clsx('text-sm', 'truncate')} style={{ color: theme.timestampColor || '#667781' }}>{item.admin?.email || 'N/A'}</Text>
                       </div>
                       {item.admin?.phone && (
-                        <div className="flex items-center gap-2">
+                        <div className={clsx('flex', 'items-center', 'gap-2')}>
                           <PhoneOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '14px' }} />
                           <Text className="text-sm" style={{ color: theme.timestampColor || '#667781' }}>{item.admin.phone}</Text>
                         </div>
                       )}
-                      <div className="flex items-center gap-2">
+                      <div className={clsx('flex', 'items-center', 'gap-2')}>
                         <Text className="text-xs" style={{ color: theme.timestampColor || '#9CA3AF' }}>
                           Created: {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                         </Text>
                       </div>
                     </div>
                     {/* 2-col grid so buttons never overflow */}
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className={clsx('grid', 'grid-cols-2', 'gap-2')}>
                       <Button type="default" icon={<EditOutlined />} size="small" onClick={() => handleEditPlatform(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Edit</Button>
                       <Button type="default" icon={<KeyOutlined />} size="small" onClick={() => handleChangePassword(item)} style={{ color: theme.sidebarHeaderColor || '#008069', borderColor: theme.sidebarHeaderColor || '#008069', borderRadius: '6px' }}>Password</Button>
                       <Popconfirm
@@ -512,7 +612,7 @@ const copyApiKey = () => {
               </Card>
             )}
             />
-            <div className="mt-4 flex justify-center">
+            <div className={clsx('mt-4', 'flex', 'justify-center')}>
               <Pagination
                 current={currentPage}
                 pageSize={pageSize}
@@ -534,8 +634,8 @@ const copyApiKey = () => {
       {/* Create Admin Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#00806920' }}>
+          <div className={clsx('flex', 'items-center', 'gap-3')}>
+            <div className={clsx('p-2', 'rounded-lg')} style={{ backgroundColor: '#00806920' }}>
               <UserOutlined style={{ color: '#008069', fontSize: '20px' }} />
             </div>
             <span style={{ color: '#111B21', fontSize: '18px', fontWeight: 600 }}>Create New Admin Workspace</span>
@@ -574,8 +674,8 @@ const copyApiKey = () => {
       {/* Edit Admin Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#00806920' }}>
+          <div className={clsx('flex', 'items-center', 'gap-3')}>
+            <div className={clsx('p-2', 'rounded-lg')} style={{ backgroundColor: '#00806920' }}>
               <EditOutlined style={{ color: '#008069', fontSize: '20px' }} />
             </div>
             <span style={{ color: '#111B21', fontSize: '18px', fontWeight: 600 }}>Edit Admin Workspace</span>
@@ -600,6 +700,36 @@ const copyApiKey = () => {
           <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Sender Charge (Charge Users for Messages)</span>} name="senderCharge" valuePropName="checked">
             <Switch />
           </Form.Item>
+          
+          <Divider orientation="left" plain style={{ margin: '12px 0' }}>Custom Pricing (Optional)</Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: '16px', fontSize: '12px' }}>
+            Set a specific price for this platform to override the global pricing. Leave empty to use global pricing.
+          </Text>
+          
+          <div className={clsx('flex', 'gap-4')}>
+            <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Text Cost</span>} name="textCost" className="flex-1">
+              <InputNumber placeholder="e.g. 5" min={0} size="large" style={{ width: '100%', borderRadius: '8px' }} />
+            </Form.Item>
+            <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Media Cost</span>} name="mediaCost" className="flex-1">
+              <InputNumber placeholder="e.g. 20" min={0} size="large" style={{ width: '100%', borderRadius: '8px' }} />
+            </Form.Item>
+          </div>
+          
+          <div className={clsx('flex', 'gap-4')}>
+            <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Text Translation</span>} name="textTranslationCost" className="flex-1">
+              <InputNumber placeholder="e.g. 10" min={0} size="large" style={{ width: '100%', borderRadius: '8px' }} />
+            </Form.Item>
+            <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Voice Cost</span>} name="voiceCost" className="flex-1">
+              <InputNumber placeholder="e.g. 15" min={0} size="large" style={{ width: '100%', borderRadius: '8px' }} />
+            </Form.Item>
+          </div>
+
+          <div className={clsx('flex', 'gap-4')}>
+            <Form.Item label={<span style={{ color: '#111B21', fontWeight: 500 }}>Voice Translation</span>} name="voiceTranslationCost" className="flex-1">
+              <InputNumber placeholder="e.g. 25" min={0} size="large" style={{ width: '100%', borderRadius: '8px' }} />
+            </Form.Item>
+          </div>
+
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={updateLoading} block size="large" style={{ backgroundColor: '#008069', borderColor: '#008069', height: '44px', borderRadius: '8px', fontWeight: 500 }}>
               {updateLoading ? 'Updating Workspace...' : 'Update Workspace'}
@@ -611,8 +741,8 @@ const copyApiKey = () => {
       {/* Change Password Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}>
+          <div className={clsx('flex', 'items-center', 'gap-3')}>
+            <div className={clsx('p-2', 'rounded-lg')} style={{ backgroundColor: `${theme.sidebarHeaderColor || '#008069'}20` }}>
               <KeyOutlined style={{ color: theme.sidebarHeaderColor || '#008069', fontSize: '20px' }} />
             </div>
             <span style={{ color: theme.sidebarTextColor || '#111B21', fontSize: '18px', fontWeight: 600 }}>Change Password — {pwdTarget?.name}</span>
@@ -675,8 +805,8 @@ const copyApiKey = () => {
       {/* API Key Modal - shown once after platform creation */}
       <Modal
         title={
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#00806920' }}>
+          <div className={clsx('flex', 'items-center', 'gap-3')}>
+            <div className={clsx('p-2', 'rounded-lg')} style={{ backgroundColor: '#00806920' }}>
               <KeyOutlined style={{ color: '#008069', fontSize: '20px' }} />
             </div>
             <span style={{ color: '#111B21', fontSize: '18px', fontWeight: 600 }}>Platform API Key Generated</span>
@@ -701,14 +831,14 @@ const copyApiKey = () => {
             showIcon
             style={{ marginBottom: '16px', borderRadius: '8px' }}
           />
-          <p className="text-sm mb-3" style={{ color: '#667781' }}>
+          <p className={clsx('text-sm', 'mb-3')} style={{ color: '#667781' }}>
             The platform admin can use this key to integrate the chat widget into their platform.
           </p>
           <div
-            className="flex items-center gap-2 p-3 rounded-lg"
+            className={clsx('flex', 'items-center', 'gap-2', 'p-3', 'rounded-lg')}
             style={{ backgroundColor: '#F0F2F5', border: '1px solid #E9EDEF' }}
           >
-            <code className="flex-1 text-sm break-all select-all" style={{ color: '#111B21', fontFamily: 'monospace' }}>
+            <code className={clsx('flex-1', 'text-sm', 'break-all', 'select-all')} style={{ color: '#111B21', fontFamily: 'monospace' }}>
               {displayedApiKey}
             </code>
             <Tooltip title={apiKeyCopied ? 'Copied!' : 'Copy'}>
@@ -721,6 +851,61 @@ const copyApiKey = () => {
             </Tooltip>
           </div>
         </div>
+      </Modal>
+      <Modal
+        title={
+          <div className={clsx('flex', 'items-center', 'gap-2')}>
+            <DollarOutlined style={{ color: '#10B981', fontSize: '20px' }} />
+            <span>Add Credits to {creditTarget?.name}</span>
+          </div>
+        }
+        open={creditModalOpen}
+        onCancel={() => {
+          setCreditModalOpen(false);
+          creditForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={creditForm}
+          layout="vertical"
+          onFinish={handleSubmitCredit}
+          className="mt-4"
+        >
+          <Form.Item
+            name="amount"
+            label="Amount (ChatCoins)"
+            rules={[{ required: true, message: 'Please enter the amount' }]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              min={1}
+              size="large"
+              placeholder="e.g. 100"
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="remark"
+            label="Remark"
+            rules={[{ required: true, message: 'Please enter a remark' }]}
+          >
+            <Input.TextArea
+              placeholder="Reason for adding credits..."
+              rows={3}
+            />
+          </Form.Item>
+
+          <Form.Item className={clsx('mb-0', 'text-right', 'mt-6')}>
+            <Space>
+              <Button onClick={() => setCreditModalOpen(false)}>Cancel</Button>
+              <Button type="primary" htmlType="submit" loading={creditLoading} style={{ backgroundColor: '#10B981', borderColor: '#10B981' }}>
+                Add Credits
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
