@@ -103,7 +103,7 @@ export const usePlatformDetection = () => {
     const hasSessionToken = !!platformParams.sessionToken;
     const hasApiKey = !!platformParams.apiKey;
     const hasPlatformParam = !!platformParams.platform;
-    const hasUserData = !!(platformParams.name && platformParams.email && platformParams.phone);
+    const hasUserData = !!platformParams.name; // name-only is sufficient
     const hasAutoLogin = platformParams.autoLogin;
 
     // Prefer sessionToken (secure), fall back to apiKey (legacy)
@@ -115,9 +115,7 @@ export const usePlatformDetection = () => {
       shouldAutoLogin: isDetected && (hasAutoLogin || hasSessionToken || (hasUserData && isValidApiKey)),
       userData: hasUserData ? {
         name: platformParams.name,
-        email: platformParams.email,
-        phone: platformParams.phone,
-        externalUserId: platformParams.externalUserId || `auto_${Date.now()}`
+        externalUserId: platformParams.externalUserId || undefined
       } : null
     };
   }, [platformParams, isValidApiKey]);
@@ -131,19 +129,32 @@ export const usePlatformDetection = () => {
         const result = await consumeSessionToken(platformParams.sessionToken);
         if (result.success) {
           const targetRoom = platformParams.roomId || result.data.room?._id;
+          
+          // ✅ Strip the token synchronously to prevent re-triggering the effect
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('sessionToken');
+          newParams.delete('st');
+          setSearchParams(newParams, { replace: true });
+          
           if (targetRoom) {
             dispatch(setActiveRoom(targetRoom));
             navigate(`/user/chats/${targetRoom}`, { replace: true });
-            window.history.replaceState({}, document.title, `/user/chats/${targetRoom}`);
           } else {
             navigate('/user/chats', { replace: true });
           }
+          
           setPlatformState(prev => ({ ...prev, isProcessing: false, retryCount: 0 }));
           return true;
         } else {
           throw new Error(result.error || 'Session login failed');
         }
       } catch (error) {
+        // ✅ Strip the token from URL using setSearchParams to prevent infinite retry loops
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('sessionToken');
+        newParams.delete('st'); // Just in case
+        setSearchParams(newParams, { replace: true });
+        
         setPlatformState(prev => ({ ...prev, isProcessing: false, error: error.message }));
         return false;
       }
@@ -256,22 +267,19 @@ export const usePlatformDetection = () => {
     if (!initialized) return;
     if (platformState.isProcessing) return;
 
-    // Normalize phone numbers for comparison
-    const urlPhoneNormalized = normalizePhone(platformParams.phone);
-    const userPhoneNormalized = normalizePhone(user?.phone);
-
     // Detect if we need to switch users (Sticky identity fix)
+    // Compare by name — the only required identifier in the username-only auth model
+    // A new sessionToken also always forces re-auth (user may have changed on the server)
     const isDifferentUser = user && (
-      (platformParams.email && user.email !== platformParams.email) ||
-      (urlPhoneNormalized && userPhoneNormalized !== urlPhoneNormalized)
+      (platformParams.sessionToken) || // new session token always forces re-login
+      (platformParams.name && user.name !== platformParams.name)
     );
 
     if (isDifferentUser) {
-      console.log('🔄 [PlatformDetection] Different user detected in URL, forcing re-authentication', {
-        urlEmail: platformParams.email,
-        userEmail: user.email,
-        urlPhone: urlPhoneNormalized,
-        userPhone: userPhoneNormalized
+      console.log('🔄 [PlatformDetection] Different user detected, forcing re-authentication', {
+        urlName: platformParams.name,
+        userName: user.name,
+        hasNewToken: !!platformParams.sessionToken
       });
       performAutoLogin(detectionResult.userData);
       return;

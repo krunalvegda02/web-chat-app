@@ -291,15 +291,13 @@
     // Change these to point to your live chat server
     const CHAT_PLATFORM_URL = "http://localhost:5173";
     const CHAT_API_URL = "http://localhost:5500";
-    const API_KEY = "pk_36809949c1a61162a5011b41352524211d532edac96fe5124a3943dc18a0b0a5"
-    // "pk_7a4a6dfc0c7f7b831cb4c6ff108c0a41828fe21c6f37d99e5786d4a992436efb"; // The platform's API Key
+    // const API_KEY = "pk_36809949c1a61162a5011b41352524211d532edac96fe5124a3943dc18a0b0a5"
+    const API_KEY = "pk_7a4a6dfc0c7f7b831cb4c6ff108c0a41828fe21c6f37d99e5786d4a992436efb"; // DR247 's API Key
 
     // --- MOCK USER DATA ---
     // In production, the external site injects the real logged-in user data here
     const externalUser = {
-      name: "Demo User1",
-      email: "demo1@external.club",
-      phone: "1134567890"
+      name: "TestUser1",
     };
 
     // DOM Elements
@@ -328,9 +326,6 @@
           },
           body: JSON.stringify({
             name: externalUser.name,
-            email: externalUser.email,
-            phone: externalUser.phone,
-            externalUserId: `${externalUser.name.toLowerCase()}_${externalUser.phone}`,
           }),
         });
 
@@ -347,8 +342,6 @@
         const params = new URLSearchParams({
           apiKey: API_KEY,
           name: externalUser.name,
-          email: externalUser.email,
-          phone: externalUser.phone,
           autoLogin: "true",
         });
 
@@ -371,9 +364,24 @@
     }
 
     function closeChat() {
-      overlay.style.display = 'none';
-      iframe.src = ''; // clear iframe
+      // 1. Send logout command to iframe
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'LOGOUT_CHAT' }, '*');
+      }
+      
+      // 2. Hide overlay and clear iframe after a tiny delay to allow message to send
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        iframe.src = ''; // clear iframe
+      }, 50);
     }
+
+    // Ensure session is cleared when user refreshes the parent site
+    window.addEventListener('beforeunload', () => {
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'LOGOUT_CHAT' }, '*');
+      }
+    });
   </script>
 </body>
 

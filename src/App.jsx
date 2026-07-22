@@ -21,6 +21,7 @@ import WhatsAppNotification from "./components/common/WhatsAppNotification";
 import { useSocket } from "./hooks/useSocket";
 import { useAuthSync } from "./hooks/useAuthSync";
 import PlatformGateway from "./components/platform/PlatformGateway";
+import clsx from "clsx";
 
 function AppContent() {
   const dispatch = useDispatch();
@@ -45,9 +46,20 @@ function AppContent() {
     chatSocketClient.emit('send_message', { roomId, content: message });
   };
 
-  // Listen for service worker messages
+  // Listen for service worker and window messages
   useEffect(() => {
-    const handleServiceWorkerMessage = (event) => {
+    const handleMessage = (event) => {
+      // Handle parent window commands
+      if (event.data?.type === 'LOGOUT_CHAT') {
+        console.log('🚪 [App] Received LOGOUT_CHAT from parent, clearing session');
+        dispatch(clearAuth());
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        sessionStorage.clear();
+        return;
+      }
+      
+      // Handle Service Worker commands
       if (event.data?.type === 'SEND_REPLY') {
         chatSocketClient.emit('send_message', { roomId: event.data.roomId, content: event.data.message });
       } else if (event.data?.type === 'OPEN_CHAT' && event.data.roomId) {
@@ -55,8 +67,13 @@ function AppContent() {
       }
     };
 
-    navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
-    return () => navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
+    window.addEventListener('message', handleMessage);
+    navigator.serviceWorker?.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      navigator.serviceWorker?.removeEventListener('message', handleMessage);
+    };
   }, [dispatch]);
 
   // Show call window for incoming calls
@@ -85,11 +102,11 @@ function AppContent() {
     const hasPlatformParam = urlParams.get('platform');
     const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
     // Also check storage — index.html strips params from URL before React loads
-    const storedParams = (() => { try { return localStorage.getItem('__platformParams') || sessionStorage.getItem('__platformParams'); } catch(e) { return null; } })();
+    const storedParams = (() => { try { return localStorage.getItem('__platformParams') || sessionStorage.getItem('__platformParams'); } catch (e) { return null; } })();
     const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData || !!storedParams;
-    
+
     console.log('🔄 [App] Path check:', { currentPath, hasSearch, initialized, hasToken: !!token, hasUser: !!user, isPlatformRequest });
-    
+
     // If on root path and initialized but no user/token
     if (currentPath === '/' && initialized && !token && !user) {
       if (isPlatformRequest) {
@@ -101,7 +118,7 @@ function AppContent() {
         window.location.replace('/login');
       }
     }
-    
+
     // If on login page but platform request detected, redirect to root for platform handling
     if (currentPath === '/login' && isPlatformRequest && initialized) {
       console.log('🔄 [App] Platform request on login page, redirecting to root');
@@ -116,9 +133,9 @@ function AppContent() {
     const hasPlatformParam = urlParams.get('platform');
     const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
     // Also check storage — index.html strips params from URL before React loads
-    const storedParams = (() => { try { return localStorage.getItem('__platformParams') || sessionStorage.getItem('__platformParams'); } catch(e) { return null; } })();
+    const storedParams = (() => { try { return localStorage.getItem('__platformParams') || sessionStorage.getItem('__platformParams'); } catch (e) { return null; } })();
     const isPlatformRequest = hasApiKey || hasPlatformParam || hasUserData || !!storedParams;
-    
+
     console.log('🔐 [App] Initial auth check effect running', {
       hasToken: !!token,
       initialized,
@@ -127,30 +144,30 @@ function AppContent() {
     });
 
     if (!initialized) {
-    if (token) {
-      console.log('🔐 [App] Token exists, calling fetchMe...');
-      // Token exists, fetch user data to verify it's still valid
-      dispatch(fetchMe()).unwrap().catch((error) => {
-        console.warn('⚠️ [App] fetchMe failed:', error);
-        // If fetchMe fails, keep the token and user data from Redux
-        // Don't clear auth, just mark as initialized
-        console.log('🔐 [App] Calling setInitialized after fetchMe failure');
+      if (token) {
+        console.log('🔐 [App] Token exists, calling fetchMe...');
+        // Token exists, fetch user data to verify it's still valid
+        dispatch(fetchMe()).unwrap().catch((error) => {
+          console.warn('⚠️ [App] fetchMe failed:', error);
+          // If fetchMe fails, keep the token and user data from Redux
+          // Don't clear auth, just mark as initialized
+          console.log('🔐 [App] Calling setInitialized after fetchMe failure');
+          dispatch(setInitialized());
+        });
+      } else {
+        console.log('🔐 [App] No token, calling setInitialized');
+        // No token, mark as initialized
         dispatch(setInitialized());
-      });
-    } else {
-      console.log('🔐 [App] No token, calling setInitialized');
-      // No token, mark as initialized
-      dispatch(setInitialized());
-      
-      // If on root path and no platform parameters, redirect to login immediately
-      if (window.location.pathname === '/') {
-        if (!isPlatformRequest) {
-          console.log('🔄 [App] No platform params, redirecting to login');
-          window.location.href = '/login';
-        } else {
-          console.log('🔄 [App] Platform request detected, staying on root');
+
+        // If on root path and no platform parameters, redirect to login immediately
+        if (window.location.pathname === '/') {
+          if (!isPlatformRequest) {
+            console.log('🔄 [App] No platform params, redirecting to login');
+            window.location.href = '/login';
+          } else {
+            console.log('🔄 [App] Platform request detected, staying on root');
+          }
         }
-      }
       }
     } else {
       console.log('🔐 [App] Already initialized or token check skipped');
@@ -194,8 +211,8 @@ function AppContent() {
       {user && <NotificationPrompt />}
 
       {notifications.length > 0 && (
-        <div cclassName={clsx('fixed', 'top-0', 'right-0', 'p-4')}style={{ zIndex: 999999, pointerEvents: 'none' }}>
-          <div cclassName={clsx('flex', 'flex-col', 'gap-3')}style={{ pointerEvents: 'auto' }}>
+        <div cclassName={clsx('fixed', 'top-0', 'right-0', 'p-4')} style={{ zIndex: 999999, pointerEvents: 'none' }}>
+          <div cclassName={clsx('flex', 'flex-col', 'gap-3')} style={{ pointerEvents: 'auto' }}>
             {notifications.map((notification) => (
               <WhatsAppNotification
                 key={notification.id}

@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Form, Input, Button, Card, Typography, Alert, Spin, Steps } from 'antd';
 import { 
   UserOutlined, 
-  MailOutlined, 
-  PhoneOutlined, 
   KeyOutlined,
   CheckCircleOutlined,
   LoadingOutlined
@@ -67,13 +65,10 @@ export default function PlatformAuth() {
       
       setCurrentStep(2); // Show authentication step
       
-      // Prepare user data
+      // Prepare user data — only name required
       const userData = {
         name: values.name?.trim(),
-        email: values.email?.trim().toLowerCase(),
-        phone: values.phone?.replace(/\D/g, ''), // Remove non-digits
-        password: values.password,
-        externalUserId: values.externalUserId?.trim() || `ext_${Date.now()}`
+        externalUserId: values.externalUserId?.trim() || undefined
       };
       
       console.log('🔐 [PlatformAuth] Submitting login request...');
@@ -203,7 +198,8 @@ export default function PlatformAuth() {
                 rules={[
                   { required: true, message: 'Name is required' },
                   { min: 2, message: 'Name must be at least 2 characters' },
-                  { max: 50, message: 'Name must be less than 50 characters' }
+                  { max: 50, message: 'Name must be less than 50 characters' },
+                  { pattern: /^\S+$/, message: 'Username cannot contain spaces' }
                 ]}
               >
                 <Input
@@ -211,50 +207,6 @@ export default function PlatformAuth() {
                   prefix={<UserOutlined />}
                   placeholder="Enter your full name"
                   maxLength={50}
-                />
-              </Form.Item>
-              
-              <Form.Item
-                name="email"
-                label="Email Address"
-                rules={[
-                  { required: true, message: 'Email is required' },
-                  { type: 'email', message: 'Please enter a valid email' }
-                ]}
-              >
-                <Input
-                  size="large"
-                  prefix={<MailOutlined />}
-                  placeholder="Enter your email address"
-                  type="email"
-                />
-              </Form.Item>
-              
-              <Form.Item
-                name="phone"
-                label="Phone Number"
-                rules={[
-                  { required: true, message: 'Phone number is required' },
-                  { 
-                    validator: (_, value) => {
-                      if (!value) return Promise.resolve();
-                      const cleanPhone = value.replace(/\D/g, '');
-                      if (cleanPhone.length < 10) {
-                        return Promise.reject('Phone number must be at least 10 digits');
-                      }
-                      if (cleanPhone.length > 15) {
-                        return Promise.reject('Phone number must be less than 15 digits');
-                      }
-                      return Promise.resolve();
-                    }
-                  }
-                ]}
-              >
-                <Input
-                  size="large"
-                  prefix={<PhoneOutlined />}
-                  placeholder="Enter your phone number"
-                  type="tel"
                 />
               </Form.Item>
               

@@ -10,9 +10,7 @@ import React from 'react';
  * Generate a seamless chat link for external platforms
  * @param {Object} config - Configuration object
  * @param {string} config.apiKey - Platform API key
- * @param {string} config.name - User's name
- * @param {string} config.email - User's email
- * @param {string} config.phone - User's phone number
+ * @param {string} config.name - User's name (username) — the only required identifier
  * @param {string} config.externalUserId - External user ID (optional)
  * @param {string} config.roomId - Specific room ID (optional)
  * @param {string} config.baseUrl - Base URL of the chat application
@@ -23,8 +21,6 @@ import React from 'react';
 export const generateSeamlessChatLink = ({
   apiKey,
   name,
-  email,
-  phone,
   externalUserId,
   roomId,
   baseUrl = window.location.origin,
@@ -32,16 +28,14 @@ export const generateSeamlessChatLink = ({
   redirect
 }) => {
   // Validate required parameters
-  if (!apiKey || !name || !email || !phone) {
-    throw new Error('API key, name, email, and phone are required');
+  if (!apiKey || !name) {
+    throw new Error('API key and name (username) are required');
   }
 
   // Create URL parameters
   const params = new URLSearchParams({
     apiKey,
     name: encodeURIComponent(name),
-    email: encodeURIComponent(email),
-    phone: encodeURIComponent(phone),
     autoLogin: autoLogin.toString(),
     platform: 'true'
   });
@@ -76,8 +70,6 @@ export const generateSeamlessChatLink = ({
 export const SeamlessChatButton = ({
   apiKey,
   name,
-  email,
-  phone,
   externalUserId,
   roomId,
   baseUrl,
@@ -95,8 +87,6 @@ export const SeamlessChatButton = ({
       const chatUrl = generateSeamlessChatLink({
         apiKey,
         name,
-        email,
-        phone,
         externalUserId,
         roomId,
         baseUrl,
@@ -300,8 +290,6 @@ export const generateIntegrationCode = ({
     const params = new URLSearchParams({
       apiKey: CHAT_CONFIG.apiKey,
       name: encodeURIComponent(userData.name),
-      email: encodeURIComponent(userData.email),
-      phone: encodeURIComponent(userData.phone),
       autoLogin: 'true',
       platform: 'true'
     });
@@ -356,10 +344,8 @@ export const generateIntegrationCode = ({
     document.getElementById('seamless-chat-widget').addEventListener('click', function() {
       // Get user data (customize this based on your platform)
       const userData = {
-        name: 'User Name', // Replace with actual user data
-        email: 'user@example.com', // Replace with actual user data
-        phone: '+1234567890', // Replace with actual user data
-        userId: 'user123' // Replace with actual user ID
+        name: 'User Name', // Replace with actual user name from your platform
+        userId: 'user123' // Optional: your internal user ID for deduplication
       };
 
       const chatUrl = generateChatLink(userData);

@@ -86,7 +86,7 @@
     const API_KEY = "pk_7a4a6dfc0c7f7b831cb4c6ff108c0a41828fe21c6f37d99e5786d4a992436efb"; 
 
     // --- MOCK USER DATA ---
-    const externalUser = { name: "Secure User", email: "secure@test.com", phone: "1234567890" };
+    const externalUser = { name: "test12" };
 
     const btn = document.getElementById('chat-widget-btn');
     const icon = document.getElementById('chat-icon');
@@ -112,9 +112,6 @@
           },
           body: JSON.stringify({
             name: externalUser.name,
-            email: externalUser.email,
-            phone: externalUser.phone,
-            externalUserId: `secure_${externalUser.phone}`,
           }),
         });
 
@@ -151,9 +148,24 @@
     }
 
     function closeChat() {
-      overlay.style.display = 'none';
-      iframe.src = ''; 
+      // 1. Send logout command to iframe
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'LOGOUT_CHAT' }, '*');
+      }
+      
+      // Hide overlay and clear iframe after a tiny delay
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        iframe.src = ''; 
+      }, 50);
     }
+
+    // Ensure session is cleared when user refreshes the parent site
+    window.addEventListener('beforeunload', () => {
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'LOGOUT_CHAT' }, '*');
+      }
+    });
   </script>
 </body>
 </html>

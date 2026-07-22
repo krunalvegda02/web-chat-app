@@ -174,16 +174,8 @@ export const frontendSecurity = {
     
     // Check required fields for platform users
     if (user.role === 'USER' && user.platformId) {
-      if (!user.email || !securityUtils.isValidEmail(user.email)) {
-        errors.push('Valid email is required');
-      }
-      
-      if (!user.phone || !securityUtils.isValidPhone(user.phone)) {
-        errors.push('Valid phone number is required');
-      }
-      
       if (!user.name || user.name.length < 2) {
-        errors.push('Valid name is required');
+        errors.push('Valid name (username) is required');
       }
     }
     

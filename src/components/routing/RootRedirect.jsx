@@ -32,9 +32,9 @@ export default function RootRedirect() {
   const hasApiKey = urlParams.get('apiKey') || urlParams.get('key');
   const hasSessionToken = urlParams.get('sessionToken') || urlParams.get('st');
   const hasPlatformParam = urlParams.get('platform');
-  const hasUserData = urlParams.get('name') && urlParams.get('email') && urlParams.get('phone');
+  const hasUserData = !!urlParams.get('name'); // name only — email/phone not required
   const hasAutoLogin = urlParams.get('autoLogin') === 'true' || urlParams.get('auto') === 'true';
-  
+
   // If platform parameters exist, let platform detection handle it
   const isPlatformRequest = hasApiKey || hasSessionToken || hasPlatformParam || (hasUserData && hasAutoLogin);
   
@@ -47,16 +47,19 @@ export default function RootRedirect() {
     isPlatformRequest
   });
   
-  // If user is authenticated, redirect based on role (even if it's a platform request)
+  // If user is authenticated, redirect based on role
+  // IMPORTANT: Preserve query string so usePlatformDetection can detect a user switch
   if (user && token) {
     console.log('👤 [RootRedirect] User authenticated, redirecting based on role:', user.role);
+    const search = window.location.search;
     switch (user.role) {
       case 'SUPER_ADMIN':
         return <Navigate to="/super-admin/admins" replace />;
       case 'PLATFORM_ADMIN':
         return <Navigate to="/admin" replace />;
       case 'USER':
-        return <Navigate to="/user/chats" replace />;
+        // Pass query string through so usePlatformDetection can handle user switching
+        return <Navigate to={`/user/chats${search}`} replace />;
       default:
         console.log('❓ [RootRedirect] Unknown role, redirecting to login');
         return <Navigate to={`/login${window.location.search}`} replace />;

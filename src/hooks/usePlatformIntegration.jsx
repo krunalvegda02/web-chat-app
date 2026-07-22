@@ -72,22 +72,10 @@ export const usePlatformIntegration = (apiKey = null) => {
       return { success: false, error: 'Valid API key is required' };
     }
 
-    // Validate required fields
-    if (!userData.email || !userData.phone) {
-      setError('Email and phone are required');
-      return { success: false, error: 'Email and phone are required' };
-    }
-
-    // Validate email format
-    if (!securityUtils.isValidEmail(userData.email)) {
-      setError('Invalid email format');
-      return { success: false, error: 'Invalid email format' };
-    }
-
-    // Validate phone format
-    if (!securityUtils.isValidPhone(userData.phone)) {
-      setError('Invalid phone format');
-      return { success: false, error: 'Invalid phone format' };
+    // Validate required fields - only name (username) is required
+    if (!userData.name) {
+      setError('Name (username) is required');
+      return { success: false, error: 'Name (username) is required' };
     }
 
     setLoading(true);
@@ -96,10 +84,7 @@ export const usePlatformIntegration = (apiKey = null) => {
     try {
       // Sanitize input data
       const sanitizedData = {
-        name: userData.name ? securityUtils.sanitizeInput(userData.name) : undefined,
-        email: securityUtils.sanitizeInput(userData.email),
-        phone: securityUtils.sanitizeInput(userData.phone),
-        password: userData.password,
+        name: securityUtils.sanitizeInput(userData.name),
         externalUserId: userData.externalUserId ? securityUtils.sanitizeInput(userData.externalUserId) : undefined
       };
 
@@ -330,24 +315,14 @@ export const usePlatformIntegration = (apiKey = null) => {
     }
   }, [apiKey, isValidApiKey]);
 
-  // Validate user data format
+  // Validate user data format \u2014 only name required
   const validateUserData = useCallback((userData) => {
     const errors = [];
 
-    if (!userData.email) {
-      errors.push('Email is required');
-    } else if (!securityUtils.isValidEmail(userData.email)) {
-      errors.push('Invalid email format');
-    }
-
-    if (!userData.phone) {
-      errors.push('Phone is required');
-    } else if (!securityUtils.isValidPhone(userData.phone)) {
-      errors.push('Invalid phone format');
-    }
-
-    if (userData.name && userData.name.length < 2) {
-      errors.push('Name must be at least 2 characters');
+    if (!userData.name || userData.name.trim().length < 2) {
+      errors.push('Name (username) must be at least 2 characters');
+    } else if (/\s/.test(userData.name)) {
+      errors.push('Username cannot contain spaces');
     }
 
     return {
